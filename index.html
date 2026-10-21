@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Step 3 Block Pacer</title>
+<meta name="description" content="37:30 countdown for 20-question UWorld blocks with checkpoint targets, ahead/behind verdicts, flag-at-50 mode and the 2:00 fill-every-blank alert.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F5F8">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E141B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pacer">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Martian+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one column on phones and in split view; two columns (clock left, controls right) on the
+   iPad Pro 13" and the Fold's open inner screen. Scratch-paper checkpoint rail on top, clock as hero. */
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --fg:#13202C; --muted:#5A6A7B; --line:#D3DAE4;
+  --accent:#2458D6; --on-accent:#FFFFFF;
+  --good:#167A4E; --good-bg:#E0F2E9; --on-good:#FFFFFF;
+  --warn:#9A6400; --warn-bg:#FBEFCF; --on-warn:#FFFFFF;
+  --crit:#B8262F; --crit-bg:#FBE1E2; --on-crit:#FFFFFF;
+  --font-ui:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --font-num:"Martian Mono","SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E141B; --surface:#161E27; --fg:#E6ECF3; --muted:#92A2B4; --line:#2A3542;
+    --accent:#7EA2FF; --on-accent:#0B1220;
+    --good:#4FCF8E; --good-bg:#12302A; --on-good:#06201A;
+    --warn:#F2B13F; --warn-bg:#352A12; --on-warn:#221800;
+    --crit:#FF6B70; --crit-bg:#3A1A1E; --on-crit:#2A0608;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E141B; --surface:#161E27; --fg:#E6ECF3; --muted:#92A2B4; --line:#2A3542;
+  --accent:#7EA2FF; --on-accent:#0B1220;
+  --good:#4FCF8E; --good-bg:#12302A; --on-good:#06201A;
+  --warn:#F2B13F; --warn-bg:#352A12; --on-warn:#221800;
+  --crit:#FF6B70; --crit-bg:#3A1A1E; --on-crit:#2A0608;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:16px;line-height:1.4;-webkit-text-size-adjust:100%;overscroll-behavior:none;touch-action:manipulation}
+[hidden]{display:none!important}
+.wrap{max-width:600px;margin-inline:auto;display:grid;gap:14px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:calc(14px + env(safe-area-inset-top,0px));padding-bottom:calc(36px + env(safe-area-inset-bottom,0px))}
+.colL,.colR{display:contents}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:6px 14px;flex-wrap:wrap}
+h1{font-size:17px;margin:0;font-weight:700}
+.tag{margin:0;color:var(--muted);font-size:14px}
+
+/* Checkpoint rail — the scratch-paper line */
+.rail{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px}
+.rail li{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 6px 7px;display:grid;gap:2px;min-width:0;text-align:center}
+.rail .cq{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.rail .ct{font-family:var(--font-num);font-weight:700;font-size:18px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rail .cd{font-family:var(--font-num);font-size:12px;min-height:1.3em;font-variant-numeric:tabular-nums}
+.rail li.current{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.rail li.ahead{border-color:var(--good)} .rail li.ahead .cd{color:var(--good)}
+.rail li.behind{border-color:var(--warn)} .rail li.behind .cd{color:var(--warn)}
+
+/* Clock card */
+.clockcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;display:grid;gap:12px;justify-items:center;text-align:center;container-type:inline-size;user-select:none;-webkit-user-select:none}
+.banner{width:100%;border-radius:10px;padding:10px 12px;background:var(--crit);color:var(--on-crit);font-weight:700;font-size:16px;line-height:1.3;text-wrap:balance}
+@media (prefers-reduced-motion: no-preference){
+  .banner{animation:pulse 1.2s ease-in-out infinite alternate}
+  @keyframes pulse{from{opacity:1}to{opacity:.72}}
+}
+.clock{font-family:var(--font-num);font-weight:700;font-size:clamp(48px,21cqi,150px);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin-top:4px;white-space:nowrap}
+.clockcard[data-tone="warn"] .clock{color:var(--warn)}
+.clockcard[data-tone="crit"] .clock{color:var(--crit)}
+.clockcard[data-tone="paused"] .clock{color:var(--muted)}
+.barwrap{width:100%;display:grid;gap:5px;padding-top:10px}
+.bar{position:relative;width:100%;height:10px;border-radius:5px;background:var(--line)}
+.fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:5px;background:var(--accent)}
+.tick{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--muted);transform:translateX(-1px)}
+.qmark{position:absolute;top:-10px;left:0;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid var(--fg);transform:translateX(-7px)}
+.barcap{font-size:12px;color:var(--muted);text-align:left}
+.mode{display:grid;gap:5px;justify-items:center}
+.pill{display:inline-block;padding:4px 11px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--line);color:var(--fg)}
+.pill[data-kind="first"]{background:var(--accent);color:var(--on-accent)}
+.pill[data-kind="flag50"]{background:var(--warn);color:var(--on-warn)}
+.pill[data-kind="review"]{background:var(--good);color:var(--on-good)}
+.pill[data-kind="done"]{background:var(--fg);color:var(--bg)}
+.modeText{font-size:15px;color:var(--muted);text-wrap:balance;max-width:42ch;margin:0}
+.verdict{width:100%;border-radius:10px;padding:10px 12px;font-weight:700;font-size:15px;line-height:1.3;text-wrap:balance}
+.verdict.ahead{background:var(--good-bg);color:var(--good)}
+.verdict.behind{background:var(--warn-bg);color:var(--warn)}
+
+/* Question row + actions */
+.qcard{display:grid;gap:12px}
+.qrow{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.qnum{display:flex;align-items:baseline;gap:8px;flex:0 0 auto}
+.qlabel{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.qbig{font-family:var(--font-num);font-weight:700;font-size:40px;line-height:1;font-variant-numeric:tabular-nums}
+.qof{font-family:var(--font-num);color:var(--muted);font-size:15px}
+.qcue{flex:1 1 auto;min-width:0;font-size:14px;color:var(--muted);line-height:1.3}
+.qcue.over{color:var(--crit);font-weight:700}
+.qtimer{position:relative;width:62px;height:62px;flex:0 0 auto}
+.qtimer svg{width:100%;height:100%;transform:rotate(-90deg)}
+.qtimer .track{fill:none;stroke:var(--line);stroke-width:6}
+.qtimer .arc{fill:none;stroke:var(--accent);stroke-width:6;stroke-linecap:round;stroke-dasharray:163.36;stroke-dashoffset:163.36}
+.qtimer .qsec{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--font-num);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
+.qtimer[data-over="1"] .arc{stroke:var(--crit)} .qtimer[data-over="1"] .qsec{color:var(--crit)}
+.qtimer[data-over="0"].near .arc{stroke:var(--warn)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{font:inherit;cursor:pointer;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:12px 10px;font-weight:700;font-size:15px;min-height:48px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+button.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent);min-height:76px;font-size:20px}
+button.secondary{border-color:var(--warn);color:var(--warn);min-height:76px;font-size:18px}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.subactions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.subactions button{min-height:46px;font-size:14px;padding:10px 6px;white-space:nowrap}
+.subactions button.go{border-color:var(--fg)}
+.subactions button.armed{border-color:var(--crit);color:var(--crit)}
+
+/* Folds */
+details.fold{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:0 14px}
+details.fold summary{cursor:pointer;padding:12px 0;font-weight:700;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px}
+details.fold summary::-webkit-details-marker{display:none}
+details.fold summary::after{content:"+";font-family:var(--font-num);color:var(--muted);font-size:18px;line-height:1}
+details.fold[open] summary::after{content:"−"}
+.body{padding:0 0 14px;display:grid;gap:12px}
+.scratch{margin:0;padding:10px 12px;border:1px dashed var(--line);border-radius:8px;font-family:var(--font-num);font-size:14px;font-variant-numeric:tabular-nums;overflow-x:auto;white-space:nowrap;background:var(--bg)}
+.rules{margin:0;padding-left:20px;display:grid;gap:7px;font-size:15px}
+.rules li::marker{color:var(--muted)}
+kbd{font-family:var(--font-num);font-size:12px;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--muted);background:var(--bg)}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:700;min-width:0}
+.form input[type=text],.form input[type=number],.form select{font:inherit;font-family:var(--font-num);font-size:15px;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%;min-width:0}
+.form select{font-family:var(--font-ui)}
+.form input:focus-visible,.form select:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.form .wide{grid-column:1/-1}
+.check{display:flex;align-items:center;gap:8px;font-weight:400;color:var(--fg);font-size:15px}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.presets{display:flex;gap:8px;flex-wrap:wrap}
+.presets button{min-height:38px;font-size:13px;padding:8px 10px;font-weight:700;border-radius:999px}
+.formrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.formrow button{min-height:42px;padding:9px 14px}
+.note{font-size:13px;color:var(--muted);margin:0}
+fieldset{border:0;padding:0;margin:0;min-width:0;display:grid;gap:12px}
+fieldset:disabled{opacity:.6}
+
+/* Summary */
+.summary{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px}
+.summary h2{margin:0;font-size:16px}
+.summary table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.summary th,.summary td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+.summary th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.summary td.n,.summary th.n{text-align:right;font-family:var(--font-num)}
+.summary td.ahead{color:var(--good)} .summary td.behind{color:var(--warn)}
+.stats{margin:0;padding-left:18px;display:grid;gap:4px;font-size:15px}
+.stats b{font-family:var(--font-num)}
+.summary button{justify-self:start;min-height:42px;padding:9px 14px}
+
+/* Wide screens: iPad Pro 13" (any orientation) and the Fold 7 opened. Split view stays one column. */
+@media (min-width:820px) and (min-height:520px){
+  .wrap{max-width:1200px;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);column-gap:22px;align-items:start}
+  .top{grid-column:1/-1}
+  .colL,.colR{display:grid;gap:14px;min-width:0}
+  .clockcard{padding:22px 20px 18px}
+  .rail li{padding:10px 8px 9px}
+  .qbig{font-size:52px}
+  .qtimer{width:72px;height:72px}
+  button.primary,button.secondary{min-height:96px}
+  .subactions button{min-height:52px;font-size:15px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Step 3 Block Pacer</h1>
+    <p class="tag" id="tagline">20 Q in 37:30 — by checkpoint, not per question</p>
+  </header>
+
+  <div class="colL">
+    <ol class="rail" id="rail" aria-label="Checkpoint targets"></ol>
+
+    <section class="clockcard" id="clockcard" data-tone="normal" aria-live="polite">
+      <div class="banner" id="banner" hidden></div>
+      <div class="clock" id="clock">37:30</div>
+      <div class="barwrap">
+        <div class="bar" aria-hidden="true">
+          <div class="fill" id="fill"></div>
+          <div id="ticks"></div>
+          <div class="qmark" id="qmark"></div>
+        </div>
+        <div class="barcap">▼ questions done · ■ time used. Marker right of the bar = ahead.</div>
+      </div>
+      <div class="mode">
+        <span class="pill" id="pill" data-kind="idle">Ready</span>
+        <p class="modeText" id="modeText">Press Start here the moment you press Start in UWorld.</p>
+      </div>
+      <div class="verdict" id="verdict" hidden></div>
+    </section>
+  </div>
+
+  <div class="colR">
+    <section class="qcard">
+      <div class="qrow">
+        <div class="qnum">
+          <span class="qlabel">Q</span>
+          <span class="qbig" id="qnum">1</span>
+          <span class="qof" id="qof">/ 20</span>
+        </div>
+        <div class="qcue" id="qcue">Easy ones first. Tap when you submit each question.</div>
+        <div class="qtimer" id="qtimer" data-over="0" aria-label="Seconds on this question">
+          <svg viewBox="0 0 60 60" aria-hidden="true"><circle class="track" cx="30" cy="30" r="26"/><circle class="arc" id="arc" cx="30" cy="30" r="26"/></svg>
+          <span class="qsec" id="qsec">0</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="btnDone" type="button" disabled>Q1 answered</button>
+        <button class="secondary" id="btnFlag" type="button" disabled>Q1 flagged</button>
+      </div>
+      <div class="subactions">
+        <button class="go" id="btnStart" type="button">Start</button>
+        <button id="btnUndo" type="button" disabled>Undo</button>
+        <button id="btnReset" type="button" disabled>Reset</button>
+        <button id="btnSound" type="button" aria-pressed="true">Sound on</button>
+      </div>
+    </section>
+
+    <section class="summary" id="summary" hidden>
+      <h2>Block summary</h2>
+      <table>
+        <thead><tr><th>Checkpoint</th><th class="n">Target</th><th class="n">Clock</th><th class="n">±</th></tr></thead>
+        <tbody id="sumRows"></tbody>
+      </table>
+      <ul class="stats" id="stats"></ul>
+      <button id="btnCopy" type="button">Copy summary</button>
+    </section>
+
+    <details class="fold" id="rulesFold" open>
+      <summary>Rules for this block</summary>
+      <div class="body">
+        <p class="note">Write this line on top of your scratch paper before you press Start:</p>
+        <p class="scratch" id="scratch"></p>
+        <ol class="rules">
+          <li>At each checkpoint the clock must read <b>at least</b> the target. Behind (clock lower than the number) → the next 5 are <b>flag-at-50</b> questions: last line, stem once, best answer, flag, move.</li>
+          <li>Ahead → the extra goes to flagged questions after Q20.</li>
+          <li>First pass = easy ones. At 50 s with no big picture: flag, best guess, move.</li>
+          <li>Mixed blocks and the real exam: skip biostats and drug ads on pass 1.</li>
+          <li><b>2:00 left</b> → fill every blank with a guess. Never leave a blank.</li>
+        </ol>
+        <p class="note">Keep this app visible beside UWorld (split screen) so the chimes can fire; a hidden app is paused by the phone. Keys when a keyboard is attached: <kbd>Space</kbd> answered · <kbd>F</kbd> flagged · <kbd>P</kbd> pause/resume · <kbd>Z</kbd> undo.</p>
+      </div>
+    </details>
+
+    <details class="fold" id="settingsFold">
+      <summary>Settings</summary>
+      <div class="body">
+        <fieldset id="settingsFs">
+          <div class="presets" aria-label="Presets">
+            <button type="button" data-preset="1.25">1.25× · 37:30</button>
+            <button type="button" data-preset="1.5">1.5× · 45:00</button>
+            <button type="button" data-preset="1">1× · 30:00</button>
+          </div>
+          <div class="form">
+            <label>Block time (mm:ss)<input type="text" id="fBlock" inputmode="numeric" value="37:30"></label>
+            <label>Questions per block<input type="number" id="fN" min="1" max="60" value="20"></label>
+            <label>Checkpoint every<input type="number" id="fEvery" min="1" max="60" value="5"></label>
+            <label>Flag-at (seconds)<input type="number" id="fFlag" min="10" max="300" value="50"></label>
+            <label class="wide">Checkpoint targets, clock should read at least (mm:ss, one per checkpoint)<input type="text" id="fTargets" value="28:00, 18:45, 9:20, 0:00"></label>
+            <label>Fill-every-blank warning (mm:ss)<input type="text" id="fFill" inputmode="numeric" value="2:00"></label>
+            <label>Theme<select id="fTheme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+            <label class="check wide"><input type="checkbox" id="fChime"> Chime at 50 s on every question (not only when behind)</label>
+          </div>
+          <div class="formrow">
+            <button type="button" id="btnApply">Save settings</button>
+            <button type="button" id="btnRecalc">Recalculate targets evenly</button>
+            <span class="note" id="settingsMsg"></span>
+          </div>
+        </fieldset>
+        <p class="note" id="settingsLock" hidden>Settings unlock when the block is reset or finished.</p>
+        <p class="note" id="installNote" hidden>To install: iPad Safari → Share → Add to Home Screen. Galaxy Fold → browser menu → Install app / Add to Home screen.</p>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+(() => {
+/* pure:start */
+const DEFAULTS = { blockSec: 2250, nQ: 20, every: 5, targets: [1680, 1125, 560, 0], flagSec: 50, fillSec: 120, sound: true, chimeEvery: false, theme: "system" };
+const PRESET_TARGETS = { "1.25": [1680, 1125, 560, 0] };
+
+function fmt(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return m + ":" + String(s).padStart(2, "0");
+}
+function fmtDelta(sec) { return (sec < 0 ? "−" : "+") + fmt(Math.abs(sec)); }
+function parseMS(str) {
+  const m = String(str).trim().match(/^(\d{1,3})(?::([0-5]?\d))?$/);
+  if (!m) return null;
+  return (+m[1]) * 60 + (m[2] ? +m[2] : 0);
+}
+function checkpointQs(nQ, every) {
+  const qs = [];
+  for (let q = every; q < nQ; q += every) qs.push(q);
+  qs.push(nQ);
+  return qs;
+}
+function evenTargets(blockSec, nQ, every) {
+  return checkpointQs(nQ, every).map(q => Math.floor((blockSec * (1 - q / nQ)) / 5) * 5);
+}
+function verdictFor(q, nQ, rem, target, nextQ, flagSec, flagged) {
+  const delta = rem - target;
+  if (q >= nQ) {
+    return { delta, kind: delta < 0 ? "behind" : "ahead",
+      text: "Q" + q + " done at " + fmt(rem) + " — " + flagged + " flagged. Review time starts now." };
+  }
+  if (delta < 0) {
+    return { delta, kind: "behind",
+      text: "Q" + q + " at " + fmt(rem) + " — behind by " + fmt(-delta) + ". Q" + (q + 1) + "–" + nextQ + ": flag at " + flagSec + "." };
+  }
+  return { delta, kind: "ahead",
+    text: "Q" + q + " at " + fmt(rem) + " — ahead by " + fmt(delta) + ". Banked for flagged review." };
+}
+/* pure:end */
+
+const $ = id => document.getElementById(id);
+const LS_S = "step3pacer.settings.v1", LS_R = "step3pacer.run.v1";
+let S = Object.assign({}, DEFAULTS);
+let R = freshRun();
+let resetArmed = 0;
+
+function freshRun() {
+  return { phase: "idle", startAt: 0, pausedAt: 0, pausedTotal: 0, q: 1, qStartEl: 0, taps: [], cps: {},
+    mode: "first", flagged: 0, reviewLeft: 0, fillFired: false, chimed: false, endEl: 0, verdict: null };
+}
+function qs() { return checkpointQs(S.nQ, S.every); }
+
+/* ---------- storage ---------- */
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(LS_S);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p);
+      if (!Array.isArray(S.targets) || S.targets.length !== qs().length) S.targets = evenTargets(S.blockSec, S.nQ, S.every);
+    }
+  } catch (e) {}
+}
+function saveSettings() { try { localStorage.setItem(LS_S, JSON.stringify(S)); } catch (e) {} }
+function persistRun() { try { localStorage.setItem(LS_R, JSON.stringify(R)); } catch (e) {} }
+function loadRun() {
+  try {
+    const raw = localStorage.getItem(LS_R);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (!p || (p.phase !== "running" && p.phase !== "paused")) return;
+    if (Date.now() - p.startAt > 6 * 3600 * 1000) return;
+    R = Object.assign(freshRun(), p);
+  } catch (e) {}
+}
+function applyTheme() {
+  const root = document.documentElement;
+  if (S.theme === "light" || S.theme === "dark") root.setAttribute("data-theme", S.theme);
+  else root.removeAttribute("data-theme");
+}
+
+/* ---------- time ---------- */
+function elapsedMs(now) {
+  now = now || Date.now();
+  if (R.phase === "idle") return 0;
+  if (R.phase === "done") return R.endEl;
+  const ref = R.phase === "paused" ? R.pausedAt : now;
+  return Math.max(0, ref - R.startAt - R.pausedTotal);
+}
+
+/* ---------- audio / haptics / wake lock ---------- */
+let actx = null;
+function audioInit() {
+  try {
+    if (!actx) { const C = window.AudioContext || window.webkitAudioContext; if (C) actx = new C(); }
+    if (actx && actx.state === "suspended") actx.resume();
+  } catch (e) {}
+}
+function tone(f, dur, at, type, g) {
+  if (!S.sound || !actx) return;
+  try {
+    const o = actx.createOscillator(), gn = actx.createGain();
+    o.type = type || "triangle"; o.frequency.value = f;
+    const t0 = actx.currentTime + (at || 0);
+    gn.gain.setValueAtTime(0.0001, t0);
+    gn.gain.exponentialRampToValueAtTime(g || 0.12, t0 + 0.012);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(gn).connect(actx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.03);
+  } catch (e) {}
+}
+function sfx(kind) {
+  audioInit();
+  switch (kind) {
+    case "start": tone(523, .09); break;
+    case "ahead": tone(587, .1); tone(880, .16, .12); break;
+    case "behind": tone(330, .14); tone(330, .14, .18); tone(247, .28, .36); break;
+    case "flag": tone(440, .07); tone(440, .07, .12); break;
+    case "fill": tone(880, .1); tone(880, .1, .15); tone(880, .1, .3); tone(1175, .35, .5); break;
+    case "end": tone(523, .5); tone(392, .6, .3); break;
+  }
+}
+function vibrate(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+let wake = null;
+async function keepAwake() {
+  try { if (navigator.wakeLock && !wake) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; }); } } catch (e) { wake = null; }
+}
+function releaseWake() { try { if (wake) wake.release(); } catch (e) {} wake = null; }
+
+/* ---------- actions ---------- */
+function startPause() {
+  if (R.phase === "idle") {
+    R = freshRun(); R.phase = "running"; R.startAt = Date.now();
+    audioInit(); sfx("start"); keepAwake();
+    $("rulesFold").open = false;
+  } else if (R.phase === "paused") {
+    R.pausedTotal += Date.now() - R.pausedAt; R.pausedAt = 0; R.phase = "running"; keepAwake();
+  } else if (R.phase === "running") {
+    R.phase = "paused"; R.pausedAt = Date.now();
+  } else if (R.phase === "done") {
+    R = freshRun();
+  }
+  persistRun(); render();
+}
+function tap(flagged) {
+  if (R.phase !== "running") return;
+  const now = Date.now(), el = elapsedMs(now), rem = S.blockSec - el / 1000;
+  if (R.mode === "review") {
+    if (R.reviewLeft > 0) R.reviewLeft--;
+    persistRun(); render(); return;
+  }
+  const q = R.q;
+  R.taps.push({ q: q, el: el, rem: rem, flagged: !!flagged });
+  if (flagged) R.flagged++;
+  const list = qs(), idx = list.indexOf(q);
+  if (idx >= 0) {
+    const target = S.targets[idx] || 0;
+    const nextQ = list[idx + 1] || S.nQ;
+    const v = verdictFor(q, S.nQ, rem, target, nextQ, S.flagSec, R.flagged);
+    R.cps[q] = { rem: rem, delta: v.delta };
+    R.verdict = { kind: v.kind, text: v.text, until: now + 10000 };
+    if (q >= S.nQ) { R.mode = "review"; R.reviewLeft = R.flagged; sfx(rem > 0 ? "ahead" : "behind"); }
+    else { R.mode = v.delta < 0 ? "flag50" : "first"; sfx(v.kind); vibrate(v.kind === "behind" ? [150, 80, 150, 80, 150] : [80]); }
+  }
+  R.chimed = false;
+  if (q < S.nQ) { R.q = q + 1; R.qStartEl = el; } else { R.q = S.nQ + 1; }
+  persistRun(); render();
+}
+function undo() {
+  if (R.phase === "idle" || R.phase === "done") return;
+  if (R.mode === "review" && R.reviewLeft < R.flagged) { R.reviewLeft++; persistRun(); render(); return; }
+  if (!R.taps.length) return;
+  const t = R.taps.pop();
+  if (t.flagged) R.flagged = Math.max(0, R.flagged - 1);
+  delete R.cps[t.q];
+  R.q = t.q;
+  R.qStartEl = R.taps.length ? R.taps[R.taps.length - 1].el : 0;
+  let mode = "first";
+  for (const cq of qs()) if (cq < t.q && R.cps[cq]) mode = R.cps[cq].delta < 0 ? "flag50" : "first";
+  R.mode = mode; R.reviewLeft = 0; R.verdict = null; R.chimed = false;
+  persistRun(); render();
+}
+function endBlock() {
+  if (R.phase === "idle" || R.phase === "done") return;
+  R.endEl = elapsedMs(); R.phase = "done"; R.verdict = null;
+  sfx("end"); releaseWake(); persistRun(); render();
+}
+function reset() {
+  if (resetArmed && Date.now() - resetArmed < 3500) {
+    resetArmed = 0; R = freshRun(); releaseWake(); persistRun(); render(); return;
+  }
+  resetArmed = Date.now(); render();
+  setTimeout(() => { if (resetArmed && Date.now() - resetArmed >= 3500) { resetArmed = 0; render(); } }, 3600);
+}
+
+/* ---------- tick ---------- */
+function tick() {
+  if (R.phase === "running") {
+    const now = Date.now(), el = elapsedMs(now), rem = S.blockSec - el / 1000;
+    if (!R.fillFired && rem <= S.fillSec) { R.fillFired = true; sfx("fill"); vibrate([200, 100, 200, 100, 450]); persistRun(); }
+    if (R.mode !== "review" && !R.chimed && (el - R.qStartEl) / 1000 >= S.flagSec) {
+      R.chimed = true;
+      if (R.mode === "flag50" || S.chimeEvery) { sfx("flag"); vibrate([120, 60, 120]); }
+      persistRun();
+    }
+    if (rem <= 0) { R.phase = "done"; R.endEl = S.blockSec * 1000; R.verdict = null; sfx("end"); vibrate([600]); releaseWake(); persistRun(); }
+  }
+  render();
+}
+
+/* ---------- render ---------- */
+function buildRail() {
+  const list = qs(), rail = $("rail"), ticks = $("ticks");
+  rail.innerHTML = ""; ticks.innerHTML = "";
+  list.forEach((q, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = '<span class="cq">Q' + q + '</span><span class="ct">→ ' + fmt(S.targets[i] || 0) + '</span><span class="cd"></span>';
+    rail.appendChild(li);
+    const t = document.createElement("i"); t.className = "tick";
+    t.style.left = ((1 - (S.targets[i] || 0) / S.blockSec) * 100) + "%";
+    ticks.appendChild(t);
+  });
+  $("tagline").textContent = S.nQ + " Q in " + fmt(S.blockSec) + " — by checkpoint, not per question";
+  $("scratch").textContent = list.map((q, i) => "Q" + q + " → " + fmt(S.targets[i] || 0)).join("    ");
+  $("qof").textContent = "/ " + S.nQ;
+  $("fBlock").value = fmt(S.blockSec); $("fN").value = S.nQ; $("fEvery").value = S.every;
+  $("fFlag").value = S.flagSec; $("fFill").value = fmt(S.fillSec);
+  $("fTargets").value = S.targets.map(fmt).join(", ");
+  $("fChime").checked = !!S.chimeEvery;
+  $("fTheme").value = S.theme || "system";
+  $("btnSound").textContent = S.sound ? "Sound on" : "Sound off";
+  $("btnSound").setAttribute("aria-pressed", S.sound ? "true" : "false");
+  applyTheme();
+}
+function segmentOf(q) {
+  const list = qs();
+  const end = list.find(c => c >= q) || S.nQ;
+  const i = list.indexOf(end);
+  const start = i > 0 ? list[i - 1] + 1 : 1;
+  return [start, end];
+}
+function render() {
+  const now = Date.now(), el = elapsedMs(now), rem = Math.max(0, S.blockSec - el / 1000);
+  const running = R.phase === "running", live = running || R.phase === "paused";
+  const inReview = R.mode === "review";
+
+  $("clock").textContent = fmt(R.phase === "idle" ? S.blockSec : Math.ceil(rem));
+  const card = $("clockcard");
+  card.dataset.tone = R.phase === "paused" ? "paused" : (live && rem <= S.fillSec) ? "crit" : (live && R.mode === "flag50") ? "warn" : "normal";
+  $("fill").style.width = Math.min(100, (el / 1000) / S.blockSec * 100) + "%";
+  const doneQ = inReview ? S.nQ : Math.max(0, R.q - 1);
+  $("qmark").style.left = (doneQ / S.nQ * 100) + "%";
+
+  const banner = $("banner");
+  if (live && R.fillFired && rem > 0) {
+    banner.hidden = false;
+    banner.textContent = fmt(S.fillSec) + " left — fill every blank with a guess. Never leave a blank.";
+  } else banner.hidden = true;
+
+  const pill = $("pill"), mt = $("modeText");
+  if (R.phase === "idle") {
+    pill.dataset.kind = "idle"; pill.textContent = "Ready";
+    mt.textContent = "Press Start here the moment you press Start in UWorld.";
+  } else if (R.phase === "done") {
+    pill.dataset.kind = "done"; pill.textContent = "Time";
+    mt.textContent = R.taps.length >= S.nQ ? "Block over. Summary below." : "Block over with " + (S.nQ - R.taps.length) + " not tapped. Summary below.";
+  } else if (R.phase === "paused") {
+    pill.dataset.kind = "idle"; pill.textContent = "Paused";
+    mt.textContent = "UWorld's clock does not pause. Resume as soon as you are back.";
+  } else if (inReview) {
+    pill.dataset.kind = "review"; pill.textContent = "Review flagged";
+    mt.textContent = R.reviewLeft > 0
+      ? fmt(rem) + " for " + R.reviewLeft + " flagged — about " + fmt(rem / R.reviewLeft) + " each."
+      : "No flags left. Check every question has an answer.";
+  } else {
+    const seg = segmentOf(R.q);
+    const range = "Q" + seg[0] + "–" + seg[1];
+    if (R.mode === "flag50") {
+      pill.dataset.kind = "flag50"; pill.textContent = "Flag at " + S.flagSec + " · " + range;
+      mt.textContent = "Last line → stem once → best answer → flag → move.";
+    } else {
+      pill.dataset.kind = "first"; pill.textContent = "First pass · " + range;
+      mt.textContent = "Easy ones first. At " + S.flagSec + " s with no big picture: flag, best guess, move.";
+    }
+  }
+
+  const v = $("verdict");
+  if (R.verdict && now < R.verdict.until && R.phase !== "done") {
+    v.hidden = false; v.className = "verdict " + R.verdict.kind; v.textContent = R.verdict.text;
+  } else v.hidden = true;
+
+  const list = qs(), nextCp = list.find(c => c >= R.q);
+  Array.from($("rail").children).forEach((li, i) => {
+    const q = list[i], cp = R.cps[q], cd = li.querySelector(".cd");
+    li.classList.remove("current", "ahead", "behind");
+    if (cp) { li.classList.add(cp.delta < 0 ? "behind" : "ahead"); cd.textContent = fmtDelta(cp.delta); }
+    else { cd.textContent = ""; if (live && !inReview && q === nextCp) li.classList.add("current"); }
+  });
+
+  const qnum = $("qnum"), qcue = $("qcue"), qt = $("qtimer"), qsec = $("qsec"), arc = $("arc");
+  const C = 163.36;
+  if (inReview || R.phase === "done") {
+    qnum.textContent = inReview && R.phase !== "done" ? "✓" : String(Math.min(S.nQ, R.taps.length));
+    arc.style.strokeDashoffset = C; qsec.textContent = "—"; qt.dataset.over = "0"; qt.classList.remove("near");
+    qcue.className = "qcue";
+    qcue.textContent = R.phase === "done" ? "Block finished." : "Each tap = one flagged question resolved.";
+  } else {
+    qnum.textContent = String(R.q);
+    const qEl = live ? Math.max(0, (el - R.qStartEl) / 1000) : 0;
+    const frac = Math.min(1, qEl / S.flagSec);
+    arc.style.strokeDashoffset = C * (1 - frac);
+    qsec.textContent = qEl < 100 ? String(Math.floor(qEl)) : fmt(qEl);
+    const over = qEl >= S.flagSec;
+    qt.dataset.over = over ? "1" : "0";
+    qt.classList.toggle("near", !over && qEl >= S.flagSec * 0.7);
+    qcue.className = "qcue" + (over ? " over" : "");
+    if (!live) qcue.textContent = "Easy ones first. Tap when you submit each question.";
+    else if (over) qcue.textContent = R.mode === "flag50" ? S.flagSec + " s — flag, best answer, move." : S.flagSec + " s. No big picture? Flag, best guess, move.";
+    else qcue.textContent = R.mode === "flag50" ? "Skim mode. Flag at " + S.flagSec + " s, no exceptions." : "Tap when you submit this question.";
+  }
+
+  const bd = $("btnDone"), bf = $("btnFlag");
+  bd.disabled = !running; bf.disabled = !running;
+  if (inReview) { bd.textContent = "Flagged Q resolved"; bf.textContent = "End block"; }
+  else { bd.textContent = "Q" + Math.min(R.q, S.nQ) + " answered"; bf.textContent = "Q" + Math.min(R.q, S.nQ) + " flagged"; }
+
+  const bs = $("btnStart");
+  bs.textContent = R.phase === "idle" ? "Start" : R.phase === "running" ? "Pause" : R.phase === "paused" ? "Resume" : "New block";
+  $("btnUndo").disabled = !live || (!R.taps.length && !(inReview && R.reviewLeft < R.flagged));
+  const br = $("btnReset");
+  br.disabled = R.phase === "idle";
+  br.textContent = resetArmed ? "Sure?" : "Reset";
+  br.classList.toggle("armed", !!resetArmed);
+
+  $("settingsFs").disabled = live; $("settingsLock").hidden = !live;
+  renderSummary();
+}
+function renderSummary() {
+  const sum = $("summary");
+  if (R.phase !== "done") { sum.hidden = true; return; }
+  sum.hidden = false;
+  const list = qs();
+  $("sumRows").innerHTML = list.map((q, i) => {
+    const cp = R.cps[q];
+    return "<tr><td>Q" + q + "</td><td class=\"n\">" + fmt(S.targets[i] || 0) + "</td><td class=\"n\">" + (cp ? fmt(cp.rem) : "—") + "</td><td class=\"n " + (cp ? (cp.delta < 0 ? "behind" : "ahead") : "") + "\">" + (cp ? fmtDelta(cp.delta) : "—") + "</td></tr>";
+  }).join("");
+  const answered = R.taps.length;
+  const avg = answered ? (R.taps[answered - 1].el / 1000) / answered : 0;
+  const flagSegs = list.filter(q => q < S.nQ && R.cps[q] && R.cps[q].delta < 0).length;
+  const reviewSec = R.cps[S.nQ] ? Math.max(0, R.cps[S.nQ].rem) : 0;
+  $("stats").innerHTML =
+    "<li><b>" + answered + "</b> of " + S.nQ + " tapped on first pass</li>" +
+    "<li><b>" + R.flagged + "</b> flagged</li>" +
+    "<li><b>" + fmt(avg) + "</b> average per question</li>" +
+    "<li><b>" + flagSegs + "</b> segment" + (flagSegs === 1 ? "" : "s") + " in flag-at-" + S.flagSec + "</li>" +
+    "<li><b>" + fmt(reviewSec) + "</b> left at Q" + S.nQ + " for flagged review</li>";
+}
+function summaryText() {
+  const list = qs();
+  const lines = ["Step 3 block — " + S.nQ + " Q in " + fmt(S.blockSec)];
+  list.forEach((q, i) => { const cp = R.cps[q]; lines.push("Q" + q + " target " + fmt(S.targets[i] || 0) + " · clock " + (cp ? fmt(cp.rem) : "—") + " · " + (cp ? fmtDelta(cp.delta) : "—")); });
+  const answered = R.taps.length, avg = answered ? (R.taps[answered - 1].el / 1000) / answered : 0;
+  lines.push(answered + "/" + S.nQ + " tapped, " + R.flagged + " flagged, avg " + fmt(avg) + " per question");
+  return lines.join("\n");
+}
+
+/* ---------- settings ---------- */
+function settingsMsg(t) { $("settingsMsg").textContent = t; }
+function applySettings() {
+  const block = parseMS($("fBlock").value), nQ = parseInt($("fN").value, 10), every = parseInt($("fEvery").value, 10);
+  const flagSec = parseInt($("fFlag").value, 10), fill = parseMS($("fFill").value);
+  const raw = $("fTargets").value.split(/[,\s]+/).filter(Boolean).map(parseMS);
+  if (!block || block < 60 || !nQ || nQ < 1 || nQ > 60 || !every || every < 1 || every > nQ || !flagSec || flagSec < 10 || fill == null || fill >= block) {
+    settingsMsg("Check the values: times as mm:ss, counts as whole numbers."); return;
+  }
+  const list = checkpointQs(nQ, every);
+  let targets = raw.some(t => t == null) ? null : raw;
+  let msg = "Saved.";
+  if (!targets || targets.length !== list.length || targets.some(t => t > block)) {
+    targets = evenTargets(block, nQ, every); msg = "Saved. Targets recalculated for " + list.length + " checkpoints.";
+  }
+  S = Object.assign({}, S, { blockSec: block, nQ: nQ, every: every, targets: targets, flagSec: flagSec, fillSec: fill, chimeEvery: $("fChime").checked, theme: $("fTheme").value });
+  saveSettings(); buildRail(); render(); settingsMsg(msg);
+}
+function recalcTargets() {
+  const block = parseMS($("fBlock").value), nQ = parseInt($("fN").value, 10), every = parseInt($("fEvery").value, 10);
+  if (!block || !nQ || !every || every > nQ) { settingsMsg("Set block time, questions and checkpoint interval first."); return; }
+  $("fTargets").value = evenTargets(block, nQ, every).map(fmt).join(", ");
+  settingsMsg("Targets filled in. Press Save settings to use them.");
+}
+function applyPreset(mult) {
+  const base = 90 * 20;
+  const block = Math.round(base * parseFloat(mult));
+  $("fBlock").value = fmt(block); $("fN").value = 20; $("fEvery").value = 5;
+  const t = PRESET_TARGETS[mult] || evenTargets(block, 20, 5);
+  $("fTargets").value = t.map(fmt).join(", ");
+  applySettings();
+}
+
+/* ---------- wiring ---------- */
+function blurOnClick(btn) { btn.addEventListener("click", e => { if (e.detail > 0) e.currentTarget.blur(); }); }
+function init() {
+  buildRail();
+  $("btnDone").addEventListener("click", () => tap(false));
+  $("btnFlag").addEventListener("click", () => { if (R.mode === "review") endBlock(); else tap(true); });
+  $("btnStart").addEventListener("click", startPause);
+  $("btnUndo").addEventListener("click", undo);
+  $("btnReset").addEventListener("click", reset);
+  $("btnSound").addEventListener("click", () => { S.sound = !S.sound; saveSettings(); if (S.sound) { audioInit(); sfx("start"); } buildRail(); render(); });
+  $("btnApply").addEventListener("click", applySettings);
+  $("btnRecalc").addEventListener("click", recalcTargets);
+  $("fTheme").addEventListener("change", () => { S.theme = $("fTheme").value; saveSettings(); applyTheme(); });
+  document.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => applyPreset(b.dataset.preset)));
+  $("btnCopy").addEventListener("click", async e => {
+    const txt = summaryText(), b = e.currentTarget;
+    try { await navigator.clipboard.writeText(txt); b.textContent = "Copied"; }
+    catch (err) {
+      const ta = document.createElement("textarea"); ta.value = txt; ta.readOnly = true;
+      ta.style.cssText = "position:fixed;left:-9999px"; document.body.appendChild(ta); ta.select();
+      b.textContent = "Select and copy"; setTimeout(() => ta.remove(), 15000);
+    }
+    setTimeout(() => { b.textContent = "Copy summary"; }, 2500);
+  });
+  ["btnDone", "btnFlag", "btnStart", "btnUndo", "btnReset", "btnSound"].forEach(id => blurOnClick($(id)));
+  document.addEventListener("keydown", e => {
+    const t = e.target, tag = t && t.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || tag === "SUMMARY") return;
+    if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); tap(false); }
+    else if (e.key === "f" || e.key === "F") tap(true);
+    else if (e.key === "p" || e.key === "P") startPause();
+    else if (e.key === "z" || e.key === "Z") undo();
+  });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { if (R.phase === "running") keepAwake(); tick(); } });
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  $("installNote").hidden = standalone;
+  setInterval(tick, 250);
+  render();
+}
+loadSettings();
+loadRun();
+init();
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); });
+}
+})();
+</script>
+</body>
+</html>
