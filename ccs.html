@@ -62,6 +62,14 @@
 .missed span{border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--warn)}
 .missed span.ok{color:var(--good)}
 .scoreinput{font-size:22px!important}
+.revbox{display:grid;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--bg);container-type:inline-size}
+.revbox .revclock{font-family:var(--font-num);font-weight:700;font-size:clamp(40px,14cqi,88px);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;text-align:center}
+.revbox[data-tone="warn"] .revclock{color:var(--warn)}
+.revbox[data-tone="crit"] .revclock{color:var(--crit)}
+.revbox[data-tone="done"] .revclock{color:var(--good)}
+.revbox .ring{position:relative;width:100%;height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.revbox .ring i{position:absolute;inset:0 auto 0 0;width:0;background:var(--good);border-radius:5px}
+.revbox[data-tone="crit"] .ring i{background:var(--crit)}
 @media (min-width:820px) and (min-height:520px){
   .clockcard{padding:22px 20px 18px}
 }
@@ -113,10 +121,10 @@
         <button type="button" data-state="stable" aria-pressed="false">Stable · office / ward</button>
       </div>
       <div class="subactions">
+        <button id="btnUndo" type="button" disabled>Undo</button>
         <button id="btnPause" type="button">Pause</button>
         <button class="go" id="btnEnd" type="button">Exit case</button>
         <button id="btnAbort" type="button">Discard</button>
-        <button id="btnSound" type="button" aria-pressed="true">Sound on</button>
       </div>
     </section>
   </div>
@@ -125,7 +133,8 @@
     <section class="card">
       <div class="rowhead"><h2>Order checklist</h2><span class="meta">Tap when done · tap again for "not needed"</span></div>
       <ul class="checks" id="checks"></ul>
-      <p class="legend">The time stamp is when you tapped it. Stats uses the first clock advance and the counseling time.</p>
+      <p class="legend">The time stamp is when you tapped it. Stats uses the first clock advance and the counseling time. Undo reverts the last tap; "Unstable / Stable" can be switched any time.</p>
+      <div class="formrow"><button id="btnSound" type="button" class="small" aria-pressed="true">Sound on</button></div>
     </section>
     <details class="fold" id="rulesFold">
       <summary>Rules for a CCS case</summary>
@@ -141,7 +150,8 @@
           <li><b>Finishing early is fine.</b> Unused case time becomes break time on exam day. Don't use the clock up for its own sake.</li>
         </ol>
         <p class="note">Exam day 4: 13–14 cases, about half of them long ones. ~4½ hours of case time, 85 minutes of breaks: 10 after case 3, lunch 25 after case 7, 10 after case 10, 10 after case 12, 30 spare.</p>
-        <p class="note">Keys: <kbd>1</kbd>–<kbd>8</kbd> tick a checklist item · <kbd>U</kbd> unstable · <kbd>S</kbd> stable · <kbd>P</kbd> pause · <kbd>X</kbd> exit case.</p>
+        <p class="note">After the case: the feedback review timer is 10:00 for a 12:30 case and 15:00 for a 25:00 case (Settings). Read the feedback once, write the one order you missed, score, save. A retry is a different day.</p>
+        <p class="note">Keys: <kbd>1</kbd>–<kbd>8</kbd> tick a checklist item · <kbd>Z</kbd> undo · <kbd>U</kbd> unstable · <kbd>S</kbd> stable · <kbd>P</kbd> pause · <kbd>X</kbd> exit case.</p>
       </div>
     </details>
     <details class="fold" id="settingsFold">
@@ -150,6 +160,8 @@
         <fieldset id="settingsFs">
           <div class="form">
             <label>Final-orders alert (mm:ss before the end)<input type="text" id="fFinal" value="2:30" inputmode="numeric"></label>
+            <label>Feedback review, 12:30 case (mm:ss)<input type="text" id="fRevShort" value="10:00" inputmode="numeric"></label>
+            <label>Feedback review, 25:00 case (mm:ss)<input type="text" id="fRevLong" value="15:00" inputmode="numeric"></label>
             <label>Theme<select id="fTheme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
           </div>
           <div class="formrow"><button type="button" id="btnApply">Save settings</button><span class="note" id="settingsMsg"></span></div>
@@ -164,6 +176,15 @@
     <div class="rowhead"><h2>Case log</h2><span class="meta" id="doneMeta"></span></div>
     <ul class="stats" id="doneStats"></ul>
     <div class="missed" id="doneChecks"></div>
+    <div class="row2"><button id="btnResume" type="button" hidden>Exited by mistake — back into the case</button></div>
+
+    <section class="revbox" id="revbox">
+      <div class="rowhead"><h2>Feedback review</h2><span class="meta" id="revMeta"></span></div>
+      <div class="revclock" id="revClock">10:00</div>
+      <div class="ring"><i id="revFill"></i></div>
+      <p class="phaseText" id="revText">Open the feedback. Read it top to bottom once: every order you missed, in the order the case wanted them. The one that matters most goes in the box below. No retry now.</p>
+      <div class="row2"><button class="primary good" id="btnRevStart" type="button" style="min-height:56px;font-size:17px">Start review · 10:00</button></div>
+    </section>
     <div class="form">
       <label>Score from the feedback (%)<input type="number" id="dScore" class="scoreinput" min="0" max="100" inputmode="numeric" placeholder="78"></label>
       <label>Case (name or number)<input type="text" id="dLabel" autocomplete="off"></label>
@@ -186,7 +207,7 @@
 (() => {
 const P = window.Pacer, $ = id => document.getElementById(id), fmt = P.fmt;
 const LS_S = "step3pacer.ccs.settings.v1", LS_R = "step3pacer.ccs.run.v1";
-const DEFAULTS = { finalSec: 150, sound: true, lastLen: 750 };
+const DEFAULTS = { finalSec: 150, sound: true, lastLen: 750, revShortSec: 600, revLongSec: 900 };
 const PHASES = [
   { k: "read",  name: "Read",          frac: .12, text: "Intro, vitals, history — once. One line: who, how sick, where. Then tap Unstable or Stable." },
   { k: "first", name: "First orders",  frac: .16, text: "Unstable: IV · O2 · monitor · pulse ox, focused exam, treat. Stable: complete exam, labs, first treatment. Advance the clock." },
@@ -210,7 +231,8 @@ let chosenLen = 750, abortArmed = 0, endArmed = 0;
 
 function fresh() {
   return { phase: "setup", id: "", date: "", label: "", category: "", attempt: "first", source: "ccscases", limitSec: 750,
-    startAt: 0, pausedAt: 0, pausedTotal: 0, patient: "", checks: {}, phaseChimed: {}, finalFired: false, endEl: 0, endedBy: "", saved: false };
+    startAt: 0, pausedAt: 0, pausedTotal: 0, patient: "", checks: {}, phaseChimed: {}, finalFired: false, endEl: 0, endedBy: "", saved: false,
+    history: [], rev: { startAt: 0, limitSec: 0, endAt: 0, warned: false, rang: false } };
 }
 function loadSettings() { const p = P.readJSON(LS_S, null); if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p); P.setSound(S.sound); chosenLen = S.lastLen || 750; }
 function saveSettings() { P.writeJSON(LS_S, S); }
@@ -254,9 +276,19 @@ function pauseResume() {
   else R.pausedAt = Date.now();
   persist(); render();
 }
-function setPatient(st) { if (R.phase !== "run") return; R.patient = st; if (st === "stable" && !(R.checks.stab && R.checks.stab.state === "done")) R.checks.stab = { state: "na", at: Math.round(elapsed()) }; persist(); render(); }
+function snapshot() { return { patient: R.patient, checks: JSON.parse(JSON.stringify(R.checks)) }; }
+function pushHistory() { R.history.push(snapshot()); if (R.history.length > 40) R.history.shift(); }
+function setPatient(st) {
+  if (R.phase !== "run") return;
+  pushHistory();
+  R.patient = st;
+  if (st === "stable" && !(R.checks.stab && R.checks.stab.state === "done")) R.checks.stab = { state: "na", at: Math.round(elapsed()), auto: true };
+  if (st === "unstable" && R.checks.stab && R.checks.stab.auto) delete R.checks.stab;
+  persist(); render();
+}
 function cycleCheck(k) {
   if (R.phase !== "run" || R.pausedAt) return;
+  pushHistory();
   const cur = (R.checks[k] && R.checks[k].state) || "";
   const next = cur === "" ? "done" : cur === "done" ? "na" : "";
   R.checks[k] = next ? { state: next, at: Math.round(elapsed()) } : undefined;
@@ -264,6 +296,26 @@ function cycleCheck(k) {
   if (next === "done") P.sfx("tick");
   persist(); render();
 }
+function undoTap() {
+  if (R.phase !== "run" || !R.history.length) return;
+  const prev = R.history.pop();
+  R.patient = prev.patient; R.checks = prev.checks;
+  persist(); render();
+}
+function resumeCase() { // exited by mistake; real time never stopped
+  if (R.phase !== "done" || R.endedBy === "clock" || R.saved) return;
+  const el = (Date.now() - R.startAt - R.pausedTotal) / 1000;
+  if (el >= R.limitSec) return;
+  R.phase = "run"; R.endEl = 0; R.endedBy = ""; R.rev = { startAt: 0, limitSec: 0, endAt: 0, warned: false, rang: false };
+  P.keepAwake(); persist(); render();
+}
+function revLimit() { return R.limitSec > 750 ? S.revLongSec : S.revShortSec; }
+function startReview() {
+  if (R.phase !== "done" || R.rev.startAt) return;
+  R.rev = { startAt: Date.now(), limitSec: revLimit(), endAt: 0, warned: false, rang: false };
+  P.audioInit(); P.sfx("start"); P.keepAwake(); persist(); render();
+}
+function revElapsed() { if (!R.rev.startAt) return 0; return ((R.rev.endAt || Date.now()) - R.rev.startAt) / 1000; }
 function finish(by) {
   if (R.phase !== "run") return;
   const now = Date.now();
@@ -295,14 +347,17 @@ function saveCase() {
     limitSec: R.limitSec, timeUsedSec: Math.round(R.endEl), endedBy: R.endedBy, patient: R.patient,
     score: isNaN(score) ? null : score, missedOrder: $("dMissed").value.trim(), note: $("dNote").value.trim(),
     checks: checks, firstAdvanceSec: checks.adv.state === "done" ? checks.adv.at : null, counselSec: checks.counsel.state === "done" ? checks.counsel.at : null,
-    missedChecks: CHECKS.filter(c => !checks[c.k].state).map(c => c.k), endedIn: phaseAt(Math.max(0, R.endEl - 0.001)).k
+    missedChecks: CHECKS.filter(c => !checks[c.k].state).map(c => c.k), endedIn: phaseAt(Math.max(0, R.endEl - 0.001)).k,
+    reviewSec: R.rev.startAt ? Math.round(revElapsed()) : null, reviewLimitSec: R.rev.startAt ? R.rev.limitSec : null
   };
   P.saveSession(s); P.syncQuietly();
   R.saved = true; persist();
-  $("savedMsg").hidden = false; $("savedMsg").textContent = "Saved to Stats.";
+  $("savedMsg").hidden = false; $("savedMsg").textContent = "Saved to Stats. Change anything above and press Update to re-save.";
   $("btnSave").textContent = "Saved"; $("btnSave").disabled = true;
+  $("btnResume").hidden = true;
   $("noteLine").textContent = noteLine(score);
 }
+function markDirty() { if (R.phase === "done" && R.saved) { $("btnSave").textContent = "Update case"; $("btnSave").disabled = false; } }
 
 /* ---------- tick ---------- */
 function tick() {
@@ -312,6 +367,11 @@ function tick() {
     if (!R.phaseChimed[ph.k]) { R.phaseChimed[ph.k] = true; if (ph.k !== "read") { P.sfx(ph.k === "final" ? "fill" : ph.k === "close" ? "move" : "ahead"); P.vibrate(ph.k === "final" ? [200, 100, 200, 100, 450] : [80]); } persist(); }
     if (!R.finalFired && rem <= S.finalSec) { R.finalFired = true; P.sfx("fill"); P.vibrate([200, 100, 200]); persist(); }
     if (rem <= 0) { P.vibrate([600]); finish("clock"); return; }
+  }
+  if (R.phase === "done" && R.rev.startAt && !R.rev.endAt) {
+    const left = R.rev.limitSec - revElapsed();
+    if (left <= 60 && !R.rev.warned) { R.rev.warned = true; P.sfx("move"); P.vibrate([120, 60, 120]); persist(); }
+    if (left <= 0) { R.rev.endAt = Date.now(); R.rev.rang = true; P.sfx("stop"); P.vibrate([400, 120, 400]); P.releaseWake(); persist(); }
   }
   render();
 }
@@ -365,6 +425,7 @@ function render() {
     if (R.finalFired && rem > 0) { banner.hidden = false; banner.textContent = fmt(S.finalSec) + " left — final orders only. Counseling in? Follow-up in? Then Exit Case."; } else banner.hidden = true;
     document.querySelectorAll("#statetoggle button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.state === R.patient)));
     $("btnPause").textContent = R.pausedAt ? "Resume" : "Pause";
+    $("btnUndo").disabled = !R.history.length || !!R.pausedAt;
     $("btnEnd").textContent = endArmed ? "Sure? Exit" : "Exit case"; $("btnEnd").classList.toggle("armed", !!endArmed);
     $("btnAbort").textContent = abortArmed ? "Sure? Discard" : "Discard"; $("btnAbort").classList.toggle("armed", !!abortArmed);
     Array.from($("checks").children).forEach(li => {
@@ -378,6 +439,28 @@ function render() {
   }
   if (done && !doneRendered) { doneRendered = true; renderDone(); }
   if (!done) doneRendered = false;
+  if (done) renderReview();
+}
+function renderReview() {
+  const box = $("revbox"), lim = R.rev.startAt ? R.rev.limitSec : revLimit();
+  $("revMeta").textContent = fmt(lim) + " for a " + fmt(R.limitSec) + " case";
+  if (!R.rev.startAt) {
+    box.dataset.tone = "normal"; $("revClock").textContent = fmt(lim); $("revFill").style.width = "0%";
+    $("btnRevStart").hidden = false; $("btnRevStart").textContent = "Start review · " + fmt(lim);
+    $("revText").textContent = "Open the feedback. Read it top to bottom once: every order you missed, in the order the case wanted them. The one that matters most goes in the box below. No retry now.";
+    return;
+  }
+  const el = revElapsed(), left = Math.max(0, R.rev.limitSec - el);
+  $("btnRevStart").hidden = true;
+  $("revFill").style.width = Math.min(100, el / R.rev.limitSec * 100) + "%";
+  if (R.rev.endAt) {
+    box.dataset.tone = "done"; $("revClock").textContent = "0:00";
+    $("revText").textContent = "Review over. Score, the one missed order, save. Next step on the wall sheet.";
+  } else {
+    box.dataset.tone = left <= 60 ? "crit" : left <= 180 ? "warn" : "normal";
+    $("revClock").textContent = fmt(Math.ceil(left));
+    $("revText").textContent = left <= 60 ? "One minute. Write the one order you missed and the score." : left <= 180 ? "Last three minutes: stop reading, start writing — the one order, the score." : "Reading the feedback: missed orders first, then timing, then the sequence. Not the case again.";
+  }
 }
 let doneRendered = false;
 function noteLine(score) {
@@ -396,14 +479,16 @@ function renderDone() {
   $("doneChecks").innerHTML = CHECKS.map(c => { const v = R.checks[c.k]; return '<span class="' + (v ? "ok" : "") + '">' + (v ? (v.state === "done" ? "✓ " : "— ") : "✗ ") + P.esc(c.label) + "</span>"; }).join("");
   $("dLabel").value = R.label; $("dScore").value = ""; $("dMissed").value = ""; $("dNote").value = "";
   $("btnSave").textContent = "Save case"; $("btnSave").disabled = false; $("savedMsg").hidden = true;
+  $("btnResume").hidden = !(R.endedBy !== "clock" && !R.saved && (Date.now() - R.startAt - R.pausedTotal) / 1000 < R.limitSec);
   $("noteLine").textContent = noteLine(null);
 }
 
 /* ---------- settings ---------- */
 function applySettings() {
-  const f = P.parseMS($("fFinal").value);
+  const f = P.parseMS($("fFinal").value), rs = P.parseMS($("fRevShort").value), rl = P.parseMS($("fRevLong").value);
   if (f == null || f < 30 || f > 600) { $("settingsMsg").textContent = "Final-orders alert: 0:30 to 10:00."; return; }
-  S.finalSec = f; saveSettings(); $("settingsMsg").textContent = "Saved."; renderSetup();
+  if (rs == null || rl == null || rs < 60 || rl < 60 || rs > 3600 || rl > 3600) { $("settingsMsg").textContent = "Review timers: 1:00 to 60:00."; return; }
+  S.finalSec = f; S.revShortSec = rs; S.revLongSec = rl; saveSettings(); $("settingsMsg").textContent = "Saved."; renderSetup();
 }
 
 /* ---------- wiring ---------- */
@@ -411,7 +496,7 @@ function blurOnClick(btn) { btn.addEventListener("click", e => { if (e.detail > 
 function init() {
   P.applyTheme(); P.renderNav("ccs");
   loadSettings(); loadRun(); buildChecks();
-  $("fFinal").value = fmt(S.finalSec); $("fTheme").value = P.getTheme();
+  $("fFinal").value = fmt(S.finalSec); $("fRevShort").value = fmt(S.revShortSec); $("fRevLong").value = fmt(S.revLongSec); $("fTheme").value = P.getTheme();
   document.querySelectorAll("#presets button").forEach(b => b.addEventListener("click", () => { chosenLen = +b.dataset.len; renderSetup(); }));
   $("btnStart").addEventListener("click", () => { R.limitSec = chosenLen; startCase(); buildStrip(); render(); });
   $("btnPause").addEventListener("click", pauseResume);
@@ -422,17 +507,22 @@ function init() {
   $("btnApply").addEventListener("click", applySettings);
   $("fTheme").addEventListener("change", () => P.setTheme($("fTheme").value));
   $("btnSave").addEventListener("click", saveCase);
+  $("btnUndo").addEventListener("click", undoTap);
+  $("btnResume").addEventListener("click", resumeCase);
+  $("btnRevStart").addEventListener("click", startReview);
+  ["dScore", "dLabel", "dMissed", "dNote"].forEach(id => $(id).addEventListener("input", markDirty));
   $("dScore").addEventListener("input", () => { const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v); });
   $("dLabel").addEventListener("input", () => { R.label = $("dLabel").value.trim(); const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v); });
   $("btnCopyLine").addEventListener("click", async e => { const b = e.currentTarget; try { await navigator.clipboard.writeText($("noteLine").textContent); b.textContent = "Copied"; } catch (err) { b.textContent = "Select the line and copy"; } setTimeout(() => { b.textContent = "Copy the line"; }, 2500); });
   $("btnStats").addEventListener("click", () => { if (!R.saved && R.phase === "done") saveCase(); location.href = "./stats.html"; });
-  ["btnStart", "btnPause", "btnEnd", "btnAbort", "btnSound", "btnSave"].forEach(id => blurOnClick($(id)));
+  ["btnStart", "btnPause", "btnEnd", "btnAbort", "btnSound", "btnSave", "btnUndo", "btnResume", "btnRevStart"].forEach(id => blurOnClick($(id)));
   document.addEventListener("keydown", e => {
     const t = e.target, tag = t && t.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || tag === "SUMMARY" || tag === "LI") return;
     if (R.phase !== "run") return;
     const k = e.key.toLowerCase();
     if (k >= "1" && k <= "8") cycleCheck(CHECKS[+k - 1].k);
+    else if (k === "z") undoTap();
     else if (k === "u") setPatient("unstable");
     else if (k === "s") setPatient("stable");
     else if (k === "p") pauseResume();

@@ -137,6 +137,7 @@
       <div class="formrow">
         <button id="btnCopy" type="button">Copy summary</button>
         <button id="btnReview" type="button">Review this block</button>
+        <button id="btnReopen" type="button" hidden>Undo last tap — back into the block</button>
       </div>
     </section>
 
@@ -151,6 +152,7 @@
           <li>First pass = easy ones. At 50 s with no big picture: flag, best guess, move.</li>
           <li>Mixed blocks and the real exam: skip biostats and drug ads on pass 1.</li>
           <li><b>2:00 left</b> → fill every blank with a guess. Never leave a blank.</li>
+          <li>The block ends by itself at 0:00, or when you tap the last question (with flags: when the last flag is resolved). Tapped by mistake? Undo, or "back into the block" on the summary.</li>
         </ol>
         <p class="note">Keep this app visible beside UWorld (split screen) so the chimes can fire; a hidden app is paused by the phone. Keys when a keyboard is attached: <kbd>Space</kbd> answered · <kbd>F</kbd> flagged · <kbd>P</kbd> pause/resume · <kbd>Z</kbd> undo.</p>
       </div>
@@ -174,6 +176,7 @@
             <label>Fill-every-blank warning (mm:ss)<input type="text" id="fFill" inputmode="numeric" value="2:00"></label>
             <label>Theme<select id="fTheme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
             <label class="check wide"><input type="checkbox" id="fChime"> Chime at 50 s on every question (not only when behind)</label>
+            <label class="check wide"><input type="checkbox" id="fEndAtLast"> End the block at the last question even when questions are flagged (otherwise: timed flagged review until the last flag or 0:00)</label>
           </div>
           <div class="formrow">
             <button type="button" id="btnApply">Save settings</button>
@@ -193,7 +196,7 @@
 (() => {
 const P = window.Pacer, $ = id => document.getElementById(id), fmt = P.fmt, fmtDelta = P.fmtSigned, parseMS = P.parseMS;
 const LS_S = "step3pacer.settings.v1", LS_R = "step3pacer.run.v1";
-const DEFAULTS = { blockSec: 2250, nQ: 20, every: 5, targets: [1680, 1125, 560, 0], flagSec: 50, fillSec: 120, sound: true, chimeEvery: false };
+const DEFAULTS = { blockSec: 2250, nQ: 20, every: 5, targets: [1680, 1125, 560, 0], flagSec: 50, fillSec: 120, sound: true, chimeEvery: false, endAtLast: false };
 const PRESET_TARGETS = { "1.25": [1680, 1125, 560, 0] };
 
 function checkpointQs(nQ, every) { const qs = []; for (let q = every; q < nQ; q += every) qs.push(q); qs.push(nQ); return qs; }
@@ -211,7 +214,7 @@ let resetArmed = 0, summaryRenderedFor = "";
 
 function freshRun() {
   return { phase: "idle", sid: "", startAt: 0, pausedAt: 0, pausedTotal: 0, q: 1, qStartEl: 0, taps: [], cps: {},
-    mode: "first", flagged: 0, reviewLeft: 0, fillFired: false, chimed: false, endEl: 0, verdict: null, label: "", correct: null };
+    mode: "first", flagged: 0, reviewLeft: 0, fillFired: false, chimed: false, endEl: 0, verdict: null, label: "", correct: null, endedBy: "" };
 }
 function qs() { return checkpointQs(S.nQ, S.every); }
 
@@ -258,7 +261,11 @@ function startPause() {
 function tap(flagged) {
   if (R.phase !== "running") return;
   const now = Date.now(), el = elapsedMs(now), rem = S.blockSec - el / 1000;
-  if (R.mode === "review") { if (R.reviewLeft > 0) R.reviewLeft--; persistRun(); render(); return; }
+  if (R.mode === "review") {
+    if (R.reviewLeft > 0) R.reviewLeft--;
+    if (R.reviewLeft <= 0) { finishBlock(el, "flags"); return; }
+    persistRun(); render(); return;
+  }
   const q = R.q;
   R.taps.push({ q: q, el: el, rem: rem, flagged: !!flagged });
   if (flagged) R.flagged++;
@@ -273,6 +280,7 @@ function tap(flagged) {
   }
   R.chimed = false;
   if (q < S.nQ) { R.q = q + 1; R.qStartEl = el; } else { R.q = S.nQ + 1; }
+  if (q >= S.nQ && (R.flagged === 0 || S.endAtLast)) { finishBlock(el, "last"); return; }
   persistRun(); render();
 }
 function undo() {
@@ -289,12 +297,20 @@ function undo() {
   R.mode = mode; R.reviewLeft = 0; R.verdict = null; R.chimed = false;
   persistRun(); render();
 }
-function finishBlock(endEl) {
-  R.endEl = endEl; R.phase = "done"; R.verdict = null;
+function finishBlock(endEl, by) {
+  R.endEl = endEl; R.phase = "done"; R.verdict = null; R.endedBy = by || "me";
   P.sfx("end"); P.releaseWake();
   saveBlockSession(); persistRun(); render();
 }
-function endBlock() { if (R.phase === "idle" || R.phase === "done") return; finishBlock(elapsedMs()); }
+function endBlock() { if (R.phase === "idle" || R.phase === "done") return; finishBlock(elapsedMs(), "me"); }
+function reopenBlock() { // the block ended on a tap you didn't mean; the clock never stopped
+  if (R.phase !== "done" || R.endedBy === "clock") return;
+  const now = Date.now(), el = now - R.startAt - R.pausedTotal;
+  if (el >= S.blockSec * 1000) return;
+  R.phase = "running"; R.endEl = 0; R.endedBy = "";
+  undo(); // pops the tap that ended the block and restores the mode
+  P.keepAwake(); persistRun(); render();
+}
 function reset() {
   if (resetArmed && Date.now() - resetArmed < 3500) { resetArmed = 0; R = freshRun(); P.releaseWake(); persistRun(); render(); return; }
   resetArmed = Date.now(); render();
@@ -312,7 +328,7 @@ function saveBlockSession() {
     checkpoints: list.map((q, i) => { const cp = R.cps[q]; return cp ? { q: q, target: S.targets[i] || 0, rem: Math.round(cp.rem), delta: Math.round(cp.delta) } : null; }).filter(Boolean),
     answered: R.taps.length, flagged: R.flagged, flagSegs: list.filter(q => q < S.nQ && R.cps[q] && R.cps[q].delta < 0).length,
     avgPerQ: Math.round(last.el / 1000 / R.taps.length), qTimes: qTimes,
-    reviewLeft: R.cps[S.nQ] ? Math.round(R.cps[S.nQ].rem) : null, endedEarly: R.endEl < S.blockSec * 1000
+    reviewLeft: R.cps[S.nQ] ? Math.round(R.cps[S.nQ].rem) : null, endedEarly: R.endEl < S.blockSec * 1000, endedBy: R.endedBy
   });
   P.saveSession(s); P.syncQuietly();
 }
@@ -327,7 +343,7 @@ function tick() {
       if (R.mode === "flag50" || S.chimeEvery) { P.sfx("flag"); P.vibrate([120, 60, 120]); }
       persistRun();
     }
-    if (rem <= 0) { P.vibrate([600]); finishBlock(S.blockSec * 1000); return; }
+    if (rem <= 0) { P.vibrate([600]); finishBlock(S.blockSec * 1000, "clock"); return; }
   }
   render();
 }
@@ -350,7 +366,7 @@ function buildRail() {
   $("fBlock").value = fmt(S.blockSec); $("fN").value = S.nQ; $("fEvery").value = S.every;
   $("fFlag").value = S.flagSec; $("fFill").value = fmt(S.fillSec);
   $("fTargets").value = S.targets.map(fmt).join(", ");
-  $("fChime").checked = !!S.chimeEvery;
+  $("fChime").checked = !!S.chimeEvery; $("fEndAtLast").checked = !!S.endAtLast;
   $("fTheme").value = P.getTheme();
   $("btnSound").textContent = S.sound ? "Sound on" : "Sound off";
   $("btnSound").setAttribute("aria-pressed", S.sound ? "true" : "false");
@@ -376,7 +392,13 @@ function render() {
 
   const pill = $("pill"), mt = $("modeText");
   if (R.phase === "idle") { pill.dataset.kind = "idle"; pill.textContent = "Ready"; mt.textContent = "Press Start here the moment you press Start in UWorld."; }
-  else if (R.phase === "done") { pill.dataset.kind = "done"; pill.textContent = "Time"; mt.textContent = R.taps.length >= S.nQ ? "Block over. Summary below." : "Block over with " + (S.nQ - R.taps.length) + " not tapped. Summary below."; }
+  else if (R.phase === "done") {
+    pill.dataset.kind = "done"; pill.textContent = R.endedBy === "clock" ? "Time" : "Done";
+    mt.textContent = R.endedBy === "clock" ? (R.taps.length >= S.nQ ? "Clock ran out. Summary below." : "Clock ran out with " + (S.nQ - R.taps.length) + " not tapped. Summary below.")
+      : R.endedBy === "last" ? "Last question answered with " + fmt(S.blockSec - R.endEl / 1000) + " left" + (R.flagged ? " for " + R.flagged + " flagged." : ".") + " Summary below."
+      : R.endedBy === "flags" ? "All flags resolved with " + fmt(S.blockSec - R.endEl / 1000) + " left. Summary below."
+      : "Block ended. Summary below.";
+  }
   else if (R.phase === "paused") { pill.dataset.kind = "idle"; pill.textContent = "Paused"; mt.textContent = "UWorld's clock does not pause. Resume as soon as you are back."; }
   else if (inReview) {
     pill.dataset.kind = "review"; pill.textContent = "Review flagged";
@@ -449,6 +471,7 @@ function renderSummary() {
     "<li><b>" + flagSegs + "</b> segment" + (flagSegs === 1 ? "" : "s") + " in flag-at-" + S.flagSec + "</li>" +
     "<li><b>" + fmt(reviewSec) + "</b> left at Q" + S.nQ + " for flagged review</li>";
   $("sumLabel").value = R.label || ""; $("sumCorrect").value = R.correct != null ? R.correct : "";
+  $("btnReopen").hidden = !(R.endedBy !== "clock" && R.taps.length && (Date.now() - R.startAt - R.pausedTotal) < S.blockSec * 1000);
 }
 function summaryText() {
   const list = qs(), lines = ["Step 3 block — " + S.nQ + " Q in " + fmt(S.blockSec) + (R.label ? " · " + R.label : "") + (R.correct != null ? " · " + R.correct + "/" + S.nQ : "")];
@@ -468,7 +491,7 @@ function applySettings() {
   const list = checkpointQs(nQ, every);
   let targets = raw.some(t => t == null) ? null : raw, msg = "Saved.";
   if (!targets || targets.length !== list.length || targets.some(t => t > block)) { targets = evenTargets(block, nQ, every); msg = "Saved. Targets recalculated for " + list.length + " checkpoints."; }
-  S = Object.assign({}, S, { blockSec: block, nQ: nQ, every: every, targets: targets, flagSec: flagSec, fillSec: fill, chimeEvery: $("fChime").checked });
+  S = Object.assign({}, S, { blockSec: block, nQ: nQ, every: every, targets: targets, flagSec: flagSec, fillSec: fill, chimeEvery: $("fChime").checked, endAtLast: $("fEndAtLast").checked });
   saveSettings(); buildRail(); render(); settingsMsg(msg);
 }
 function recalcTargets() {
@@ -502,6 +525,7 @@ function init() {
   $("sumLabel").addEventListener("change", () => { R.label = $("sumLabel").value.trim(); persistRun(); saveBlockSession(); });
   $("sumCorrect").addEventListener("change", () => { const v = $("sumCorrect").value.trim(); const n = parseInt(v, 10); R.correct = (v === "" || isNaN(n)) ? null : Math.max(0, Math.min(S.nQ, n)); $("sumCorrect").value = R.correct == null ? "" : R.correct; persistRun(); saveBlockSession(); });
   $("btnReview").addEventListener("click", () => { location.href = "./review.html"; });
+  $("btnReopen").addEventListener("click", reopenBlock);
   $("btnCopy").addEventListener("click", async e => {
     const txt = summaryText(), b = e.currentTarget;
     try { await navigator.clipboard.writeText(txt); b.textContent = "Copied"; }

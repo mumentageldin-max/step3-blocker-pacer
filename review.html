@@ -61,6 +61,14 @@
 .tagbtns button[data-tag="T"] b{color:var(--t)} .tagbtns button[data-tag="G"] b{color:var(--g)}
 .extrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
 .extrow button{min-height:56px}
+.fixrow button{min-height:40px!important;font-size:14px;color:var(--muted)}
+.fixrow button:disabled{opacity:.35}
+.tallyedit{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tallyedit div{border:1px solid var(--line);border-radius:10px;padding:8px 6px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:4px;text-align:center}
+.tallyedit b{font-family:var(--font-num);font-size:22px;line-height:1}
+.tallyedit small{grid-column:1/-1;font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.tallyedit button{min-height:32px;padding:2px 0;font-size:16px;border-radius:8px}
+.tallyedit div[data-tag="K"] b{color:var(--k)} .tallyedit div[data-tag="M"] b{color:var(--m)} .tallyedit div[data-tag="T"] b{color:var(--t)} .tallyedit div[data-tag="G"] b{color:var(--g)}
 .ruleline{font-size:14px;color:var(--muted);margin:0;text-wrap:balance;max-width:44ch}
 
 .tally{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
@@ -171,6 +179,10 @@
       <div class="extrow" id="nextrow" hidden>
         <button class="primary" id="btnNext" type="button" style="grid-column:1/-1">Next</button>
       </div>
+      <div class="extrow fixrow" id="fixrow">
+        <button class="small" id="btnChange" type="button">Change choice</button>
+        <button class="small" id="btnUndo" type="button">Undo last question</button>
+      </div>
     </section>
   </div>
 
@@ -200,10 +212,11 @@
           <li><b>Don't re-read the stem.</b> Educational Objective → correct-answer paragraph → the paragraph for the choice you picked. Skip the other wrong-choice paragraphs.</li>
           <li><b>Calculation question</b> → draw the 2×2 and redo it yourself before reading their math.</li>
           <li>Write one line: <b>"Rule: ___"</b> in your own words. Ten words max. Tag the miss with one letter.</li>
-          <li><b>Chunk 3 ends with questions left</b> → Educational Objective only, 30 s each, tagged K. The app switches to that by itself.</li>
+          <li><b>Chunk 3 ends with questions left</b> → Educational Objective only, 30 s each, tagged K. The app switches to that by itself (or ends the review, if you set that in Settings).</li>
+          <li><b>Pressed the wrong button?</b> "Change choice" sends the running question back to the chooser; the clock on that question keeps counting. "Undo last question" reopens the one you just closed.</li>
           <li><b>Not allowed:</b> UWorld library, a new sheet, YouTube, a podcast, a "quick" lookup, Claude per question. Parking lot instead.</li>
         </ol>
-        <p class="note">Keys: <kbd>W</kbd> wrong · <kbd>C</kbd> correct · <kbd>L</kbd> lucky · <kbd>K</kbd> <kbd>M</kbd> <kbd>T</kbd> <kbd>G</kbd> tag · <kbd>E</kbd> +3:00 · <kbd>N</kbd> next · <kbd>P</kbd> pause.</p>
+        <p class="note">Keys: <kbd>W</kbd> wrong · <kbd>C</kbd> correct · <kbd>L</kbd> lucky · <kbd>K</kbd> <kbd>M</kbd> <kbd>T</kbd> <kbd>G</kbd> tag · <kbd>E</kbd> +3:00 · <kbd>N</kbd> next · <kbd>B</kbd> change choice · <kbd>Z</kbd> undo last · <kbd>P</kbd> pause.</p>
       </div>
     </details>
 
@@ -218,6 +231,7 @@
             <label>Timer B per wrong (mm:ss)<input type="text" id="fB" value="5:00" inputmode="numeric"></label>
             <label>Extension, once (mm:ss)<input type="text" id="fExt" value="3:00" inputmode="numeric"></label>
             <label>Correct question (seconds)<input type="number" id="fEo" value="30" min="10" max="300" inputmode="numeric"></label>
+            <label>At the hard stop<select id="fStop"><option value="sweep">EO sweep, 30 s each, tagged K</option><option value="end">End the review</option></select></label>
             <label>Theme<select id="fTheme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
           </div>
           <div class="formrow">
@@ -233,7 +247,8 @@
   <!-- DONE -->
   <section class="card done full" id="done" hidden>
     <div class="rowhead"><h2>Review summary</h2><span class="meta" id="doneMeta"></span></div>
-    <div class="tally" id="doneTally"></div>
+    <div class="tallyedit" id="doneTally"></div>
+    <p class="note">Tagged one wrong? Fix the letters here; the saved review updates itself.</p>
     <div class="fix" id="doneFix"></div>
     <ul class="stats" id="doneStats"></ul>
     <p class="note">One line for the notebook:</p>
@@ -255,7 +270,7 @@
 (() => {
 const P = window.Pacer, $ = id => document.getElementById(id), fmt = P.fmt;
 const LS_S = "step3pacer.review.settings.v1", LS_R = "step3pacer.review.run.v1";
-const DEFAULTS = { limitSec: 5400, chunkSec: 1800, standSec: 240, bSec: 300, extSec: 180, eoSec: 30, sound: true };
+const DEFAULTS = { limitSec: 5400, chunkSec: 1800, standSec: 240, bSec: 300, extSec: 180, eoSec: 30, sound: true, atStop: "sweep" };
 const FIX = {
   K: "Mostly K — knowledge gap. Normal. The \"Rule:\" lines are the fix; nothing extra.",
   M: "Mostly M — misread. Read the last line first; highlight D / T / MC / MT / GA while reading.",
@@ -270,7 +285,7 @@ function fresh() {
   return { phase: "setup", id: "", date: "", label: "", nQ: 20, correct: null, wrongTotal: null, mode: "full", blockId: null,
     startAt: 0, pausedAt: 0, pausedTotal: 0, pauseKind: "", standStartAt: 0, standChimed: false, standsDone: 0, manualStands: 0,
     q: null, items: [], tags: { K: 0, M: 0, T: 0, G: 0 }, wrongDone: 0, correctDone: 0, lucky: 0, swept: 0,
-    stopped: false, sweepStartAt: 0, endEl: 0 };
+    stopped: false, sweepStartAt: 0, endEl: 0, pendingStartEl: null };
 }
 
 /* ---------- storage ---------- */
@@ -328,33 +343,67 @@ function startItem(kind) {
   if (R.q && (R.q.kind === "wrong" || R.q.kind === "lucky")) return; // a wrong question must be tagged first
   closeCurrent(now, null);
   if (kind === "lucky") { R.lucky++; if (R.wrongTotal != null) R.wrongTotal++; }
-  R.q = { kind: kind, startEl: elA(now), startAt: now, ext: false, rang: false, hardRang: false };
+  const startEl = R.pendingStartEl != null ? R.pendingStartEl : elA(now);
+  R.q = { kind: kind, startEl: startEl, startAt: now - (elA(now) - startEl), ext: false, rang: false, hardRang: false };
+  R.pendingStartEl = null;
+  persist(); render();
+}
+function changeChoice() { // the running question goes back to the chooser; its clock keeps counting
+  if (!R.q || R.phase !== "run" || R.mode === "eo") return;
+  const k = R.q.kind;
+  if (k !== "wrong" && k !== "lucky" && k !== "correct") return;
+  if (k === "lucky") { R.lucky = Math.max(0, R.lucky - 1); if (R.wrongTotal != null) R.wrongTotal = Math.max(0, R.wrongTotal - 1); }
+  R.pendingStartEl = R.q.startEl; R.q = null;
+  persist(); render();
+}
+function undoLast() { // reopen the question you just closed, with its own clock
+  if (R.phase !== "run" && R.phase !== "sweep") return;
+  R.pendingStartEl = null;
+  if (R.q && (R.q.kind === "wrong" || R.q.kind === "lucky" || R.q.kind === "correct")) {
+    // discard the running one first (same as Change choice), then reopen the previous
+    if (R.q.kind === "lucky") { R.lucky = Math.max(0, R.lucky - 1); if (R.wrongTotal != null) R.wrongTotal = Math.max(0, R.wrongTotal - 1); }
+    R.q = null;
+  } else if (R.q && (R.q.kind === "sweep" || R.q.kind === "eo")) {
+    R.q = null; // auto-started, nothing recorded yet
+  }
+  const it = R.items.pop();
+  if (!it) { persist(); render(); return; }
+  if (it.kind === "wrong" || it.kind === "lucky") { R.tags[it.tag] = Math.max(0, R.tags[it.tag] - 1); R.wrongDone = Math.max(0, R.wrongDone - 1); }
+  else if (it.kind === "correct" || it.kind === "eo") R.correctDone = Math.max(0, R.correctDone - 1);
+  else if (it.kind === "sweep") { R.tags.K = Math.max(0, R.tags.K - 1); R.wrongDone = Math.max(0, R.wrongDone - 1); R.swept = Math.max(0, R.swept - 1); }
+  if (R.phase === "sweep" && it.kind !== "sweep") { R.q = { kind: "sweep", startEl: 0, startAt: Date.now(), ext: false, rang: false, hardRang: false }; persist(); render(); return; }
+  R.q = { kind: it.kind, startEl: it.startEl != null ? it.startEl : elA(), startAt: it.startAt || Date.now(), ext: !!it.ext, rang: false, hardRang: false };
   persist(); render();
 }
 function closeCurrent(now, tag) { // records the running item, if any
   if (!R.q) return;
   const sec = qElapsedSec(now);
   const k = R.q.kind;
+  const base = { kind: k, sec: Math.round(sec), startEl: R.q.startEl, startAt: R.q.startAt };
   if (k === "wrong" || k === "lucky") {
     if (!tag) return; // a wrong question is closed by a tag, never silently
-    R.items.push({ kind: k, sec: Math.round(sec), tag: tag, ext: !!R.q.ext, over: sec > qBudget() });
+    R.items.push(Object.assign(base, { tag: tag, ext: !!R.q.ext, over: sec > qBudget() }));
     R.tags[tag]++; R.wrongDone++;
   } else if (k === "correct") {
-    R.items.push({ kind: k, sec: Math.round(sec), over: sec > S.eoSec });
+    R.items.push(Object.assign(base, { over: sec > S.eoSec }));
     R.correctDone++;
   } else if (k === "sweep") {
-    R.items.push({ kind: k, sec: Math.round(sec), tag: "K" });
+    R.items.push(Object.assign(base, { tag: "K" }));
     R.tags.K++; R.wrongDone++; R.swept++;
   } else if (k === "eo") {
-    R.items.push({ kind: k, sec: Math.round(sec) });
+    R.items.push(base);
     R.correctDone++;
   }
   R.q = null;
 }
+function allReviewed() {
+  const left = remainingAll();
+  return (left != null && left <= 0) || (R.wrongDone + R.correctDone) >= R.nQ;
+}
 function tag(letter) {
   if (!R.q || (R.q.kind !== "wrong" && R.q.kind !== "lucky")) return;
   closeCurrent(Date.now(), letter);
-  if (R.phase === "sweep") nextSweep(); else { persist(); render(); }
+  if (R.phase === "sweep") nextSweep(); else if (allReviewed()) finish(); else { persist(); render(); }
 }
 function extend() {
   if (!R.q || (R.q.kind !== "wrong" && R.q.kind !== "lucky") || R.q.ext) return;
@@ -369,7 +418,8 @@ function next() { // sweep / eo / correct: close and move
     if (R.correctDone >= R.nQ) finish(); else { startItem("eo"); }
     return;
   }
-  closeCurrent(Date.now(), null); persist(); render();
+  closeCurrent(Date.now(), null);
+  if (allReviewed()) finish(); else { persist(); render(); }
 }
 function nextSweep() {
   const left = remainingAll();
@@ -404,14 +454,15 @@ function hardStop() {
   else closeCurrent(now, null);
   P.sfx("stop"); P.vibrate([400, 120, 400]);
   const left = remainingAll();
-  if (left == null || left > 0) { R.phase = "sweep"; R.pauseKind = ""; if (!R.q) R.q = { kind: "sweep", startEl: 0, startAt: now, ext: false, rang: false, hardRang: false }; }
+  if (S.atStop === "end") { R.phase = "done"; }
+  else if (left == null || left > 0) { R.phase = "sweep"; R.pauseKind = ""; if (!R.q) R.q = { kind: "sweep", startEl: 0, startAt: now, ext: false, rang: false, hardRang: false }; }
   else { R.phase = "done"; }
   if (R.phase === "done") finish(); else { persist(); render(); }
 }
 function finish() {
   const now = Date.now();
   if (R.phase === "run") { if (R.pauseKind) { R.pausedTotal += now - R.pausedAt; R.pauseKind = ""; } R.endEl = Math.min(S.limitSec * 1000, now - R.startAt - R.pausedTotal); }
-  if (R.q && (R.q.kind === "wrong" || R.q.kind === "lucky")) R.q.kind = "sweep";
+  if (R.q && (R.q.kind === "wrong" || R.q.kind === "lucky")) { R.q.kind = "sweep"; R.q.startAt = R.q.startAt || now; }
   closeCurrent(now, null);
   R.phase = "done";
   P.sfx("end"); P.releaseWake();
@@ -609,6 +660,15 @@ function render() {
     }
   }
 
+  // change / undo
+  const runningChoice = R.q && (R.q.kind === "wrong" || R.q.kind === "lucky" || R.q.kind === "correct");
+  $("fixrow").hidden = !!R.pauseKind || R.phase === "done";
+  $("btnChange").disabled = !(runningChoice && R.phase === "run" && R.mode !== "eo");
+  $("btnChange").textContent = runningChoice ? "Change choice" : (R.pendingStartEl != null ? "Pick again — clock continues" : "Change choice");
+  $("btnUndo").disabled = !R.items.length;
+  $("btnUndo").textContent = R.items.length ? "Undo last question" : "Nothing to undo";
+  if (!R.q && R.pendingStartEl != null && !R.pauseKind) $("textB").textContent = "Pick again. This question's clock is already at " + fmt(Math.max(0, (elA(now) - R.pendingStartEl) / 1000)) + " and keeps counting.";
+
   // progress + tally
   const w = remainingWrong(), c = remainingCorrect();
   $("prog").innerHTML = R.mode === "eo"
@@ -634,7 +694,11 @@ function noteLine() {
 }
 function renderDone() {
   $("doneMeta").textContent = (R.label ? R.label + " · " : "") + (R.correct != null ? R.correct + "/" + R.nQ + " · " : "") + P.fmtDate(R.date, true);
-  $("doneTally").innerHTML = ["K", "M", "T", "G"].map(l => '<div data-tag="' + l + '"><b>' + R.tags[l] + "</b><small>" + l + "</small></div>").join("");
+  $("doneTally").innerHTML = ["K", "M", "T", "G"].map(l => '<div data-tag="' + l + '"><button type="button" data-adj="' + l + ':-1" aria-label="one fewer ' + l + '">−</button><b>' + R.tags[l] + '</b><button type="button" data-adj="' + l + ':1" aria-label="one more ' + l + '">+</button><small>' + l + "</small></div>").join("");
+  $("doneTally").querySelectorAll("button[data-adj]").forEach(b => b.addEventListener("click", () => {
+    const [l, d] = b.dataset.adj.split(":"); R.tags[l] = Math.max(0, R.tags[l] + (+d));
+    saveReview(); persist(); doneRenderedFor = ""; render();
+  }));
   const dom = dominant();
   $("doneFix").textContent = dom ? FIX[dom] : (R.mode === "eo" ? "EO-only pass done." : "No wrong questions tagged.");
   const wrongItems = R.items.filter(i => i.kind === "wrong" || i.kind === "lucky"), correctItems = R.items.filter(i => i.kind === "correct" || i.kind === "eo");
@@ -675,12 +739,12 @@ function applySettings() {
   const limit = P.parseMS($("fLimit").value), chunk = P.parseMS($("fChunk").value), stand = P.parseMS($("fStand").value);
   const b = P.parseMS($("fB").value), ext = P.parseMS($("fExt").value), eo = parseInt($("fEo").value, 10);
   if (!limit || !chunk || stand == null || !b || ext == null || !eo || chunk > limit || eo < 10) { $("settingsMsg").textContent = "Check the values: times as mm:ss."; return; }
-  S = Object.assign({}, S, { limitSec: limit, chunkSec: chunk, standSec: stand, bSec: b, extSec: ext, eoSec: eo });
+  S = Object.assign({}, S, { limitSec: limit, chunkSec: chunk, standSec: stand, bSec: b, extSec: ext, eoSec: eo, atStop: $("fStop").value === "end" ? "end" : "sweep" });
   saveSettings(); fillSettings(); renderDerived(); render(); $("settingsMsg").textContent = "Saved.";
 }
 function fillSettings() {
   $("fLimit").value = fmt(S.limitSec); $("fChunk").value = fmt(S.chunkSec); $("fStand").value = fmt(S.standSec);
-  $("fB").value = fmt(S.bSec); $("fExt").value = fmt(S.extSec); $("fEo").value = S.eoSec; $("fTheme").value = P.getTheme();
+  $("fB").value = fmt(S.bSec); $("fExt").value = fmt(S.extSec); $("fEo").value = S.eoSec; $("fTheme").value = P.getTheme(); $("fStop").value = S.atStop === "end" ? "end" : "sweep";
   $("tagline").textContent = fmt(S.limitSec) + " hard stop · " + Math.round(S.bSec / 60) + "+" + Math.round(S.extSec / 60) + " per wrong · " + S.eoSec + " s per correct";
   $("textA").textContent = "Stand " + Math.round(S.standSec / 60) + " minutes at the end of each chunk. " + Math.round(S.limitSec / 60) + " minutes of review, hard stop.";
 }
@@ -698,6 +762,8 @@ function init() {
   $("btnCorrect").addEventListener("click", () => startItem("correct"));
   $("btnLucky").addEventListener("click", () => startItem("lucky"));
   $("btnExtend").addEventListener("click", extend);
+  $("btnChange").addEventListener("click", changeChoice);
+  $("btnUndo").addEventListener("click", undoLast);
   $("btnNext").addEventListener("click", next);
   $("tagbtns").querySelectorAll("button[data-tag]").forEach(b => { b.addEventListener("click", () => tag(b.dataset.tag)); blurOnClick(b); });
   $("btnPause").addEventListener("click", () => { if (R.pauseKind === "pause") resume(); else pause("pause"); });
@@ -717,7 +783,7 @@ function init() {
   $("btnNew").addEventListener("click", () => { R = fresh(); pickedBlock = null; persist(); renderPicks(); renderDerived(); render(); });
   $("btnPark15").addEventListener("click", startPark15);
   $("btnParkClear").addEventListener("click", () => { P.saveParking([]); renderParking(); });
-  ["btnWrong", "btnCorrect", "btnLucky", "btnExtend", "btnNext", "btnPause", "btnStandNow", "btnResume", "btnEnd", "btnSound", "btnStart"].forEach(id => blurOnClick($(id)));
+  ["btnWrong", "btnCorrect", "btnLucky", "btnExtend", "btnNext", "btnPause", "btnStandNow", "btnResume", "btnEnd", "btnSound", "btnStart", "btnChange", "btnUndo"].forEach(id => blurOnClick($(id)));
   document.addEventListener("keydown", e => {
     const t = e.target, tag_ = t && t.tagName;
     if (tag_ === "INPUT" || tag_ === "TEXTAREA" || tag_ === "SELECT" || tag_ === "BUTTON" || tag_ === "SUMMARY") return;
@@ -729,6 +795,8 @@ function init() {
     else if (k === "l") { if (!R.q || R.q.kind === "correct") startItem("lucky"); }
     else if (k === "k" || k === "m" || k === "t" || k === "g") tag(k.toUpperCase());
     else if (k === "e") extend();
+    else if (k === "b") changeChoice();
+    else if (k === "z") undoLast();
     else if (k === "n" || e.code === "Space") { e.preventDefault(); next(); }
     else if (k === "p") pause("pause");
   });
