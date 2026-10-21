@@ -1,16 +1,25 @@
-/* Step 3 Block Pacer — service worker.
-   Caches the app shell on install so the pacer opens offline, then refreshes it in the background.
-   Bump VERSION whenever index.html changes so installed copies pick up the update. */
-const VERSION = "pacer-v1";
+/* Step 3 Pacer — service worker.
+   Caches the app shell on install so the pacers open offline, then refreshes it in the background.
+   Bump VERSION whenever a page changes so installed copies pick up the update. */
+const VERSION = "pacer-v2";
 const FONT_CACHE = "pacer-fonts";
 const SHELL = [
   "./",
   "./index.html",
+  "./review.html",
+  "./stats.html",
+  "./shared.css",
+  "./shared.js",
   "./manifest.webmanifest",
+  "./manifest-review.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
-  "./icons/apple-touch-icon.png"
+  "./icons/apple-touch-icon.png",
+  "./icons/review-192.png",
+  "./icons/review-512.png",
+  "./icons/review-maskable-512.png",
+  "./icons/review-apple-touch-icon.png"
 ];
 
 self.addEventListener("install", event => {
@@ -47,7 +56,7 @@ self.addEventListener("fetch", event => {
   }
 
   if (url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com") {
-    // Fonts: keep the first good copy so the clock looks the same offline.
+    // Fonts: keep the first good copy so the clocks look the same offline.
     event.respondWith(
       caches.open(FONT_CACHE).then(async cache => {
         const cached = await cache.match(req);
@@ -62,4 +71,5 @@ self.addEventListener("fetch", event => {
       })
     );
   }
+  // api.github.com (sync) is never cached.
 });

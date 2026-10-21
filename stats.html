@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Step 3 Pacer Stats</title>
+<meta name="description" content="Progress and patterns from your block and review pacers: pacing at each checkpoint, K/M/T/G tags, scores, review discipline, and what to fix next.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F5F8">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E141B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pacer stats">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Martian+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="./shared.css">
+<style>
+/* Layout: one filter row, a KPI row, then one card per question (what to fix, pacing, letters, scores, review time), data last. */
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.filters button{min-height:38px;padding:8px 14px;font-size:14px;border-radius:999px}
+.filters button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:2px;min-width:0}
+.kpi .l{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.04em}
+.kpi .v{font-size:26px;font-weight:700;line-height:1.1}
+.kpi .d{font-size:12px;color:var(--muted)}
+.kpi .d.up{color:var(--good)} .kpi .d.down{color:var(--warn)}
+.insights{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.insights li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--line2);font-size:15px;line-height:1.35}
+.insights .k{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--line);color:var(--fg);white-space:nowrap;margin-top:2px}
+.insights li[data-kind="warn"] .k{background:var(--warn);color:var(--on-warn)}
+.insights li[data-kind="good"] .k{background:var(--good);color:var(--on-good)}
+.insights li[data-kind="accent"] .k{background:var(--accent);color:var(--on-accent)}
+.chart{width:100%;display:block;overflow:visible}
+.chart text{font-family:var(--font-ui);font-size:11px;fill:var(--muted)}
+.chart text.v{font-family:var(--font-num);font-size:11px;fill:var(--fg);font-weight:700}
+.chart .grid{stroke:var(--line2);stroke-width:1}
+.chart .axis{stroke:var(--line);stroke-width:1}
+.chart .ref{stroke:var(--muted);stroke-width:1}
+.chart .line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart .area{fill:var(--accent);opacity:.1}
+.chart .dot{fill:var(--accent);stroke:var(--surface);stroke-width:2}
+.chart .bar{rx:0}
+.chart .hit{fill:transparent}
+.chart .hit:focus{outline:none}
+.chart .hit:focus + .bar,.chart .hit:focus + .dot{opacity:.75}
+.multiples{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.multiples>div{min-width:0}
+.multiples h3{margin:0 0 4px;font-size:13px;color:var(--muted);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.tip{position:absolute;pointer-events:none;background:var(--fg);color:var(--bg);font-size:12px;padding:6px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-110%);z-index:5;font-variant-numeric:tabular-nums}
+.chartwrap{position:relative}
+.empty{color:var(--muted);font-size:14px;margin:0}
+.report{font-family:var(--font-num);font-size:12.5px;white-space:pre-wrap;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:10px 12px;margin:0;max-height:320px;overflow:auto;line-height:1.45}
+.row2{display:flex;gap:8px;flex-wrap:wrap}
+.row2 button{min-height:42px;padding:9px 14px}
+.sessions{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.sessions li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line2);border-radius:10px;font-size:14px;min-width:0}
+.sessions .kind{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--line);white-space:nowrap}
+.sessions li[data-type="block"] .kind{background:var(--accent);color:var(--on-accent)}
+.sessions li[data-type="review"] .kind{background:var(--good);color:var(--on-good)}
+.sessions .what{min-width:0;overflow-wrap:anywhere}
+.sessions .what b{font-family:var(--font-num)}
+.sessions button{min-height:32px;padding:4px 10px;font-size:13px}
+.synccard .status{font-size:14px;color:var(--muted);margin:0}
+.synccard .status.ok{color:var(--good)} .synccard .status.bad{color:var(--crit)}
+textarea.imp{font-family:var(--font-num);font-size:12px;min-height:80px;width:100%;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);padding:8px}
+@media (max-width:560px){ .multiples{grid-template-columns:1fr} }
+@media (min-width:820px) and (min-height:520px){
+  .wrap{grid-template-columns:1fr}
+  .wrap{max-width:1100px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Step 3 Pacer Stats</h1>
+    <p class="tag" id="tagline">Every block and review you finish lands here.</p>
+  </header>
+  <nav id="pnav" aria-label="Pages"></nav>
+
+  <div class="filters" id="filters" role="group" aria-label="Range">
+    <span class="note">Range:</span>
+    <button type="button" data-range="7">7 days</button>
+    <button type="button" data-range="14">14 days</button>
+    <button type="button" data-range="30">30 days</button>
+    <button type="button" data-range="0">All</button>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="card">
+    <div class="rowhead"><h2>What to fix next</h2><span class="meta">Rules from your Daily Card, applied to your own numbers</span></div>
+    <ul class="insights" id="insights"></ul>
+  </section>
+
+  <section class="card">
+    <div class="rowhead"><h2>Pacing at each checkpoint</h2><span class="meta">Clock minus target when you tapped the checkpoint. Above zero = ahead.</span></div>
+    <div class="multiples" id="pacing"></div>
+    <details class="fold"><summary>Table</summary><div class="body" id="pacingTable"></div></details>
+  </section>
+
+  <section class="card">
+    <div class="rowhead"><h2>Why the misses happened</h2><span class="meta">K / M / T / G per review</span></div>
+    <div class="legend"><span><i style="background:var(--k)"></i>K didn't know</span><span><i style="background:var(--m)"></i>M misread</span><span><i style="background:var(--t)"></i>T wrong form</span><span><i style="background:var(--g)"></i>G rushed</span></div>
+    <div class="chartwrap" id="letters"></div>
+    <details class="fold"><summary>Table</summary><div class="body" id="lettersTable"></div></details>
+  </section>
+
+  <section class="card">
+    <div class="rowhead"><h2>Scores</h2><span class="meta">Percent correct per block, in order</span></div>
+    <div class="chartwrap" id="scores"></div>
+    <details class="fold"><summary>By system</summary><div class="body" id="systemsTable"></div></details>
+  </section>
+
+  <section class="card">
+    <div class="rowhead"><h2>Review discipline</h2><span class="meta">Minutes used per review; the line is the hard stop</span></div>
+    <div class="chartwrap" id="rtime"></div>
+    <details class="fold"><summary>Table</summary><div class="body" id="rtimeTable"></div></details>
+  </section>
+
+  <section class="card">
+    <div class="rowhead"><h2>Weekly report</h2><span class="meta">Last 7 days — paste it to Claude on Sunday</span></div>
+    <pre class="report" id="report"></pre>
+    <div class="row2"><button type="button" id="btnCopyReport">Copy report</button></div>
+  </section>
+
+  <section class="card synccard">
+    <div class="rowhead"><h2>Sync across devices</h2><span class="meta">Optional · a private GitHub gist holds the sessions</span></div>
+    <p class="note">Each device keeps its own log. To merge iPad, Fold, iMac and Mac mini: create one GitHub token with only the <b>gist</b> permission, paste it on every device, then sync. The token stays in this browser.</p>
+    <div class="form">
+      <label class="wide">GitHub token (gist scope)<input type="password" id="syncToken" autocomplete="off" placeholder="ghp_…"></label>
+    </div>
+    <div class="row2">
+      <button type="button" id="btnSyncSave">Save token and sync</button>
+      <button type="button" id="btnSyncNow">Sync now</button>
+      <button type="button" id="btnSyncForget">Forget token</button>
+      <a href="https://github.com/settings/tokens/new?scopes=gist&description=Step%203%20Pacer%20sync" target="_blank" rel="noopener" style="align-self:center;font-size:14px">Create a token on GitHub ↗</a>
+    </div>
+    <p class="status" id="syncStatus"></p>
+  </section>
+
+  <section class="card">
+    <div class="rowhead"><h2>Data</h2><span class="meta" id="dataMeta"></span></div>
+    <div class="row2">
+      <button type="button" id="btnExport">Download backup (JSON)</button>
+      <button type="button" id="btnCopyExport">Copy backup</button>
+      <label class="small" style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:9px 14px;cursor:pointer;font-weight:700;font-size:15px"><input type="file" id="importFile" accept="application/json,.json" style="display:none">Import a backup…</label>
+      <button type="button" id="btnClear">Delete all data</button>
+    </div>
+    <textarea class="imp" id="importText" placeholder="…or paste a backup here and press Import pasted"></textarea>
+    <div class="row2"><button type="button" id="btnImportText">Import pasted</button></div>
+    <details class="fold"><summary>Sessions</summary><div class="body"><ul class="sessions" id="sessions"></ul></div></details>
+  </section>
+</div>
+
+<script src="./shared.js"></script>
+<script>
+(() => {
+const P = window.Pacer, $ = id => document.getElementById(id), fmt = P.fmt, esc = P.esc;
+const LS_RANGE = "step3pacer.stats.range.v1";
+const FIX = {
+  K: "Knowledge gap. Normal. The \"Rule:\" lines are the fix; nothing extra.",
+  M: "Misread. Read the last line first; highlight D / T / MC / MT / GA while reading.",
+  T: "Translation. Write your answer on paper, then convert it to the other form before giving up (biostats sheet, last page).",
+  G: "Guessed or rushed. You're rushing on hard ones. Flag at 50 sec instead of guessing; come back on pass 2."
+};
+let range = P.readJSON(LS_RANGE, 14);
+let ALL = [];
+
+function inRange(s, days) {
+  if (!days) return true;
+  return new Date(s.date).getTime() >= Date.now() - days * 86400000;
+}
+function sessionsIn(days) { return ALL.filter(s => inRange(s, days)).sort((a, b) => new Date(a.date) - new Date(b.date)); }
+function pct(a, b) { return b ? Math.round(a / b * 100) : null; }
+function mean(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null; }
+function scoreOf(s) {
+  if (s.correct == null || !s.nQ) return null;
+  return s.correct / s.nQ * 100;
+}
+function blockScoreRows(list) {
+  // one score per block: the review's score if the block was reviewed, otherwise the block's own
+  const rows = [];
+  const reviewedBlocks = new Set(list.filter(s => s.type === "review" && s.blockId).map(s => s.blockId));
+  list.forEach(s => {
+    if (s.type === "review" && scoreOf(s) != null) rows.push({ date: s.date, label: s.label || "", score: scoreOf(s), nQ: s.nQ, correct: s.correct });
+    else if (s.type === "block" && scoreOf(s) != null && !reviewedBlocks.has(s.id)) rows.push({ date: s.date, label: s.label || "", score: scoreOf(s), nQ: s.nQ, correct: s.correct });
+  });
+  return rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+/* ---------- svg helpers ---------- */
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function text(parent, x, y, str, cls, anchor) {
+  const t = el("text", { x: x, y: y, "text-anchor": anchor || "start" }, parent);
+  if (cls) t.setAttribute("class", cls);
+  t.textContent = str;
+  return t;
+}
+let tip = null;
+function showTip(wrap, x, y, str) {
+  if (!tip) { tip = document.createElement("div"); tip.className = "tip"; }
+  if (tip.parentNode !== wrap) wrap.appendChild(tip);
+  tip.textContent = str; tip.style.left = x + "px"; tip.style.top = y + "px"; tip.hidden = false;
+}
+function hideTip() { if (tip) tip.hidden = true; }
+function hover(target, wrap, svg, str) {
+  const place = () => {
+    const r = target.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+    showTip(wrap, r.left - w.left + r.width / 2, r.top - w.top, str);
+  };
+  target.addEventListener("mouseenter", place); target.addEventListener("focus", place);
+  target.addEventListener("mouseleave", hideTip); target.addEventListener("blur", hideTip);
+  target.addEventListener("touchstart", e => { place(); setTimeout(hideTip, 1800); }, { passive: true });
+  const t = el("title", {}, target); t.textContent = str;
+}
+function niceMax(v, step) { return Math.max(step, Math.ceil(v / step) * step); }
+function barPath(x, y, w, h, r, roundTop) {
+  // a bar with its data end rounded (top for positive values, bottom for negative) and a square baseline
+  if (h <= 0) return "";
+  if (!r) return "M" + x + " " + y + "h" + w + "v" + h + "h" + (-w) + "Z";
+  if (roundTop) return "M" + x + " " + (y + h) + "V" + (y + r) + "a" + r + " " + r + " 0 0 1 " + r + " " + (-r) + "h" + (w - 2 * r) + "a" + r + " " + r + " 0 0 1 " + r + " " + r + "V" + (y + h) + "Z";
+  return "M" + x + " " + y + "h" + w + "V" + (y + h - r) + "a" + r + " " + r + " 0 0 1 " + (-r) + " " + r + "h" + (-(w - 2 * r)) + "a" + r + " " + r + " 0 0 1 " + (-r) + " " + (-r) + "Z";
+}
+
+/* ---------- charts ---------- */
+function columnChart(wrap, opts) {
+  // opts: items [{label, parts:[{v, color, name}], total, tipText}], yMax, yFmt, ref [{y, label}], symmetric
+  wrap.innerHTML = "";
+  const W = 600, H = opts.height || 190, padL = 38, padR = 12, padT = 12, padB = 26;
+  const svg = el("svg", { viewBox: "0 0 " + W + " " + H, class: "chart", role: "img", "aria-label": opts.aria || "" }, wrap);
+  const n = opts.items.length;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const yMax = opts.yMax, yMin = opts.symmetric ? -yMax : 0;
+  const y = v => padT + plotH - (v - yMin) / (yMax - yMin) * plotH;
+  const ticks = opts.ticks || [yMin, (yMin + yMax) / 2, yMax];
+  ticks.forEach(tv => { el("line", { x1: padL, x2: W - padR, y1: y(tv), y2: y(tv), class: "grid" }, svg); text(svg, padL - 6, y(tv) + 4, opts.yFmt(tv), "", "end"); });
+  el("line", { x1: padL, x2: W - padR, y1: y(0), y2: y(0), class: "axis" }, svg);
+  (opts.ref || []).forEach(r => { el("line", { x1: padL, x2: W - padR, y1: y(r.y), y2: y(r.y), class: "ref" }, svg); text(svg, W - padR, y(r.y) - 4, r.label, "", "end"); });
+  const band = plotW / Math.max(n, 1), barW = Math.min(24, Math.max(6, band * 0.6));
+  opts.items.forEach((it, i) => {
+    const cx = padL + band * (i + 0.5);
+    let acc = 0;
+    const gap = 2;
+    it.parts.forEach(p => {
+      if (!p.v) return;
+      const y0 = y(acc), y1 = y(acc + p.v);
+      const inner = (p.v > 0 && acc > 0) ? gap : 0;              // 2px surface gap between stacked segments
+      const top = Math.min(y0, y1) + inner, h = Math.max(0, Math.abs(y1 - y0) - inner);
+      const isEnd = (acc + p.v === it.total);                     // only the data end is rounded; the baseline stays square
+      const r = el("path", { d: barPath(cx - barW / 2, top, barW, h, isEnd ? Math.min(4, h / 2) : 0, p.v >= 0), class: "bar", style: "fill:" + p.color }, svg);
+      hover(r, wrap, svg, p.tip || (it.label + " · " + p.name + " " + p.v));
+      acc += p.v;
+    });
+    if (it.capLabel != null) text(svg, cx, y(Math.max(0, it.total)) - 5, it.capLabel, "v", "middle");
+    if (it.xLabel) text(svg, cx, H - 8, it.xLabel, "", "middle");
+  });
+  return svg;
+}
+function lineChart(wrap, opts) {
+  // opts: points [{x label, v, tip}], yMin,yMax, ref, yFmt
+  wrap.innerHTML = "";
+  const W = 600, H = opts.height || 200, padL = 38, padR = 40, padT = 12, padB = 26;
+  const svg = el("svg", { viewBox: "0 0 " + W + " " + H, class: "chart", role: "img", "aria-label": opts.aria || "" }, wrap);
+  const n = opts.points.length, plotW = W - padL - padR, plotH = H - padT - padB;
+  const y = v => padT + plotH - (v - opts.yMin) / (opts.yMax - opts.yMin) * plotH;
+  const x = i => n === 1 ? padL + plotW / 2 : padL + plotW * i / (n - 1);
+  (opts.ticks || [opts.yMin, (opts.yMin + opts.yMax) / 2, opts.yMax]).forEach(tv => { el("line", { x1: padL, x2: W - padR, y1: y(tv), y2: y(tv), class: "grid" }, svg); text(svg, padL - 6, y(tv) + 4, opts.yFmt(tv), "", "end"); });
+  (opts.ref || []).forEach(r => { el("line", { x1: padL, x2: W - padR, y1: y(r.y), y2: y(r.y), class: "ref" }, svg); text(svg, W - padR + 4, y(r.y) + 4, r.label, "", "start"); });
+  if (n > 1) {
+    const d = opts.points.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1)).join(" ");
+    el("path", { d: d + " L" + x(n - 1).toFixed(1) + " " + y(opts.yMin) + " L" + x(0).toFixed(1) + " " + y(opts.yMin) + " Z", class: "area" }, svg);
+    el("path", { d: d, class: "line" }, svg);
+  }
+  opts.points.forEach((p, i) => {
+    const c = el("circle", { cx: x(i), cy: y(p.v), r: 4, class: "dot" }, svg);
+    const hit = el("circle", { cx: x(i), cy: y(p.v), r: 12, class: "hit", tabindex: 0 }, svg);
+    svg.insertBefore(hit, c);
+    hover(hit, wrap, svg, p.tip);
+    if (i === n - 1) text(svg, x(i) + 8, y(p.v) + 4, opts.yFmt(p.v), "v", "start");
+    if (p.xLabel) text(svg, x(i), H - 8, p.xLabel, "", i === 0 ? "start" : i === n - 1 ? "end" : "middle");
+  });
+  return svg;
+}
+
+/* ---------- sections ---------- */
+function renderKpis(list, prevList) {
+  const blocks = list.filter(s => s.type === "block"), reviews = list.filter(s => s.type === "review");
+  const scores = blockScoreRows(list).map(r => r.score), prevScores = blockScoreRows(prevList).map(r => r.score);
+  const avg = mean(scores), pavg = mean(prevScores);
+  const q10 = blocks.map(b => (b.checkpoints || []).find(c => c.q === 10 || c.q === Math.round(b.nQ / 2))).filter(Boolean);
+  const onPace = q10.length ? Math.round(q10.filter(c => c.delta >= 0).length / q10.length * 100) : null;
+  const tags = { K: 0, M: 0, T: 0, G: 0 };
+  reviews.forEach(r => { if (r.tags) ["K", "M", "T", "G"].forEach(l => tags[l] += r.tags[l] || 0); });
+  const total = tags.K + tags.M + tags.T + tags.G;
+  const dom = total ? ["K", "M", "T", "G"].sort((a, b) => tags[b] - tags[a])[0] : null;
+  const within = reviews.filter(r => r.mode !== "eo"), ok = within.filter(r => !r.stopped && (r.timeUsedSec || 0) <= (r.limitSec || 5400)).length;
+  const today = P.todayKey();
+  const kp = [
+    { l: "Blocks", v: blocks.length, d: blocks.filter(b => P.todayKey(b.date) === today).length + " today" },
+    { l: "Reviews", v: reviews.length, d: reviews.filter(b => P.todayKey(b.date) === today).length + " today" },
+    { l: "Average score", v: avg == null ? "—" : Math.round(avg) + "%", d: (avg != null && pavg != null) ? ((avg - pavg >= 0 ? "+" : "−") + Math.abs(Math.round(avg - pavg)) + " pts vs the period before") : (scores.length ? scores.length + " scored block" + (scores.length === 1 ? "" : "s") : "enter scores in the review pacer"), cls: (avg != null && pavg != null) ? (avg - pavg >= 0 ? "up" : "down") : "" },
+    { l: "On pace at Q10", v: onPace == null ? "—" : onPace + "%", d: q10.length ? "of " + q10.length + " blocks" : "no checkpoints yet" },
+    { l: "Main miss letter", v: dom ? dom : "—", d: dom ? tags[dom] + " of " + total + " tags" : "no tags yet" },
+    { l: "Reviews within 90:00", v: within.length ? Math.round(ok / within.length * 100) + "%" : "—", d: within.length ? ok + " of " + within.length : "no full reviews yet" }
+  ];
+  $("kpis").innerHTML = kp.map(k => '<div class="kpi"><div class="l">' + esc(k.l) + '</div><div class="v">' + esc(k.v) + '</div><div class="d ' + (k.cls || "") + '">' + esc(k.d) + "</div></div>").join("");
+  return { tags: tags, dom: dom, total: total };
+}
+function renderInsights(list, tagsInfo) {
+  const out = [];
+  const blocks = list.filter(s => s.type === "block"), reviews = list.filter(s => s.type === "review" && s.mode !== "eo");
+  const add = (kind, k, t) => out.push({ kind: kind, k: k, t: t });
+  const cps = q => blocks.map(b => (b.checkpoints || []).find(c => c.q === q)).filter(Boolean);
+  const nB = blocks.length;
+  if (nB >= 2) {
+    const q5 = cps(5), q10 = cps(10), q15 = cps(15), q20 = cps(20);
+    const behind = arr => arr.filter(c => c.delta < 0).length;
+    if (q5.length >= 2 && behind(q5) / q5.length >= 0.4) add("warn", "Pacing", "Slow starts: behind at Q5 in " + behind(q5) + " of " + q5.length + " blocks. The first five are not a warm-up — last line first, 50 seconds with no big picture → flag, best guess, move, from Q1.");
+    const drift = blocks.filter(b => { const a = (b.checkpoints || []).find(c => c.q === 10), c15 = (b.checkpoints || []).find(c => c.q === 15); return a && c15 && a.delta >= 0 && c15.delta < 0; }).length;
+    if (drift >= 2 || (nB >= 3 && drift / nB >= 0.3)) add("warn", "Pacing", "Mid-block drift: on pace at Q10 and behind at Q15 in " + drift + " of " + nB + " blocks — one question swallowed the clock. Micro-reset after Q10 (eyes off the screen 10 s, one breath), then flag at 50.");
+    const untapped = blocks.filter(b => (b.answered || 0) < (b.nQ || 20));
+    if (untapped.length) add("warn", "Pacing", untapped.length + " block" + (untapped.length === 1 ? "" : "s") + " ended with questions not tapped. 2:00 left → fill every blank with a guess. Never leave a blank.");
+    const banked = q20.map(c => c.rem).filter(v => v != null), avgBanked = mean(banked), avgFlag = mean(blocks.map(b => b.flagged || 0));
+    if (avgBanked != null && avgBanked < 60 && avgFlag >= 2) add("warn", "Pacing", "No time for flags: you reach Q20 with " + fmt(avgBanked) + " on average while flagging about " + Math.round(avgFlag) + " per block. Pass 1 is too slow — protect the easy questions, flag the hard ones at 50 s rather than at 2 minutes.");
+    if (avgFlag != null && avgFlag >= 6) add("warn", "Pacing", "About " + Math.round(avgFlag) + " flags per block. A flag is for 50 seconds with no big picture, not a maybe. Say the answer as one plain sentence before you click.");
+    const allCps = [].concat(q5, q10, q15, q20), behindAll = allCps.filter(c => c.delta < 0).length;
+    if (nB >= 3 && allCps.length && behindAll / allCps.length < 0.15 && !untapped.length) add("good", "Pacing", "Pacing is holding: behind at only " + behindAll + " of " + allCps.length + " checkpoints. Keep the scratch-paper line; nothing to change here.");
+  } else if (nB === 1) add("accent", "Pacing", "One block so far. Patterns show after three or four — keep tapping the checkpoints.");
+
+  if (tagsInfo.dom && tagsInfo.total >= 5) add(tagsInfo.dom === "K" ? "accent" : "warn", "Review", "Mostly " + tagsInfo.dom + " (" + tagsInfo.tags[tagsInfo.dom] + " of " + tagsInfo.total + " tags). " + FIX[tagsInfo.dom]);
+  else if (tagsInfo.total) add("accent", "Review", tagsInfo.total + " tagged miss" + (tagsInfo.total === 1 ? "" : "es") + " so far. The letters start to mean something at five or more.");
+  if (reviews.length) {
+    const stopped = reviews.filter(r => r.stopped).length, swept = reviews.reduce((a, r) => a + (r.swept || 0), 0);
+    if (stopped) add("warn", "Review", "Chunk 3 ran out in " + stopped + " of " + reviews.length + " reviews (" + swept + " question" + (swept === 1 ? "" : "s") + " swept with the Educational Objective only). If 90 min keeps running out, you're re-reading stems or reading wrong-choice paragraphs.");
+    const wrongN = reviews.reduce((a, r) => a + (r.wrongDone || 0), 0), extN = reviews.reduce((a, r) => a + (r.extensions || 0), 0);
+    if (wrongN >= 5 && extN / wrongN >= 0.5) add("warn", "Review", "The +3:00 was needed on " + Math.round(extN / wrongN * 100) + "% of wrong questions. Five minutes is: Educational Objective → correct-answer paragraph → the paragraph for your choice. Skip the other wrong-choice paragraphs.");
+    const corrAvg = mean(reviews.filter(r => r.avgCorrectSec).map(r => r.avgCorrectSec));
+    if (corrAvg != null && corrAvg > 45) add("warn", "Review", "Correct questions are taking about " + Math.round(corrAvg) + " s each; the budget is 30. Educational Objective only — a lucky guess is the one exception, and it gets Timer B.");
+    const wrongAvg = mean(reviews.filter(r => r.avgWrongSec).map(r => r.avgWrongSec));
+    if (!stopped && wrongN >= 5 && extN / wrongN < 0.25 && wrongAvg != null && wrongAvg <= 300) add("good", "Review", "Review discipline is holding: about " + fmt(wrongAvg) + " per wrong question, " + Math.round(extN / wrongN * 100) + "% extensions, every review inside 90:00.");
+  }
+  const rows = blockScoreRows(list);
+  if (rows.length >= 6) {
+    const recent = rows.slice(-3).map(r => r.score), earlier = rows.slice(-6, -3).map(r => r.score);
+    const a = mean(recent), b = mean(earlier);
+    if (a != null && b != null) add(a >= b ? "good" : "accent", "Scores", "Last three blocks average " + Math.round(a) + "% vs " + Math.round(b) + "% for the three before. One block's percentage is noise; the review is the part that pays.");
+  } else if (rows.length) add("accent", "Scores", rows.length + " scored block" + (rows.length === 1 ? "" : "s") + ". Scores in a new system move on the third and fourth block; the climb is not visible inside one day.");
+  const days = new Set(list.map(s => P.todayKey(s.date)));
+  const bothDays = Array.from(days).filter(d => list.some(s => s.type === "block" && P.todayKey(s.date) === d) && list.some(s => s.type === "review" && P.todayKey(s.date) === d)).length;
+  if (days.size) add("accent", "Sequence", days.size + " study day" + (days.size === 1 ? "" : "s") + " in range, " + bothDays + " with a block and its review. A reviewed block counts; an unreviewed one is half a day.");
+  if (!out.length) add("accent", "Start", "Nothing to analyze yet. Finish a block in the Block pacer and a review in the Review pacer; they save here by themselves.");
+  lastInsights = out;
+  $("insights").innerHTML = out.map(o => '<li data-kind="' + o.kind + '"><span class="k">' + esc(o.k) + "</span><span>" + esc(o.t) + "</span></li>").join("");
+}
+let lastInsights = [];
+function renderPacing(list) {
+  const blocks = list.filter(s => s.type === "block" && (s.checkpoints || []).length);
+  const wrap = $("pacing"), tbl = $("pacingTable");
+  if (!blocks.length) { wrap.innerHTML = '<p class="empty">No checkpoint data yet. Tap the checkpoints in the Block pacer.</p>'; tbl.innerHTML = ""; return; }
+  const qs = Array.from(new Set(blocks.flatMap(b => b.checkpoints.map(c => c.q)))).sort((a, b) => a - b).slice(0, 4);
+  const maxAbs = Math.max(30, ...blocks.flatMap(b => b.checkpoints.map(c => Math.abs(c.delta || 0))));
+  const yMax = niceMax(maxAbs, 30);
+  wrap.innerHTML = "";
+  const good = "var(--good)", warn = "var(--warn)";
+  qs.forEach(q => {
+    const box = document.createElement("div"); const h = document.createElement("h3"); h.textContent = "Q" + q; box.appendChild(h);
+    const cw = document.createElement("div"); cw.className = "chartwrap"; box.appendChild(cw); wrap.appendChild(box);
+    const items = blocks.map((b, i) => {
+      const c = b.checkpoints.find(x => x.q === q); const v = c ? Math.round(c.delta) : 0;
+      return { label: P.fmtDate(b.date, true) + (b.label ? " · " + b.label : ""), total: v, parts: [{ v: v, color: v >= 0 ? good : warn, name: "Q" + q, tip: P.fmtDate(b.date) + (b.label ? " · " + b.label : "") + " · Q" + q + " " + P.fmtSigned(v) + " (clock " + (c ? fmt(c.rem) : "—") + ", target " + (c ? fmt(c.target) : "—") + ")" }], xLabel: (i === 0 || i === blocks.length - 1) ? P.fmtDate(b.date) : null, capLabel: i === blocks.length - 1 ? P.fmtSigned(v) : null };
+    });
+    columnChart(cw, { items: items, yMax: yMax, symmetric: true, yFmt: v => P.fmtSigned(v), height: 150, aria: "Delta at Q" + q + " per block" });
+  });
+  tbl.innerHTML = '<table class="t"><thead><tr><th>Block</th>' + qs.map(q => '<th class="n">Q' + q + "</th>").join("") + '<th class="n">Flags</th></tr></thead><tbody>' +
+    blocks.map(b => "<tr><td>" + esc(P.fmtDate(b.date, true)) + (b.label ? " · " + esc(b.label) : "") + "</td>" + qs.map(q => { const c = b.checkpoints.find(x => x.q === q); return '<td class="n ' + (c ? (c.delta < 0 ? "behind" : "ahead") : "") + '">' + (c ? P.fmtSigned(Math.round(c.delta)) : "—") + "</td>"; }).join("") + '<td class="n">' + (b.flagged || 0) + "</td></tr>").join("") + "</tbody></table>";
+}
+function renderLetters(list) {
+  const reviews = list.filter(s => s.type === "review" && s.tags);
+  const wrap = $("letters"), tbl = $("lettersTable");
+  if (!reviews.length) { wrap.innerHTML = '<p class="empty">No reviews yet.</p>'; tbl.innerHTML = ""; return; }
+  const col = { K: "var(--k)", M: "var(--m)", T: "var(--t)", G: "var(--g)" };
+  const items = reviews.map((r, i) => {
+    const t = r.tags, total = (t.K || 0) + (t.M || 0) + (t.T || 0) + (t.G || 0);
+    return { label: P.fmtDate(r.date) + (r.label ? " · " + r.label : ""), total: total, capLabel: total ? String(total) : null,
+      parts: ["K", "M", "T", "G"].map(l => ({ v: t[l] || 0, color: col[l], name: l, tip: P.fmtDate(r.date) + (r.label ? " · " + r.label : "") + " · " + l + " " + (t[l] || 0) + " of " + total })),
+      xLabel: (i === 0 || i === reviews.length - 1) ? P.fmtDate(r.date) : null };
+  });
+  const yMax = niceMax(Math.max(1, ...items.map(i => i.total)), 2);
+  columnChart(wrap, { items: items, yMax: yMax, yFmt: v => String(Math.round(v)), ticks: [0, yMax / 2, yMax], aria: "Miss letters per review" });
+  tbl.innerHTML = '<table class="t"><thead><tr><th>Review</th><th class="n">K</th><th class="n">M</th><th class="n">T</th><th class="n">G</th><th class="n">Used</th></tr></thead><tbody>' +
+    reviews.map(r => "<tr><td>" + esc(P.fmtDate(r.date, true)) + (r.label ? " · " + esc(r.label) : "") + '</td><td class="n">' + (r.tags.K || 0) + '</td><td class="n">' + (r.tags.M || 0) + '</td><td class="n">' + (r.tags.T || 0) + '</td><td class="n">' + (r.tags.G || 0) + '</td><td class="n">' + fmt(r.timeUsedSec || 0) + "</td></tr>").join("") + "</tbody></table>";
+}
+function renderScores(list) {
+  const rows = blockScoreRows(list);
+  const wrap = $("scores"), tbl = $("systemsTable");
+  if (!rows.length) { wrap.innerHTML = '<p class="empty">No scores yet. Enter the block\'s correct count when you start its review (or in the block summary).</p>'; tbl.innerHTML = ""; return; }
+  const points = rows.map((r, i) => ({ v: r.score, tip: P.fmtDate(r.date) + (r.label ? " · " + r.label : "") + " · " + r.correct + "/" + r.nQ + " = " + Math.round(r.score) + "%", xLabel: (i === 0 || i === rows.length - 1) ? P.fmtDate(r.date) : null }));
+  lineChart(wrap, { points: points, yMin: 0, yMax: 100, ticks: [0, 50, 100], ref: [{ y: 60, label: "60" }], yFmt: v => Math.round(v) + "%", aria: "Score per block" });
+  const by = {};
+  rows.forEach(r => { const k = (r.label || "unlabeled").trim().toLowerCase(); (by[k] = by[k] || { name: r.label || "unlabeled", n: 0, sum: 0 }); by[k].n++; by[k].sum += r.score; });
+  const arr = Object.values(by).sort((a, b) => b.n - a.n);
+  tbl.innerHTML = '<table class="t"><thead><tr><th>System / label</th><th class="n">Blocks</th><th class="n">Average</th></tr></thead><tbody>' +
+    arr.map(s => "<tr><td>" + esc(s.name) + '</td><td class="n">' + s.n + '</td><td class="n">' + Math.round(s.sum / s.n) + "%</td></tr>").join("") + "</tbody></table>";
+}
+function renderReviewTime(list) {
+  const reviews = list.filter(s => s.type === "review" && s.mode !== "eo");
+  const wrap = $("rtime"), tbl = $("rtimeTable");
+  if (!reviews.length) { wrap.innerHTML = '<p class="empty">No full reviews yet.</p>'; tbl.innerHTML = ""; return; }
+  const accent = "var(--accent)", warn = "var(--warn)";
+  const limitMin = Math.round((reviews[reviews.length - 1].limitSec || 5400) / 60);
+  const items = reviews.map((r, i) => { const m = Math.round((r.timeUsedSec || 0) / 60); return { label: P.fmtDate(r.date), total: m, parts: [{ v: m, color: r.stopped ? warn : accent, name: "minutes", tip: P.fmtDate(r.date) + (r.label ? " · " + r.label : "") + " · " + fmt(r.timeUsedSec || 0) + (r.stopped ? " · hard stop, " + (r.swept || 0) + " swept" : "") + " · " + (r.extensions || 0) + " extension" + ((r.extensions || 0) === 1 ? "" : "s") }], xLabel: (i === 0 || i === reviews.length - 1) ? P.fmtDate(r.date) : null, capLabel: i === reviews.length - 1 ? m + " min" : null }; });
+  const yMax = niceMax(Math.max(limitMin, ...items.map(i => i.total)), 30);
+  columnChart(wrap, { items: items, yMax: yMax, yFmt: v => Math.round(v) + "", ticks: [0, yMax / 2, yMax], ref: [{ y: limitMin, label: "hard stop " + limitMin }], aria: "Review minutes used" });
+  tbl.innerHTML = '<table class="t"><thead><tr><th>Review</th><th class="n">Used</th><th class="n">Wrong</th><th class="n">Avg / wrong</th><th class="n">+3:00</th><th class="n">Swept</th></tr></thead><tbody>' +
+    reviews.map(r => "<tr><td>" + esc(P.fmtDate(r.date, true)) + (r.label ? " · " + esc(r.label) : "") + '</td><td class="n ' + (r.stopped ? "behind" : "") + '">' + fmt(r.timeUsedSec || 0) + '</td><td class="n">' + (r.wrongDone || 0) + '</td><td class="n">' + fmt(r.avgWrongSec || 0) + '</td><td class="n">' + (r.extensions || 0) + '</td><td class="n">' + (r.swept || 0) + "</td></tr>").join("") + "</tbody></table>";
+}
+function weeklyReport() {
+  const list = sessionsIn(7);
+  const lines = ["Step 3 pacer — last 7 days (" + P.fmtDate(new Date(Date.now() - 6 * 86400000).toISOString()) + " to " + P.fmtDate(new Date().toISOString()) + ")"];
+  const days = {};
+  list.forEach(s => { const k = P.todayKey(s.date); (days[k] = days[k] || []).push(s); });
+  Object.keys(days).sort().forEach(k => {
+    lines.push(""); lines.push(P.fmtDay(days[k][0].date));
+    days[k].forEach(s => {
+      if (s.type === "block") {
+        const cps = (s.checkpoints || []).map(c => "Q" + c.q + " " + P.fmtSigned(Math.round(c.delta))).join(" ");
+        lines.push("  Block " + (s.label ? s.label + " " : "") + (s.correct != null ? s.correct + "/" + s.nQ + " " : "") + "· " + cps + " · " + (s.flagged || 0) + " flagged" + ((s.answered || 0) < s.nQ ? " · " + (s.nQ - (s.answered || 0)) + " untapped" : ""));
+      } else {
+        const t = s.tags || {};
+        lines.push("  Review " + (s.label ? s.label + " " : "") + (s.correct != null ? s.correct + "/" + s.nQ + " " : "") + "· K" + (t.K || 0) + " M" + (t.M || 0) + " T" + (t.T || 0) + " G" + (t.G || 0) + " · " + fmt(s.timeUsedSec || 0) + " used" + (s.stopped ? " · hard stop, " + (s.swept || 0) + " swept" : "") + (s.extensions ? " · " + s.extensions + " ext" : "") + (s.mode === "eo" ? " · EO only" : ""));
+      }
+    });
+  });
+  if (!list.length) lines.push("", "No sessions in the last 7 days.");
+  const blocks = list.filter(s => s.type === "block"), reviews = list.filter(s => s.type === "review");
+  const scores = blockScoreRows(list).map(r => r.score);
+  lines.push("", "Totals: " + blocks.length + " blocks, " + reviews.length + " reviews" + (scores.length ? ", average score " + Math.round(mean(scores)) + "%" : ""));
+  const tags = { K: 0, M: 0, T: 0, G: 0 }; reviews.forEach(r => { if (r.tags) ["K", "M", "T", "G"].forEach(l => tags[l] += r.tags[l] || 0); });
+  lines.push("Letters: K" + tags.K + " M" + tags.M + " T" + tags.T + " G" + tags.G);
+  const ins = lastInsights.map(o => "- " + o.k + ": " + o.t);
+  if (ins.length) { lines.push("", "What to fix next:"); lines.push(...ins); }
+  return lines.join("\n");
+}
+function renderSessions() {
+  const list = ALL.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 40);
+  const ul = $("sessions");
+  if (!list.length) { ul.innerHTML = '<li class="empty">No sessions saved on this device.</li>'; return; }
+  ul.innerHTML = list.map(s => {
+    let what;
+    if (s.type === "block") what = esc(P.fmtDate(s.date, true)) + (s.label ? " · " + esc(s.label) : "") + (s.correct != null ? " · <b>" + s.correct + "/" + s.nQ + "</b>" : "") + " · " + (s.checkpoints || []).map(c => "Q" + c.q + " " + P.fmtSigned(Math.round(c.delta))).join(" ") + " · " + (s.flagged || 0) + " flagged";
+    else { const t = s.tags || {}; what = esc(P.fmtDate(s.date, true)) + (s.label ? " · " + esc(s.label) : "") + (s.correct != null ? " · <b>" + s.correct + "/" + s.nQ + "</b>" : "") + " · K" + (t.K || 0) + " M" + (t.M || 0) + " T" + (t.T || 0) + " G" + (t.G || 0) + " · " + fmt(s.timeUsedSec || 0) + (s.mode === "eo" ? " · EO only" : ""); }
+    return '<li data-type="' + s.type + '"><span class="kind">' + s.type + '</span><span class="what">' + what + '</span><button type="button" data-del="' + esc(s.id) + '">Delete</button></li>';
+  }).join("");
+  ul.querySelectorAll("button[data-del]").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.armed) { P.deleteSession(b.dataset.del); refresh(); P.syncQuietly(); return; }
+    b.dataset.armed = "1"; b.textContent = "Sure?"; setTimeout(() => { b.dataset.armed = ""; b.textContent = "Delete"; }, 3000);
+  }));
+}
+function renderSync() {
+  const cfg = P.getSync();
+  $("syncToken").value = cfg.token || "";
+  const st = $("syncStatus");
+  if (!cfg.token) { st.textContent = "Not set up on this device."; st.className = "status"; return; }
+  st.className = "status " + (cfg.lastError ? "bad" : "ok");
+  st.textContent = cfg.lastError ? "Last sync failed: " + cfg.lastError : (cfg.lastSync ? "Last synced " + P.fmtDate(new Date(cfg.lastSync).toISOString(), true) + "." : "Token saved. Press Sync now.");
+}
+function refresh() {
+  ALL = P.loadSessions();
+  const list = sessionsIn(range);
+  const prevList = range ? ALL.filter(s => { const t = new Date(s.date).getTime(); return t < Date.now() - range * 86400000 && t >= Date.now() - 2 * range * 86400000; }) : [];
+  document.querySelectorAll("#filters button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.range === +range)));
+  const tagsInfo = renderKpis(list, prevList);
+  renderInsights(list, tagsInfo);
+  renderPacing(list); renderLetters(list); renderScores(list); renderReviewTime(list);
+  $("report").textContent = weeklyReport();
+  $("dataMeta").textContent = ALL.length + " session" + (ALL.length === 1 ? "" : "s") + " on this device";
+  renderSessions(); renderSync();
+}
+function exportText() { return JSON.stringify({ app: "step3-pacer", savedAt: new Date().toISOString(), sessions: P.loadSessions() }, null, 1); }
+function importText(txt) {
+  let parsed;
+  try { parsed = JSON.parse(txt); } catch (e) { return "That is not a pacer backup (invalid JSON)."; }
+  const arr = Array.isArray(parsed) ? parsed : parsed.sessions;
+  if (!Array.isArray(arr)) return "That is not a pacer backup (no sessions list).";
+  const before = P.loadSessions().length;
+  P.saveSessions(P.mergeSessions(P.loadSessions(), arr));
+  const after = P.loadSessions().length;
+  refresh();
+  return "Imported. " + (after - before) + " new session" + (after - before === 1 ? "" : "s") + ", " + after + " total.";
+}
+async function doSync(btn) {
+  const b = btn; const old = b.textContent; b.textContent = "Syncing…"; b.disabled = true;
+  const res = await P.syncNow();
+  b.textContent = old; b.disabled = false;
+  refresh();
+  const st = $("syncStatus"); st.textContent = res.msg; st.className = "status " + (res.ok ? "ok" : "bad");
+}
+function init() {
+  P.applyTheme(); P.renderNav("stats");
+  document.querySelectorAll("#filters button").forEach(b => b.addEventListener("click", () => { range = +b.dataset.range; P.writeJSON(LS_RANGE, range); refresh(); }));
+  $("btnCopyReport").addEventListener("click", async e => { const b = e.currentTarget; try { await navigator.clipboard.writeText(weeklyReport()); b.textContent = "Copied"; } catch (err) { b.textContent = "Select the text and copy"; } setTimeout(() => { b.textContent = "Copy report"; }, 2500); });
+  $("btnExport").addEventListener("click", () => { const blob = new Blob([exportText()], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "step3-pacer-backup-" + P.todayKey() + ".json"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); });
+  $("btnCopyExport").addEventListener("click", async e => { const b = e.currentTarget; try { await navigator.clipboard.writeText(exportText()); b.textContent = "Copied"; } catch (err) { $("importText").value = exportText(); b.textContent = "Pasted below — copy it"; } setTimeout(() => { b.textContent = "Copy backup"; }, 2500); });
+  $("importFile").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { $("syncStatus").textContent = ""; $("importText").value = ""; alertNote(importText(String(r.result))); }; r.readAsText(f); e.target.value = ""; });
+  $("btnImportText").addEventListener("click", () => { const t = $("importText").value.trim(); if (!t) return; alertNote(importText(t)); $("importText").value = ""; });
+  $("btnClear").addEventListener("click", e => { const b = e.currentTarget; if (b.dataset.armed) { P.saveSessions([]); b.dataset.armed = ""; b.textContent = "Delete all data"; refresh(); return; } b.dataset.armed = "1"; b.textContent = "Sure? Deletes every session on this device"; setTimeout(() => { b.dataset.armed = ""; b.textContent = "Delete all data"; }, 4000); });
+  $("btnSyncSave").addEventListener("click", e => { const t = $("syncToken").value.trim(); if (!t) { $("syncStatus").textContent = "Paste a token first."; return; } P.setSync(Object.assign({}, P.getSync(), { token: t, lastError: "" })); doSync(e.currentTarget); });
+  $("btnSyncNow").addEventListener("click", e => doSync(e.currentTarget));
+  $("btnSyncForget").addEventListener("click", () => { P.setSync({}); renderSync(); });
+  refresh();
+  if (P.getSync().token) P.syncNow().then(() => refresh()).catch(() => {});
+}
+function alertNote(msg) { $("dataMeta").textContent = msg; }
+init();
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); }); }
+})();
+</script>
+</body>
+</html>

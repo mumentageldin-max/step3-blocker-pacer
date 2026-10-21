@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Step 3 Review Pacer</title>
+<meta name="description" content="Two-timer review pacer for UWorld blocks: 90-minute hard stop in three chunks, 5+3 minutes per wrong question, 30 seconds per correct one, K/M/T/G tagging and a parking lot.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F5F8">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E141B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Review">
+<link rel="manifest" href="./manifest-review.webmanifest">
+<link rel="icon" href="./icons/review-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icons/review-apple-touch-icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Martian+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="./shared.css">
+<style>
+/* Layout: Timer A (the 90-minute budget) is a slim full-width band; Timer B (this question) is the big card
+   you tap; letters tally, parking lot and rules sit beside it on wide screens and below it on a phone. */
+.band{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:10px;container-type:inline-size}
+.band .row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.band .clockA{font-family:var(--font-num);font-weight:700;font-size:clamp(34px,9cqi,64px);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.band[data-tone="warn"] .clockA{color:var(--warn)}
+.band[data-tone="crit"] .clockA{color:var(--crit)}
+.band[data-tone="paused"] .clockA{color:var(--muted)}
+.band[data-tone="stand"]{border-color:var(--good);box-shadow:inset 0 0 0 1px var(--good)}
+.chunks{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.chunk{height:10px;border-radius:5px;background:var(--line);position:relative;overflow:hidden}
+.chunk i{position:absolute;inset:0 auto 0 0;width:0;background:var(--accent);border-radius:5px}
+.chunk.done i{width:100%}
+.chunklabels{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;font-size:12px;color:var(--muted)}
+.chunklabels span{text-align:center}
+.standbox{display:grid;gap:10px;justify-items:center;text-align:center;background:var(--good-bg);border-radius:10px;padding:12px}
+.standbox .standclock{font-family:var(--font-num);font-weight:700;font-size:clamp(40px,12cqi,72px);line-height:1;color:var(--good);font-variant-numeric:tabular-nums}
+.standbox .standclock.over{color:var(--crit)}
+.standbox p{margin:0;color:var(--good);font-weight:700}
+.standbox button{width:100%}
+
+.qcard{container-type:inline-size;user-select:none;-webkit-user-select:none;text-align:center;justify-items:center}
+.qcard .clockB{font-family:var(--font-num);font-weight:700;font-size:clamp(48px,21cqi,150px);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin-top:4px;white-space:nowrap}
+.qcard[data-tone="warn"] .clockB{color:var(--warn)}
+.qcard[data-tone="crit"] .clockB{color:var(--crit)}
+.qcard[data-tone="good"] .clockB{color:var(--good)}
+.qcard[data-tone="idle"] .clockB{color:var(--muted)}
+.ring{position:relative;width:100%;height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.ring i{position:absolute;inset:0 auto 0 0;width:0;background:var(--accent);border-radius:5px}
+.qcard[data-tone="warn"] .ring i{background:var(--warn)}
+.qcard[data-tone="crit"] .ring i{background:var(--crit)}
+.qcard[data-tone="good"] .ring i{background:var(--good)}
+.starts{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.starts .lucky{grid-column:1/-1;min-height:48px;font-size:15px;border-color:var(--warn);color:var(--warn)}
+.tagbtns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%}
+.tagbtns button{min-height:84px;display:grid;gap:2px;align-content:center;padding:8px 4px;line-height:1.15}
+.tagbtns button b{font-family:var(--font-num);font-size:28px}
+.tagbtns button small{font-size:11px;color:var(--muted);font-weight:700;white-space:normal}
+.tagbtns button[data-tag="K"]{border-color:var(--k)} .tagbtns button[data-tag="M"]{border-color:var(--m)}
+.tagbtns button[data-tag="T"]{border-color:var(--t)} .tagbtns button[data-tag="G"]{border-color:var(--g)}
+.tagbtns button[data-tag="K"] b{color:var(--k)} .tagbtns button[data-tag="M"] b{color:var(--m)}
+.tagbtns button[data-tag="T"] b{color:var(--t)} .tagbtns button[data-tag="G"] b{color:var(--g)}
+.extrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.extrow button{min-height:56px}
+.ruleline{font-size:14px;color:var(--muted);margin:0;text-wrap:balance;max-width:44ch}
+
+.tally{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tally div{border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center;display:grid;gap:2px}
+.tally b{font-family:var(--font-num);font-size:22px;line-height:1}
+.tally small{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.tally div[data-tag="K"] b{color:var(--k)} .tally div[data-tag="M"] b{color:var(--m)} .tally div[data-tag="T"] b{color:var(--t)} .tally div[data-tag="G"] b{color:var(--g)}
+.prog{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.prog b{font-family:var(--font-num);color:var(--fg)}
+
+.park form{display:flex;gap:8px}
+.park input{flex:1;min-width:0;font:inherit;font-size:15px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.park input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.park ul,ul.park{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.park li{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:15px;border-bottom:1px solid var(--line2);padding:4px 0}
+.park li button{min-height:32px;padding:4px 10px;font-size:13px}
+.park .empty{color:var(--muted);font-size:14px;margin:0}
+
+.picks{display:flex;gap:8px;flex-wrap:wrap}
+.picks button{min-height:42px;font-size:14px;padding:8px 12px;border-radius:999px;font-weight:700}
+.picks button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.setup .primary{width:100%}
+
+.done .fix{border-radius:10px;padding:10px 12px;background:var(--good-bg);color:var(--good);font-weight:700}
+.done .line{font-family:var(--font-num);font-size:14px;padding:10px 12px;border:1px dashed var(--line);border-radius:8px;background:var(--bg);overflow-x:auto;white-space:nowrap;margin:0}
+.done .row2{display:flex;gap:8px;flex-wrap:wrap}
+.done .row2 button{min-height:44px;padding:10px 14px}
+.parkclock{font-family:var(--font-num);font-weight:700;font-size:40px;line-height:1;font-variant-numeric:tabular-nums}
+
+@media (min-width:820px) and (min-height:520px){
+  .band{grid-column:1/-1}
+  .band .clockA{font-size:clamp(40px,6cqi,64px)}
+  .tagbtns button{min-height:96px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Step 3 Review Pacer</h1>
+    <p class="tag" id="tagline">90:00 hard stop · 5+3 per wrong · 30 s per correct</p>
+  </header>
+  <nav id="pnav" aria-label="Pages"></nav>
+
+  <!-- SETUP -->
+  <section class="card setup full" id="setup">
+    <div class="rowhead"><h2>This review</h2><span class="meta">Before you start: Daily Card page 2, scratch paper, pen.</span></div>
+    <div class="picks" id="picks" hidden></div>
+    <div class="form">
+      <label>Block label or system<input type="text" id="sLabel" placeholder="Cardio · Random · Ethics…" autocomplete="off"></label>
+      <label>Questions in the block<input type="number" id="sN" min="1" max="60" value="20" inputmode="numeric"></label>
+      <label>Correct (from the results page)<input type="number" id="sCorrect" min="0" max="60" placeholder="13" inputmode="numeric"></label>
+      <label>Mode<select id="sMode"><option value="full">Full review · 90:00 hard stop</option><option value="eo">EO only · 30 s per question</option></select></label>
+    </div>
+    <p class="note" id="sDerived">Enter the score and the app knows how many wrong questions get Timer B.</p>
+    <button class="primary" id="btnStart" type="button">Start review</button>
+  </section>
+
+  <!-- TIMER A -->
+  <section class="band full" id="band" data-tone="normal" hidden>
+    <div class="row">
+      <div>
+        <span class="pill" data-kind="accent" id="pillA">Chunk 1 of 3</span>
+        <span class="meta" id="metaA"></span>
+      </div>
+      <div class="clockA" id="clockA">90:00</div>
+    </div>
+    <div class="chunks" id="chunks"><div class="chunk"><i></i></div><div class="chunk"><i></i></div><div class="chunk"><i></i></div></div>
+    <div class="chunklabels"><span>Chunk 1</span><span>Chunk 2</span><span>Chunk 3</span></div>
+    <p class="modeText" id="textA">Stand 4 minutes at the end of each chunk. 90 minutes of review, hard stop.</p>
+    <div class="standbox" id="standbox" hidden>
+      <p id="standTitle">Stand. Walk. Water. No phone.</p>
+      <div class="standclock" id="standClock">4:00</div>
+      <button class="primary good" id="btnResume" type="button">Back at the desk — resume</button>
+    </div>
+    <div class="subactions">
+      <button id="btnPause" type="button">Pause</button>
+      <button id="btnStandNow" type="button">Stand now</button>
+      <button id="btnEnd" type="button">End review</button>
+      <button id="btnSound" type="button" aria-pressed="true">Sound on</button>
+    </div>
+  </section>
+
+  <div class="colL" id="colL" hidden>
+    <!-- TIMER B -->
+    <section class="card qcard" id="qcard" data-tone="idle">
+      <div class="rowhead" style="width:100%">
+        <span class="pill" id="pillB">Next question</span>
+        <span class="meta" id="metaB"></span>
+      </div>
+      <div class="clockB" id="clockB">5:00</div>
+      <div class="ring"><i id="ringFill"></i></div>
+      <p class="ruleline" id="textB">Which one is next? Wrong gets 5:00 — EO, the correct-answer paragraph, your choice. Correct gets 30 s — Educational Objective only.</p>
+      <div class="starts" id="starts">
+        <button class="primary" id="btnWrong" type="button">Wrong · 5:00</button>
+        <button class="primary good" id="btnCorrect" type="button">Correct · 30 s</button>
+        <button class="lucky" id="btnLucky" type="button">Lucky guess → treat as wrong</button>
+      </div>
+      <div class="extrow" id="extrow" hidden>
+        <button id="btnExtend" type="button" style="grid-column:1/-1">+3:00 (once)</button>
+      </div>
+      <div class="tagbtns" id="tagbtns" hidden>
+        <button type="button" data-tag="K"><b>K</b><small>didn't know the fact</small></button>
+        <button type="button" data-tag="M"><b>M</b><small>misread / missed a detail</small></button>
+        <button type="button" data-tag="T"><b>T</b><small>knew it, not the form</small></button>
+        <button type="button" data-tag="G"><b>G</b><small>guessed / rushed</small></button>
+      </div>
+      <div class="extrow" id="nextrow" hidden>
+        <button class="primary" id="btnNext" type="button" style="grid-column:1/-1">Next</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="colR" id="colR">
+    <section class="card" id="progCard" hidden>
+      <div class="prog" id="prog"></div>
+      <div class="tally" id="tally">
+        <div data-tag="K"><b>0</b><small>K know</small></div>
+        <div data-tag="M"><b>0</b><small>M misread</small></div>
+        <div data-tag="T"><b>0</b><small>T form</small></div>
+        <div data-tag="G"><b>0</b><small>G rushed</small></div>
+      </div>
+    </section>
+
+    <section class="card park">
+      <div class="rowhead"><h2>Parking lot</h2><span class="meta">Not on this screen = not for now</span></div>
+      <form id="parkForm"><input id="parkIn" placeholder="three words, then back to the screen" autocomplete="off" maxlength="80"><button type="submit" class="small">Add</button></form>
+      <ul id="parkList"></ul>
+    </section>
+
+    <details class="fold" id="rulesFold">
+      <summary>Rules for this review</summary>
+      <div class="body">
+        <ol class="rules">
+          <li><b>Two timers.</b> Timer A: 30-min chunks, 3 chunks = 90 min per block, hard stop; stand 3–5 min between chunks. Timer B: 5 min per wrong question, +3 if you need it = 8 max. Rings → you move.</li>
+          <li><b>Correct questions:</b> no Timer B. Educational Objective, 30 seconds. A lucky guess counts as wrong.</li>
+          <li><b>Don't re-read the stem.</b> Educational Objective → correct-answer paragraph → the paragraph for the choice you picked. Skip the other wrong-choice paragraphs.</li>
+          <li><b>Calculation question</b> → draw the 2×2 and redo it yourself before reading their math.</li>
+          <li>Write one line: <b>"Rule: ___"</b> in your own words. Ten words max. Tag the miss with one letter.</li>
+          <li><b>Chunk 3 ends with questions left</b> → Educational Objective only, 30 s each, tagged K. The app switches to that by itself.</li>
+          <li><b>Not allowed:</b> UWorld library, a new sheet, YouTube, a podcast, a "quick" lookup, Claude per question. Parking lot instead.</li>
+        </ol>
+        <p class="note">Keys: <kbd>W</kbd> wrong · <kbd>C</kbd> correct · <kbd>L</kbd> lucky · <kbd>K</kbd> <kbd>M</kbd> <kbd>T</kbd> <kbd>G</kbd> tag · <kbd>E</kbd> +3:00 · <kbd>N</kbd> next · <kbd>P</kbd> pause.</p>
+      </div>
+    </details>
+
+    <details class="fold" id="settingsFold">
+      <summary>Settings</summary>
+      <div class="body">
+        <fieldset id="settingsFs">
+          <div class="form">
+            <label>Timer A total (mm:ss)<input type="text" id="fLimit" value="90:00" inputmode="numeric"></label>
+            <label>Chunk length (mm:ss)<input type="text" id="fChunk" value="30:00" inputmode="numeric"></label>
+            <label>Stand between chunks (mm:ss)<input type="text" id="fStand" value="4:00" inputmode="numeric"></label>
+            <label>Timer B per wrong (mm:ss)<input type="text" id="fB" value="5:00" inputmode="numeric"></label>
+            <label>Extension, once (mm:ss)<input type="text" id="fExt" value="3:00" inputmode="numeric"></label>
+            <label>Correct question (seconds)<input type="number" id="fEo" value="30" min="10" max="300" inputmode="numeric"></label>
+            <label>Theme<select id="fTheme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+          </div>
+          <div class="formrow">
+            <button type="button" id="btnApply">Save settings</button>
+            <span class="note" id="settingsMsg"></span>
+          </div>
+        </fieldset>
+        <p class="note" id="settingsLock" hidden>Settings unlock when the review is finished.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- DONE -->
+  <section class="card done full" id="done" hidden>
+    <div class="rowhead"><h2>Review summary</h2><span class="meta" id="doneMeta"></span></div>
+    <div class="tally" id="doneTally"></div>
+    <div class="fix" id="doneFix"></div>
+    <ul class="stats" id="doneStats"></ul>
+    <p class="note">One line for the notebook:</p>
+    <p class="line" id="noteLine"></p>
+    <div class="row2">
+      <button id="btnCopyLine" type="button">Copy the line</button>
+      <button id="btnStats" type="button">Open stats</button>
+      <button id="btnNew" type="button">New review</button>
+    </div>
+    <div class="rowhead"><h2>Parking lot · 15 minutes, timed</h2><span class="parkclock" id="parkClock">15:00</span></div>
+    <p class="note">End of the day only. Most items get crossed out unread.</p>
+    <div class="row2"><button id="btnPark15" type="button">Start 15:00</button><button id="btnParkClear" type="button">Clear the list</button></div>
+    <ul id="parkListDone" class="park"></ul>
+  </section>
+</div>
+
+<script src="./shared.js"></script>
+<script>
+(() => {
+const P = window.Pacer, $ = id => document.getElementById(id), fmt = P.fmt;
+const LS_S = "step3pacer.review.settings.v1", LS_R = "step3pacer.review.run.v1";
+const DEFAULTS = { limitSec: 5400, chunkSec: 1800, standSec: 240, bSec: 300, extSec: 180, eoSec: 30, sound: true };
+const FIX = {
+  K: "Mostly K — knowledge gap. Normal. The \"Rule:\" lines are the fix; nothing extra.",
+  M: "Mostly M — misread. Read the last line first; highlight D / T / MC / MT / GA while reading.",
+  T: "Mostly T — translation. Write your answer on paper, then convert it to the other form before giving up (biostats sheet, last page).",
+  G: "Mostly G — guessed or rushed. You're rushing on hard ones. Flag at 50 sec instead of guessing; come back on pass 2."
+};
+let S = Object.assign({}, DEFAULTS);
+let R = fresh();
+let endArmed = 0, parkTimer = null;
+
+function fresh() {
+  return { phase: "setup", id: "", date: "", label: "", nQ: 20, correct: null, wrongTotal: null, mode: "full", blockId: null,
+    startAt: 0, pausedAt: 0, pausedTotal: 0, pauseKind: "", standStartAt: 0, standChimed: false, standsDone: 0, manualStands: 0,
+    q: null, items: [], tags: { K: 0, M: 0, T: 0, G: 0 }, wrongDone: 0, correctDone: 0, lucky: 0, swept: 0,
+    stopped: false, sweepStartAt: 0, endEl: 0 };
+}
+
+/* ---------- storage ---------- */
+function loadSettings() { const p = P.readJSON(LS_S, null); if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p); P.setSound(S.sound); }
+function saveSettings() { P.writeJSON(LS_S, S); }
+function persist() { P.writeJSON(LS_R, R); }
+function loadRun() {
+  const p = P.readJSON(LS_R, null);
+  if (!p || (p.phase !== "run" && p.phase !== "sweep")) return;
+  if (Date.now() - p.startAt > 8 * 3600 * 1000) return;
+  R = Object.assign(fresh(), p);
+}
+
+/* ---------- clocks ---------- */
+function elA(now) { // review time used, in ms (stands and pauses excluded)
+  now = now || Date.now();
+  if (R.phase === "setup") return 0;
+  if (R.phase === "done" || R.phase === "sweep") return R.endEl;
+  const ref = R.pauseKind ? R.pausedAt : now;
+  return Math.max(0, ref - R.startAt - R.pausedTotal);
+}
+function qElapsedSec(now) {
+  if (!R.q) return 0;
+  if (R.phase === "sweep") return Math.max(0, ((now || Date.now()) - R.q.startAt) / 1000);
+  return Math.max(0, (elA(now) - R.q.startEl) / 1000);
+}
+function qBudget() {
+  if (!R.q) return 0;
+  if (R.q.kind === "correct" || R.q.kind === "sweep" || R.q.kind === "eo") return S.eoSec;
+  return S.bSec + (R.q.ext ? S.extSec : 0);
+}
+function remainingWrong() { return R.wrongTotal == null ? null : Math.max(0, R.wrongTotal - R.wrongDone); }
+function remainingCorrect() { return R.correct == null ? null : Math.max(0, R.correct - R.lucky - R.correctDone); }
+function remainingAll() { const w = remainingWrong(), c = remainingCorrect(); return (w == null || c == null) ? null : w + c; }
+
+/* ---------- actions ---------- */
+function startReview() {
+  const label = $("sLabel").value.trim(), nQ = parseInt($("sN").value, 10);
+  const cRaw = $("sCorrect").value.trim(), correct = cRaw === "" ? null : parseInt(cRaw, 10);
+  if (!nQ || nQ < 1) { $("sDerived").textContent = "Enter how many questions the block had."; return; }
+  if (correct != null && (isNaN(correct) || correct < 0 || correct > nQ)) { $("sDerived").textContent = "Correct must be between 0 and " + nQ + "."; return; }
+  R = fresh();
+  R.phase = "run"; R.id = P.newId(); R.date = new Date().toISOString();
+  R.label = label; R.nQ = nQ; R.correct = correct; R.wrongTotal = correct == null ? null : nQ - correct;
+  R.mode = $("sMode").value === "eo" ? "eo" : "full";
+  R.blockId = pickedBlock || null;
+  R.startAt = Date.now();
+  if (R.mode === "eo") startItem("eo");
+  P.audioInit(); P.sfx("start"); P.keepAwake();
+  $("rulesFold").open = false;
+  persist(); render();
+}
+function startItem(kind) {
+  const now = Date.now();
+  if (R.q && (R.q.kind === "wrong" || R.q.kind === "lucky")) return; // a wrong question must be tagged first
+  closeCurrent(now, null);
+  if (kind === "lucky") { R.lucky++; if (R.wrongTotal != null) R.wrongTotal++; }
+  R.q = { kind: kind, startEl: elA(now), startAt: now, ext: false, rang: false, hardRang: false };
+  persist(); render();
+}
+function closeCurrent(now, tag) { // records the running item, if any
+  if (!R.q) return;
+  const sec = qElapsedSec(now);
+  const k = R.q.kind;
+  if (k === "wrong" || k === "lucky") {
+    if (!tag) return; // a wrong question is closed by a tag, never silently
+    R.items.push({ kind: k, sec: Math.round(sec), tag: tag, ext: !!R.q.ext, over: sec > qBudget() });
+    R.tags[tag]++; R.wrongDone++;
+  } else if (k === "correct") {
+    R.items.push({ kind: k, sec: Math.round(sec), over: sec > S.eoSec });
+    R.correctDone++;
+  } else if (k === "sweep") {
+    R.items.push({ kind: k, sec: Math.round(sec), tag: "K" });
+    R.tags.K++; R.wrongDone++; R.swept++;
+  } else if (k === "eo") {
+    R.items.push({ kind: k, sec: Math.round(sec) });
+    R.correctDone++;
+  }
+  R.q = null;
+}
+function tag(letter) {
+  if (!R.q || (R.q.kind !== "wrong" && R.q.kind !== "lucky")) return;
+  closeCurrent(Date.now(), letter);
+  if (R.phase === "sweep") nextSweep(); else { persist(); render(); }
+}
+function extend() {
+  if (!R.q || (R.q.kind !== "wrong" && R.q.kind !== "lucky") || R.q.ext) return;
+  R.q.ext = true; R.q.rang = false; persist(); render();
+}
+function next() { // sweep / eo / correct: close and move
+  if (!R.q) return;
+  if (R.q.kind === "wrong" || R.q.kind === "lucky") return;
+  if (R.phase === "sweep") { closeCurrent(Date.now(), null); nextSweep(); return; }
+  if (R.mode === "eo") {
+    closeCurrent(Date.now(), null);
+    if (R.correctDone >= R.nQ) finish(); else { startItem("eo"); }
+    return;
+  }
+  closeCurrent(Date.now(), null); persist(); render();
+}
+function nextSweep() {
+  const left = remainingAll();
+  if (left != null && left <= 0) { finish(); return; }
+  R.q = { kind: "sweep", startEl: 0, startAt: Date.now(), ext: false, rang: false, hardRang: false };
+  persist(); render();
+}
+function pause(kind) {
+  if (R.phase !== "run" || R.pauseKind) return;
+  R.pauseKind = kind; R.pausedAt = Date.now();
+  if (kind === "stand") {
+    R.standStartAt = R.pausedAt; R.standChimed = false;
+    if (!R.auto) {
+      // a stand taken within 3 minutes of a chunk end counts as that chunk's stand
+      const el = elA(R.pausedAt) / 1000, boundary = S.chunkSec * (R.standsDone + 1);
+      if (R.standsDone < 2 && boundary - el < 180) R.standsDone++; else R.manualStands++;
+    }
+  }
+  R.auto = false;
+  persist(); render();
+}
+function resume() {
+  if (R.phase !== "run" || !R.pauseKind) return;
+  R.pausedTotal += Date.now() - R.pausedAt; R.pausedAt = 0; R.pauseKind = ""; R.standStartAt = 0;
+  P.keepAwake(); persist(); render();
+}
+function hardStop() {
+  const now = Date.now();
+  R.endEl = S.limitSec * 1000; R.stopped = true;
+  // an open correct item just closes; an open wrong item is closed as a sweep item (EO only from here on)
+  if (R.q && (R.q.kind === "wrong" || R.q.kind === "lucky")) { R.q.kind = "sweep"; R.q.startAt = now; }
+  else closeCurrent(now, null);
+  P.sfx("stop"); P.vibrate([400, 120, 400]);
+  const left = remainingAll();
+  if (left == null || left > 0) { R.phase = "sweep"; R.pauseKind = ""; if (!R.q) R.q = { kind: "sweep", startEl: 0, startAt: now, ext: false, rang: false, hardRang: false }; }
+  else { R.phase = "done"; }
+  if (R.phase === "done") finish(); else { persist(); render(); }
+}
+function finish() {
+  const now = Date.now();
+  if (R.phase === "run") { if (R.pauseKind) { R.pausedTotal += now - R.pausedAt; R.pauseKind = ""; } R.endEl = Math.min(S.limitSec * 1000, now - R.startAt - R.pausedTotal); }
+  if (R.q && (R.q.kind === "wrong" || R.q.kind === "lucky")) R.q.kind = "sweep";
+  closeCurrent(now, null);
+  R.phase = "done";
+  P.sfx("end"); P.releaseWake();
+  saveReview();
+  persist(); render();
+}
+function endReview() {
+  if (R.phase !== "run" && R.phase !== "sweep") return;
+  if (endArmed && Date.now() - endArmed < 3500) { endArmed = 0; finish(); return; }
+  endArmed = Date.now(); render();
+  setTimeout(() => { if (endArmed && Date.now() - endArmed >= 3500) { endArmed = 0; render(); } }, 3600);
+}
+function saveReview() {
+  const wrongItems = R.items.filter(i => i.kind === "wrong" || i.kind === "lucky");
+  const correctItems = R.items.filter(i => i.kind === "correct" || i.kind === "eo");
+  const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b.sec, 0) / arr.length) : 0;
+  const s = {
+    id: R.id, type: "review", date: R.date, label: R.label, nQ: R.nQ, correct: R.correct,
+    wrong: R.wrongTotal, lucky: R.lucky, mode: R.mode, tags: Object.assign({}, R.tags), items: R.items.slice(),
+    timeUsedSec: Math.round(R.endEl / 1000), limitSec: S.limitSec, stands: R.standsDone + R.manualStands,
+    extensions: wrongItems.filter(i => i.ext).length, overWrong: wrongItems.filter(i => i.over).length,
+    swept: R.swept, wrongDone: R.wrongDone, correctDone: R.correctDone, avgWrongSec: avg(wrongItems), avgCorrectSec: avg(correctItems),
+    stopped: !!R.stopped, blockId: R.blockId
+  };
+  P.saveSession(s);
+  if (R.blockId) {
+    const all = P.loadSessions(); const b = all.find(x => x.id === R.blockId);
+    if (b) { b.reviewId = R.id; if (R.correct != null && b.correct == null) b.correct = R.correct; if (!b.label && R.label) b.label = R.label; P.saveSession(b); }
+  }
+  P.syncQuietly();
+}
+
+/* ---------- tick ---------- */
+function tick() {
+  const now = Date.now();
+  if (R.phase === "run") {
+    const el = elA(now) / 1000;
+    if (!R.pauseKind) {
+      // chunk ends → automatic stand (first two chunk ends only)
+      if (R.standsDone < 2 && el >= S.chunkSec * (R.standsDone + 1) && el < S.limitSec) {
+        R.standsDone++; R.auto = true; P.sfx("stand"); P.vibrate([200, 100, 200]);
+        pause("stand"); return;
+      }
+      if (el >= S.limitSec) { hardStop(); return; }
+      // Timer B
+      if (R.q) {
+        const rem = qBudget() - qElapsedSec(now);
+        if (rem <= 0 && !R.q.rang) {
+          R.q.rang = true;
+          if (R.q.kind === "correct") { P.sfx("tick"); }
+          else if (R.q.ext) { R.q.hardRang = true; P.sfx("hardmove"); P.vibrate([150, 80, 150, 80, 300]); }
+          else { P.sfx("move"); P.vibrate([150, 80, 150]); }
+          persist();
+        }
+      }
+    } else if (R.pauseKind === "stand") {
+      const left = S.standSec - (now - R.standStartAt) / 1000;
+      if (left <= 0 && !R.standChimed) { R.standChimed = true; P.sfx("resume"); P.vibrate([120, 60, 120, 60, 120]); persist(); }
+    }
+  } else if (R.phase === "sweep" && R.q) {
+    const rem = S.eoSec - qElapsedSec(now);
+    if (rem <= 0 && !R.q.rang) { R.q.rang = true; P.sfx("tick"); persist(); }
+  }
+  render();
+}
+
+/* ---------- render ---------- */
+let pickedBlock = null;
+function renderPicks() {
+  const el = $("picks");
+  const cutoff = Date.now() - 2 * 86400000;
+  const blocks = P.loadSessions().filter(s => s.type === "block" && !s.reviewId && new Date(s.date).getTime() > cutoff).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 4);
+  if (!blocks.length) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = '<span class="note" style="align-self:center">Reviewing:</span>' + blocks.map(b => {
+    const score = b.correct != null ? " · " + b.correct + "/" + b.nQ : "";
+    return '<button type="button" data-block="' + P.esc(b.id) + '" aria-pressed="' + (pickedBlock === b.id ? "true" : "false") + '">' + P.esc(P.fmtDate(b.date, true)) + (b.label ? " · " + P.esc(b.label) : "") + score + "</button>";
+  }).join("") + '<button type="button" data-block="" aria-pressed="' + (pickedBlock ? "false" : "true") + '">Other</button>';
+  el.querySelectorAll("button[data-block]").forEach(b => b.addEventListener("click", () => {
+    const id = b.dataset.block; pickedBlock = id || null;
+    if (id) { const s = blocks.find(x => x.id === id); if (s) { if (s.label) $("sLabel").value = s.label; $("sN").value = s.nQ; if (s.correct != null) $("sCorrect").value = s.correct; } }
+    renderPicks(); renderDerived();
+  }));
+}
+function renderDerived() {
+  const nQ = parseInt($("sN").value, 10), c = $("sCorrect").value.trim();
+  const el = $("sDerived");
+  if (!nQ) { el.textContent = ""; return; }
+  if ($("sMode").value === "eo") { el.textContent = nQ + " questions × " + S.eoSec + " s, Educational Objective only. No tags, no hard stop."; return; }
+  if (c === "" || isNaN(parseInt(c, 10))) { el.textContent = "Enter the score and the app knows how many wrong questions get Timer B."; return; }
+  const corr = parseInt(c, 10), wrong = nQ - corr;
+  const need = wrong * S.bSec, budget = S.limitSec;
+  el.textContent = wrong + " wrong → Timer B (" + fmt(S.bSec) + " each = " + fmt(need) + ") · " + corr + " correct → " + S.eoSec + " s each (" + fmt(corr * S.eoSec) + "). Budget " + fmt(budget) + (need + corr * S.eoSec > budget ? " — tight: the +3:00 is not free today." : ".");
+}
+function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
+function render() {
+  const now = Date.now();
+  const inSetup = R.phase === "setup", live = R.phase === "run" || R.phase === "sweep", done = R.phase === "done";
+  $("setup").hidden = !inSetup;
+  $("band").hidden = inSetup || done;
+  $("colL").hidden = inSetup || done;
+  $("colR").hidden = done;
+  $("progCard").hidden = inSetup;
+  $("done").hidden = !done;
+  $("settingsFs").disabled = live; $("settingsLock").hidden = !live;
+  $("btnSound").textContent = S.sound ? "Sound on" : "Sound off";
+  $("btnSound").setAttribute("aria-pressed", S.sound ? "true" : "false");
+  if (inSetup) return;
+
+  const el = elA(now) / 1000, remA = Math.max(0, S.limitSec - el);
+  const meta = (R.label ? R.label + " · " : "") + (R.correct != null ? R.correct + "/" + R.nQ : R.nQ + " Q");
+  // Timer A band
+  const band = $("band");
+  $("metaA").textContent = meta;
+  $("clockA").textContent = R.phase === "sweep" ? "0:00" : fmt(Math.ceil(remA));
+  const chunkIdx = Math.min(2, Math.floor(el / S.chunkSec));
+  Array.from($("chunks").children).forEach((c, i) => {
+    const start = i * S.chunkSec, frac = Math.max(0, Math.min(1, (el - start) / S.chunkSec));
+    c.querySelector("i").style.width = (frac * 100) + "%";
+  });
+  const standbox = $("standbox");
+  if (R.phase === "sweep") {
+    band.dataset.tone = "crit"; $("pillA").dataset.kind = "crit"; $("pillA").textContent = "Hard stop";
+    $("textA").textContent = "90 minutes are over. Educational Objective only, 30 s each, tagged K. Then done.";
+    standbox.hidden = true;
+  } else if (R.pauseKind === "stand") {
+    band.dataset.tone = "stand"; $("pillA").dataset.kind = "good"; $("pillA").textContent = "Stand · chunk " + chunkIdx + " done";
+    const left = S.standSec - (now - R.standStartAt) / 1000;
+    $("textA").textContent = "Timer A is paused while you stand.";
+    standbox.hidden = false;
+    $("standClock").textContent = left >= 0 ? fmt(Math.ceil(left)) : "+" + fmt(-left);
+    $("standClock").classList.toggle("over", left < 0);
+    $("standTitle").textContent = left >= 0 ? "Stand. Walk. Water. No phone." : "Stand time is over — sit back down.";
+  } else if (R.pauseKind === "pause") {
+    band.dataset.tone = "paused"; $("pillA").dataset.kind = "idle"; $("pillA").textContent = "Paused";
+    $("textA").textContent = "Paused. Resume as soon as you are back.";
+    standbox.hidden = false; $("standClock").textContent = fmt(Math.ceil(remA)); $("standClock").classList.remove("over"); $("standTitle").textContent = "Timer A is paused.";
+  } else {
+    standbox.hidden = true;
+    const nextStandAt = R.standsDone < 2 ? S.limitSec - S.chunkSec * (R.standsDone + 1) : null;
+    band.dataset.tone = remA <= 300 ? "crit" : remA <= 900 ? "warn" : "normal";
+    $("pillA").dataset.kind = remA <= 300 ? "crit" : "accent"; $("pillA").textContent = "Chunk " + (chunkIdx + 1) + " of 3";
+    const left = remainingAll();
+    $("textA").textContent = (nextStandAt != null ? "Stand at " + fmt(nextStandAt) + ". " : "Last chunk — no stand, hard stop at 0:00. ") +
+      (left != null && remainingWrong() != null ? remainingWrong() + " wrong and " + remainingCorrect() + " correct still to review." : "");
+  }
+  $("btnPause").textContent = R.pauseKind === "pause" ? "Resume" : "Pause";
+  $("btnPause").disabled = R.phase !== "run" || R.pauseKind === "stand";
+  $("btnStandNow").disabled = R.phase !== "run" || !!R.pauseKind;
+  $("btnEnd").textContent = endArmed ? "Sure?" : "End review";
+  $("btnEnd").classList.toggle("armed", !!endArmed);
+
+  // Timer B card
+  const qc = $("qcard"), starts = $("starts"), extrow = $("extrow"), tagbtns = $("tagbtns"), nextrow = $("nextrow");
+  const doneCount = R.wrongDone + R.correctDone;
+  $("metaB").textContent = "Q " + Math.min(R.nQ, doneCount + (R.q ? 1 : 0)) + " of " + R.nQ;
+  if (R.pauseKind) {
+    qc.dataset.tone = "idle"; $("pillB").dataset.kind = "idle"; $("pillB").textContent = "Waiting";
+    $("clockB").textContent = R.q ? fmt(Math.ceil(Math.max(0, qBudget() - qElapsedSec(now)))) : "—";
+    $("ringFill").style.width = "0%"; $("textB").textContent = "Timer B waits with you.";
+    starts.hidden = true; extrow.hidden = true; tagbtns.hidden = true; nextrow.hidden = true;
+  } else if (!R.q) {
+    qc.dataset.tone = "idle"; $("pillB").dataset.kind = "idle"; $("pillB").textContent = "Next question";
+    $("clockB").textContent = fmt(S.bSec); $("ringFill").style.width = "0%";
+    $("textB").textContent = "Which one is next? Wrong gets " + fmt(S.bSec) + " — EO, the correct-answer paragraph, your choice. Correct gets " + S.eoSec + " s — Educational Objective only.";
+    starts.hidden = false; extrow.hidden = true; tagbtns.hidden = true; nextrow.hidden = true;
+    $("btnWrong").textContent = "Wrong · " + fmt(S.bSec); $("btnCorrect").textContent = "Correct · " + S.eoSec + " s";
+  } else {
+    const budget = qBudget(), qel = qElapsedSec(now), rem = budget - qel, over = rem < 0;
+    const k = R.q.kind;
+    $("clockB").textContent = over ? "+" + fmt(-rem) : fmt(Math.ceil(rem));
+    $("ringFill").style.width = Math.min(100, qel / budget * 100) + "%";
+    if (k === "wrong" || k === "lucky") {
+      qc.dataset.tone = over ? "crit" : rem <= 60 ? "warn" : "normal";
+      $("pillB").dataset.kind = over ? "crit" : "warn"; $("pillB").textContent = (k === "lucky" ? "Lucky guess · " : "Wrong · ") + (R.q.ext ? "extended" : "Timer B");
+      $("textB").textContent = over ? (R.q.ext ? "8 minutes. Move. Tag it and go." : "Timer B rang. Tag it and move, or take the +3:00 once.")
+        : "Educational Objective → correct-answer paragraph → the paragraph for your choice. Rule: ___ (ten words).";
+      starts.hidden = true; nextrow.hidden = true;
+      tagbtns.hidden = false;
+      extrow.hidden = R.q.ext; $("btnExtend").disabled = R.q.ext; $("btnExtend").textContent = "+" + fmt(S.extSec) + " (once)";
+    } else if (k === "correct" || k === "eo") {
+      qc.dataset.tone = over ? "crit" : "good";
+      $("pillB").dataset.kind = over ? "crit" : "good"; $("pillB").textContent = k === "eo" ? "EO only" : "Correct";
+      $("textB").textContent = over ? "30 seconds are up. Educational Objective only — next." : "Educational Objective only. Lucky guess? Tap it, it becomes a wrong question.";
+      starts.hidden = k === "eo"; extrow.hidden = true; tagbtns.hidden = true;
+      nextrow.hidden = false; $("btnNext").textContent = k === "eo" ? "Next · " + (R.correctDone + 1) + "/" + R.nQ : "Done with this one";
+      $("btnCorrect").textContent = "Correct · " + S.eoSec + " s"; $("btnWrong").textContent = "Wrong · " + fmt(S.bSec);
+    } else { // sweep
+      qc.dataset.tone = over ? "crit" : "warn";
+      $("pillB").dataset.kind = "crit"; $("pillB").textContent = "EO sweep · tagged K";
+      const left = remainingAll();
+      $("textB").textContent = "Educational Objective only, 30 s, tag K, next." + (left != null ? " " + left + " left." : "");
+      starts.hidden = true; extrow.hidden = true; tagbtns.hidden = true;
+      nextrow.hidden = false; $("btnNext").textContent = "Next (K)";
+    }
+  }
+
+  // progress + tally
+  const w = remainingWrong(), c = remainingCorrect();
+  $("prog").innerHTML = R.mode === "eo"
+    ? "<span><b>" + doneCount + "</b> of " + R.nQ + " · Educational Objective only</span>"
+    : "<span><b>" + doneCount + "</b> of " + R.nQ + " reviewed</span>" +
+      "<span>wrong <b>" + R.wrongDone + (w != null ? "/" + R.wrongTotal : "") + "</b></span>" +
+      "<span>correct <b>" + R.correctDone + (c != null ? "/" + (R.correct - R.lucky) : "") + "</b></span>" +
+      (R.lucky ? "<span>lucky <b>" + R.lucky + "</b></span>" : "") + (R.swept ? "<span>swept <b>" + R.swept + "</b></span>" : "");
+  Array.from($("tally").children).forEach(d => { d.querySelector("b").textContent = R.tags[d.dataset.tag]; });
+
+  if (done && doneRenderedFor !== R.id) { doneRenderedFor = R.id; renderDone(); renderParking(); }
+}
+let doneRenderedFor = "";
+function dominant() {
+  const t = R.tags, total = t.K + t.M + t.T + t.G;
+  if (!total) return null;
+  return ["K", "M", "T", "G"].sort((a, b) => t[b] - t[a])[0];
+}
+function noteLine() {
+  const d = new Date(R.date), day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const score = R.correct != null ? R.correct + "/" + R.nQ + " (" + pct(R.correct, R.nQ) + "%)" : R.nQ + " Q";
+  return day + " · " + (R.label || "block") + " · " + score + " · K" + R.tags.K + " M" + R.tags.M + " T" + R.tags.T + " G" + R.tags.G + (R.swept ? " · " + R.swept + " swept" : "") + " · " + fmt(R.endEl / 1000) + " used";
+}
+function renderDone() {
+  $("doneMeta").textContent = (R.label ? R.label + " · " : "") + (R.correct != null ? R.correct + "/" + R.nQ + " · " : "") + P.fmtDate(R.date, true);
+  $("doneTally").innerHTML = ["K", "M", "T", "G"].map(l => '<div data-tag="' + l + '"><b>' + R.tags[l] + "</b><small>" + l + "</small></div>").join("");
+  const dom = dominant();
+  $("doneFix").textContent = dom ? FIX[dom] : (R.mode === "eo" ? "EO-only pass done." : "No wrong questions tagged.");
+  const wrongItems = R.items.filter(i => i.kind === "wrong" || i.kind === "lucky"), correctItems = R.items.filter(i => i.kind === "correct" || i.kind === "eo");
+  const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b.sec, 0) / arr.length) : 0;
+  const ext = wrongItems.filter(i => i.ext).length, over = wrongItems.filter(i => i.over).length;
+  $("doneStats").innerHTML =
+    "<li><b>" + fmt(R.endEl / 1000) + "</b> of " + fmt(S.limitSec) + " used" + (R.stopped ? " — hard stop reached" : "") + "</li>" +
+    "<li><b>" + wrongItems.length + "</b> wrong reviewed, average <b>" + fmt(avg(wrongItems)) + "</b> each" + (ext ? " · <b>" + ext + "</b> took the +3:00" : "") + (over ? " · <b>" + over + "</b> ran over" : "") + "</li>" +
+    "<li><b>" + correctItems.length + "</b> correct, average <b>" + avg(correctItems) + " s</b> (budget " + S.eoSec + " s)</li>" +
+    (R.swept ? "<li><b>" + R.swept + "</b> swept with the Educational Objective only</li>" : "") +
+    (R.lucky ? "<li><b>" + R.lucky + "</b> lucky guess" + (R.lucky === 1 ? "" : "es") + " treated as wrong</li>" : "") +
+    "<li><b>" + (R.standsDone + R.manualStands) + "</b> stand" + ((R.standsDone + R.manualStands) === 1 ? "" : "s") + "</li>";
+  $("noteLine").textContent = noteLine();
+  $("parkClock").textContent = parkTimer ? parkTimer.text : "15:00";
+}
+
+/* ---------- parking lot ---------- */
+function renderParking() {
+  const list = P.loadParking();
+  const html = list.length ? list.map((t, i) => "<li><span>" + P.esc(t) + '</span><button type="button" class="small" data-park="' + i + '">Done</button></li>').join("") : '<li class="empty">Nothing parked.</li>';
+  $("parkList").innerHTML = html; $("parkListDone").innerHTML = html;
+  document.querySelectorAll("button[data-park]").forEach(b => b.addEventListener("click", () => { const l = P.loadParking(); l.splice(+b.dataset.park, 1); P.saveParking(l); renderParking(); }));
+}
+function startPark15() {
+  if (parkTimer) { clearInterval(parkTimer.iv); parkTimer = null; $("btnPark15").textContent = "Start 15:00"; $("parkClock").textContent = "15:00"; return; }
+  const end = Date.now() + 15 * 60000;
+  parkTimer = { iv: 0, text: "15:00" };
+  $("btnPark15").textContent = "Stop";
+  parkTimer.iv = setInterval(() => {
+    const left = (end - Date.now()) / 1000;
+    if (left <= 0) { clearInterval(parkTimer.iv); parkTimer = null; $("parkClock").textContent = "0:00"; $("btnPark15").textContent = "Start 15:00"; P.sfx("end"); return; }
+    parkTimer.text = fmt(Math.ceil(left)); $("parkClock").textContent = parkTimer.text;
+  }, 250);
+}
+
+/* ---------- settings ---------- */
+function applySettings() {
+  const limit = P.parseMS($("fLimit").value), chunk = P.parseMS($("fChunk").value), stand = P.parseMS($("fStand").value);
+  const b = P.parseMS($("fB").value), ext = P.parseMS($("fExt").value), eo = parseInt($("fEo").value, 10);
+  if (!limit || !chunk || stand == null || !b || ext == null || !eo || chunk > limit || eo < 10) { $("settingsMsg").textContent = "Check the values: times as mm:ss."; return; }
+  S = Object.assign({}, S, { limitSec: limit, chunkSec: chunk, standSec: stand, bSec: b, extSec: ext, eoSec: eo });
+  saveSettings(); fillSettings(); renderDerived(); render(); $("settingsMsg").textContent = "Saved.";
+}
+function fillSettings() {
+  $("fLimit").value = fmt(S.limitSec); $("fChunk").value = fmt(S.chunkSec); $("fStand").value = fmt(S.standSec);
+  $("fB").value = fmt(S.bSec); $("fExt").value = fmt(S.extSec); $("fEo").value = S.eoSec; $("fTheme").value = P.getTheme();
+  $("tagline").textContent = fmt(S.limitSec) + " hard stop · " + Math.round(S.bSec / 60) + "+" + Math.round(S.extSec / 60) + " per wrong · " + S.eoSec + " s per correct";
+  $("textA").textContent = "Stand " + Math.round(S.standSec / 60) + " minutes at the end of each chunk. " + Math.round(S.limitSec / 60) + " minutes of review, hard stop.";
+}
+
+/* ---------- wiring ---------- */
+function blurOnClick(btn) { btn.addEventListener("click", e => { if (e.detail > 0) e.currentTarget.blur(); }); }
+function init() {
+  P.applyTheme(); P.renderNav("review");
+  loadSettings(); fillSettings(); loadRun();
+  renderPicks(); renderDerived(); renderParking();
+  ["sN", "sCorrect"].forEach(id => $(id).addEventListener("input", renderDerived));
+  $("sMode").addEventListener("change", renderDerived);
+  $("btnStart").addEventListener("click", startReview);
+  $("btnWrong").addEventListener("click", () => startItem("wrong"));
+  $("btnCorrect").addEventListener("click", () => startItem("correct"));
+  $("btnLucky").addEventListener("click", () => startItem("lucky"));
+  $("btnExtend").addEventListener("click", extend);
+  $("btnNext").addEventListener("click", next);
+  $("tagbtns").querySelectorAll("button[data-tag]").forEach(b => { b.addEventListener("click", () => tag(b.dataset.tag)); blurOnClick(b); });
+  $("btnPause").addEventListener("click", () => { if (R.pauseKind === "pause") resume(); else pause("pause"); });
+  $("btnStandNow").addEventListener("click", () => pause("stand"));
+  $("btnResume").addEventListener("click", resume);
+  $("btnEnd").addEventListener("click", endReview);
+  $("btnSound").addEventListener("click", () => { S.sound = !S.sound; P.setSound(S.sound); saveSettings(); if (S.sound) { P.audioInit(); P.sfx("start"); } render(); });
+  $("btnApply").addEventListener("click", applySettings);
+  $("fTheme").addEventListener("change", () => P.setTheme($("fTheme").value));
+  $("parkForm").addEventListener("submit", e => { e.preventDefault(); const v = $("parkIn").value.trim(); if (!v) return; const l = P.loadParking(); l.push(v); P.saveParking(l); $("parkIn").value = ""; renderParking(); });
+  $("btnCopyLine").addEventListener("click", async e => {
+    const b = e.currentTarget, txt = noteLine();
+    try { await navigator.clipboard.writeText(txt); b.textContent = "Copied"; } catch (err) { b.textContent = "Select the line and copy"; }
+    setTimeout(() => { b.textContent = "Copy the line"; }, 2500);
+  });
+  $("btnStats").addEventListener("click", () => { location.href = "./stats.html"; });
+  $("btnNew").addEventListener("click", () => { R = fresh(); pickedBlock = null; persist(); renderPicks(); renderDerived(); render(); });
+  $("btnPark15").addEventListener("click", startPark15);
+  $("btnParkClear").addEventListener("click", () => { P.saveParking([]); renderParking(); });
+  ["btnWrong", "btnCorrect", "btnLucky", "btnExtend", "btnNext", "btnPause", "btnStandNow", "btnResume", "btnEnd", "btnSound", "btnStart"].forEach(id => blurOnClick($(id)));
+  document.addEventListener("keydown", e => {
+    const t = e.target, tag_ = t && t.tagName;
+    if (tag_ === "INPUT" || tag_ === "TEXTAREA" || tag_ === "SELECT" || tag_ === "BUTTON" || tag_ === "SUMMARY") return;
+    if (R.phase !== "run" && R.phase !== "sweep") return;
+    const k = e.key.toLowerCase();
+    if (R.pauseKind) { if (k === "p" || k === " " || e.code === "Space") { e.preventDefault(); resume(); } return; }
+    if (k === "w") { if (!R.q || R.q.kind === "correct") startItem("wrong"); }
+    else if (k === "c") { if (!R.q || R.q.kind === "correct") startItem("correct"); }
+    else if (k === "l") { if (!R.q || R.q.kind === "correct") startItem("lucky"); }
+    else if (k === "k" || k === "m" || k === "t" || k === "g") tag(k.toUpperCase());
+    else if (k === "e") extend();
+    else if (k === "n" || e.code === "Space") { e.preventDefault(); next(); }
+    else if (k === "p") pause("pause");
+  });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { if (R.phase === "run" && !R.pauseKind) P.keepAwake(); tick(); } });
+  setInterval(tick, 250);
+  render();
+}
+init();
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); }); }
+})();
+</script>
+</body>
+</html>
