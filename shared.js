@@ -138,7 +138,7 @@ window.Pacer = (() => {
   function renderNav(active) {
     const el = document.getElementById("pnav");
     if (!el) return;
-    const items = [["block", "./", "Block"], ["review", "./review.html", "Review"], ["stats", "./stats.html", "Stats"]];
+    const items = [["block", "./", "Block"], ["review", "./review.html", "Review"], ["ccs", "./ccs.html", "CCS"], ["stats", "./stats.html", "Stats"]];
     el.className = "pnav";
     el.innerHTML = items.map(([k, href, label]) => '<a href="' + href + '"' + (k === active ? ' aria-current="page"' : "") + ">" + label + "</a>").join("");
   }

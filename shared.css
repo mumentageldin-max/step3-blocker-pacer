@@ -48,7 +48,7 @@ a{color:var(--accent)}
 
 /* page switcher */
 .pnav{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px}
-.pnav a{flex:1;text-align:center;padding:8px 10px;border-radius:999px;text-decoration:none;color:var(--muted);font-weight:700;font-size:14px;min-width:0;white-space:nowrap}
+.pnav a{flex:1;text-align:center;padding:8px 6px;border-radius:999px;text-decoration:none;color:var(--muted);font-weight:700;font-size:14px;min-width:0;white-space:nowrap}
 .pnav a[aria-current="page"]{background:var(--fg);color:var(--bg)}
 .pnav a:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
 

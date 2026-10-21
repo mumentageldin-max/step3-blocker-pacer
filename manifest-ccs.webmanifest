@@ -1,0 +1,18 @@
+{
+  "name": "Step 3 CCS Pacer",
+  "short_name": "CCS",
+  "description": "Real-time pacer for Step 3 CCS cases at 12:30 or 25:00 (1.25x): read, first orders, reassess loop, close, final orders, with an order checklist and case log.",
+  "id": "./ccs",
+  "start_url": "./ccs.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0E141B",
+  "theme_color": "#13202C",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "icons/ccs-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/ccs-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/ccs-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

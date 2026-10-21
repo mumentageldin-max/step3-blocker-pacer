@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Step 3 CCS Pacer</title>
+<meta name="description" content="Real-time pacer for Step 3 CCS cases at 12:30 or 25:00 (1.25×): read, first orders, reassess loop, close, final orders — with an order checklist and the case log that feeds Stats.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F5F8">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E141B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CCS">
+<link rel="manifest" href="./manifest-ccs.webmanifest">
+<link rel="icon" href="./icons/ccs-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icons/ccs-apple-touch-icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Martian+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="./shared.css">
+<style>
+/* Layout: the real-time clock and the phase strip are the hero; the order checklist sits beside it on wide
+   screens and under it on a phone. The case ends into a short log form that feeds Stats. */
+.clockcard{container-type:inline-size;user-select:none;-webkit-user-select:none;text-align:center;justify-items:center}
+.clock{font-family:var(--font-num);font-weight:700;font-size:clamp(48px,24cqi,160px);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin-top:4px;white-space:nowrap}
+.clockcard[data-tone="warn"] .clock{color:var(--warn)}
+.clockcard[data-tone="crit"] .clock{color:var(--crit)}
+.clockcard[data-tone="paused"] .clock{color:var(--muted)}
+.phases{width:100%;display:grid;gap:5px}
+.strip{display:flex;gap:3px;height:12px}
+.strip i{position:relative;height:100%;border-radius:6px;background:var(--line);overflow:hidden;min-width:0}
+.strip i b{position:absolute;inset:0 auto 0 0;width:0;background:var(--accent);border-radius:6px}
+.strip i.cur{box-shadow:inset 0 0 0 2px var(--accent)}
+.strip i.cur b{background:var(--accent)}
+.strip i.final b{background:var(--crit)}
+.strip i.close b{background:var(--warn)}
+.striplabels{display:flex;gap:3px;font-size:11px;color:var(--muted)}
+.striplabels span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.phaseText{font-size:15px;color:var(--fg);text-wrap:balance;max-width:48ch;margin:0;line-height:1.35}
+.nextline{font-size:13px;color:var(--muted);margin:0}
+.statetoggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.statetoggle button{min-height:44px;font-size:14px}
+.statetoggle button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.checks{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.checks li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;min-width:0;user-select:none;-webkit-user-select:none}
+.checks li:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.checks .box{width:26px;height:26px;border-radius:7px;border:2px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:15px;color:var(--on-good)}
+.checks li[data-state="done"]{border-color:var(--good);background:var(--good-bg)}
+.checks li[data-state="done"] .box{background:var(--good);border-color:var(--good)}
+.checks li[data-state="na"]{opacity:.6}
+.checks li[data-state="na"] .box{color:var(--muted);border-style:dashed}
+.checks li[data-state="na"] .lbl{text-decoration:line-through}
+.checks .lbl{font-size:14px;line-height:1.3;min-width:0}
+.checks .lbl small{display:block;color:var(--muted);font-size:12px}
+.checks .at{font-family:var(--font-num);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.checks li.due{border-color:var(--accent)}
+.legend{font-size:12px;color:var(--muted);margin:0}
+.presets button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.setup .primary{width:100%}
+.done .row2{display:flex;gap:8px;flex-wrap:wrap}
+.done .row2 button{min-height:44px;padding:10px 14px}
+.done .line{font-family:var(--font-num);font-size:14px;padding:10px 12px;border:1px dashed var(--line);border-radius:8px;background:var(--bg);overflow-x:auto;white-space:nowrap;margin:0}
+.missed{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px;font-size:14px}
+.missed span{border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--warn)}
+.missed span.ok{color:var(--good)}
+.scoreinput{font-size:22px!important}
+@media (min-width:820px) and (min-height:520px){
+  .clockcard{padding:22px 20px 18px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Step 3 CCS Pacer</h1>
+    <p class="tag" id="tagline">12:30 or 25:00 of real time · 1.25×</p>
+  </header>
+  <nav id="pnav" aria-label="Pages"></nav>
+
+  <!-- SETUP -->
+  <section class="card setup full" id="setup">
+    <div class="rowhead"><h2>This case</h2><span class="meta">The case start screen shows the maximum real time. Match it here, then press both Starts.</span></div>
+    <div class="presets" id="presets" aria-label="Case length">
+      <button type="button" data-len="750" aria-pressed="true">12:30 · short case</button>
+      <button type="button" data-len="1500" aria-pressed="false">25:00 · long case</button>
+      <button type="button" data-len="600" aria-pressed="false">10:00 · 1× short</button>
+      <button type="button" data-len="1200" aria-pressed="false">20:00 · 1× long</button>
+    </div>
+    <div class="form">
+      <label>Case (name or number)<input type="text" id="sLabel" placeholder="West Nile encephalitis · #5" autocomplete="off"></label>
+      <label>Category<select id="sCat"><option>Internal Medicine</option><option>Emergency Medicine</option><option>Pediatrics</option><option>OB/GYN</option><option>Neurology</option><option>Psychiatry</option><option>Surgery</option><option>Other</option></select></label>
+      <label>Attempt<select id="sAttempt"><option value="first">First attempt</option><option value="repeat">Repeat</option></select></label>
+      <label>Source<select id="sSource"><option value="ccscases">ccscases.com</option><option value="official">Official practice cases</option><option value="other">Other</option></select></label>
+    </div>
+    <p class="note" id="sPlan"></p>
+    <button class="primary" id="btnStart" type="button">Start case</button>
+  </section>
+
+  <div class="colL" id="colL" hidden>
+    <section class="card clockcard" id="clockcard" data-tone="normal" aria-live="polite">
+      <div class="banner" id="banner" hidden></div>
+      <div class="rowhead" style="width:100%">
+        <span class="pill" data-kind="accent" id="pill">Read</span>
+        <span class="meta" id="metaCase"></span>
+      </div>
+      <div class="clock" id="clock">12:30</div>
+      <div class="phases">
+        <div class="strip" id="strip"></div>
+        <div class="striplabels" id="striplabels"></div>
+      </div>
+      <p class="phaseText" id="phaseText"></p>
+      <p class="nextline" id="nextline"></p>
+      <div class="statetoggle" id="statetoggle">
+        <button type="button" data-state="unstable" aria-pressed="false">Unstable · ED</button>
+        <button type="button" data-state="stable" aria-pressed="false">Stable · office / ward</button>
+      </div>
+      <div class="subactions">
+        <button id="btnPause" type="button">Pause</button>
+        <button class="go" id="btnEnd" type="button">Exit case</button>
+        <button id="btnAbort" type="button">Discard</button>
+        <button id="btnSound" type="button" aria-pressed="true">Sound on</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="colR" id="colR" hidden>
+    <section class="card">
+      <div class="rowhead"><h2>Order checklist</h2><span class="meta">Tap when done · tap again for "not needed"</span></div>
+      <ul class="checks" id="checks"></ul>
+      <p class="legend">The time stamp is when you tapped it. Stats uses the first clock advance and the counseling time.</p>
+    </section>
+    <details class="fold" id="rulesFold">
+      <summary>Rules for a CCS case</summary>
+      <div class="body">
+        <ol class="rules">
+          <li><b>Real time is the only clock that can end the case.</b> Simulated time moves only when you advance it, and no order is carried out until it does. Advance early, in small steps ("with next available result", "call me as needed").</li>
+          <li><b>Read once:</b> intro, vitals, history. One line: who, how sick, where. Unstable → the ED protocol. Stable → the office protocol.</li>
+          <li><b>Unstable:</b> IV access, O2, cardiac monitor, pulse ox, then a focused exam, then treat. <b>Stable:</b> complete exam, then labs and first treatment.</li>
+          <li><b>Orders as a list, confirm the exact item.</b> Primum has many look-alike names; pick the specific one. Doses are automatic; you choose the route.</li>
+          <li><b>After every batch of results:</b> treat → interval history + repeat exam → move the patient (ward / ICU / home) → consult if indicated. Then advance again.</li>
+          <li><b>Counseling, vaccines and the follow-up appointment go in as soon as the plan is settled</b>, not at the warning. Stop what's finished (fluids, monitor, IV).</li>
+          <li><b>The software warns you at about two minutes of real time.</b> From then on: no exam, no location change, no clock. Only final orders. Then Exit Case.</li>
+          <li><b>Finishing early is fine.</b> Unused case time becomes break time on exam day. Don't use the clock up for its own sake.</li>
+        </ol>
+        <p class="note">Exam day 4: 13–14 cases, about half of them long ones. ~4½ hours of case time, 85 minutes of breaks: 10 after case 3, lunch 25 after case 7, 10 after case 10, 10 after case 12, 30 spare.</p>
+        <p class="note">Keys: <kbd>1</kbd>–<kbd>8</kbd> tick a checklist item · <kbd>U</kbd> unstable · <kbd>S</kbd> stable · <kbd>P</kbd> pause · <kbd>X</kbd> exit case.</p>
+      </div>
+    </details>
+    <details class="fold" id="settingsFold">
+      <summary>Settings</summary>
+      <div class="body">
+        <fieldset id="settingsFs">
+          <div class="form">
+            <label>Final-orders alert (mm:ss before the end)<input type="text" id="fFinal" value="2:30" inputmode="numeric"></label>
+            <label>Theme<select id="fTheme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+          </div>
+          <div class="formrow"><button type="button" id="btnApply">Save settings</button><span class="note" id="settingsMsg"></span></div>
+        </fieldset>
+        <p class="note" id="settingsLock" hidden>Settings unlock when the case is over.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- DONE -->
+  <section class="card done full" id="done" hidden>
+    <div class="rowhead"><h2>Case log</h2><span class="meta" id="doneMeta"></span></div>
+    <ul class="stats" id="doneStats"></ul>
+    <div class="missed" id="doneChecks"></div>
+    <div class="form">
+      <label>Score from the feedback (%)<input type="number" id="dScore" class="scoreinput" min="0" max="100" inputmode="numeric" placeholder="78"></label>
+      <label>Case (name or number)<input type="text" id="dLabel" autocomplete="off"></label>
+      <label class="wide">The one order you missed<input type="text" id="dMissed" placeholder="e.g. repeat ECG after treatment" autocomplete="off" maxlength="120"></label>
+      <label class="wide">Note (optional)<input type="text" id="dNote" autocomplete="off" maxlength="200"></label>
+    </div>
+    <p class="note">One line for the notebook:</p>
+    <p class="line" id="noteLine"></p>
+    <div class="row2">
+      <button class="primary" id="btnSave" type="button" style="min-height:56px;font-size:17px">Save case</button>
+      <button id="btnCopyLine" type="button">Copy the line</button>
+      <button id="btnStats" type="button">Open stats</button>
+    </div>
+    <p class="note" id="savedMsg" hidden></p>
+  </section>
+</div>
+
+<script src="./shared.js"></script>
+<script>
+(() => {
+const P = window.Pacer, $ = id => document.getElementById(id), fmt = P.fmt;
+const LS_S = "step3pacer.ccs.settings.v1", LS_R = "step3pacer.ccs.run.v1";
+const DEFAULTS = { finalSec: 150, sound: true, lastLen: 750 };
+const PHASES = [
+  { k: "read",  name: "Read",          frac: .12, text: "Intro, vitals, history — once. One line: who, how sick, where. Then tap Unstable or Stable." },
+  { k: "first", name: "First orders",  frac: .16, text: "Unstable: IV · O2 · monitor · pulse ox, focused exam, treat. Stable: complete exam, labs, first treatment. Advance the clock." },
+  { k: "loop",  name: "Reassess loop", frac: .40, text: "Results → treat → interval history + repeat exam → move the patient → consult. Advance the clock in small steps." },
+  { k: "close", name: "Close",         frac: .16, text: "Definitive plan, long-term meds, counseling, vaccines, follow-up appointment. Stop what's finished." },
+  { k: "final", name: "Final orders",  frac: .16, text: "The software's warning comes here. No exam, no moves, no clock — final orders only. Then Exit Case." }
+];
+const CHECKS = [
+  { k: "stab",     label: "Stabilized first",           sub: "IV access · O2 · cardiac monitor · pulse ox (unstable only)", phase: "first" },
+  { k: "exam",     label: "Exam done",                  sub: "focused if unstable, complete if stable", phase: "first" },
+  { k: "adv",      label: "Advanced the clock",         sub: "after the first orders — nothing happens until you do", phase: "first" },
+  { k: "reassess", label: "Reassessed",                 sub: "interval history + repeat exam after treatment", phase: "loop" },
+  { k: "move",     label: "Moved the patient",          sub: "ED → ward / ICU, office → home, admit or discharge", phase: "loop" },
+  { k: "consult",  label: "Consult",                    sub: "when indicated — otherwise mark not needed", phase: "loop" },
+  { k: "counsel",  label: "Counseling · vaccines · follow-up", sub: "ordered before the warning, not after", phase: "close" },
+  { k: "stop",     label: "Stopped what's finished",    sub: "fluids, monitor, IV, O2 at discharge", phase: "close" }
+];
+let S = Object.assign({}, DEFAULTS);
+let R = fresh();
+let chosenLen = 750, abortArmed = 0, endArmed = 0;
+
+function fresh() {
+  return { phase: "setup", id: "", date: "", label: "", category: "", attempt: "first", source: "ccscases", limitSec: 750,
+    startAt: 0, pausedAt: 0, pausedTotal: 0, patient: "", checks: {}, phaseChimed: {}, finalFired: false, endEl: 0, endedBy: "", saved: false };
+}
+function loadSettings() { const p = P.readJSON(LS_S, null); if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p); P.setSound(S.sound); chosenLen = S.lastLen || 750; }
+function saveSettings() { P.writeJSON(LS_S, S); }
+function persist() { P.writeJSON(LS_R, R); }
+function loadRun() {
+  const p = P.readJSON(LS_R, null);
+  if (!p || (p.phase !== "run" && p.phase !== "done")) return;
+  if (Date.now() - p.startAt > 4 * 3600 * 1000) return;
+  if (p.phase === "done" && p.saved) return;
+  R = Object.assign(fresh(), p);
+}
+
+/* ---------- time ---------- */
+function elapsed(now) {
+  now = now || Date.now();
+  if (R.phase === "setup") return 0;
+  if (R.phase === "done") return R.endEl;
+  const ref = R.pausedAt ? R.pausedAt : now;
+  return Math.max(0, (ref - R.startAt - R.pausedTotal) / 1000);
+}
+function phaseBounds() { // [{k, start, end}]
+  let acc = 0;
+  return PHASES.map(p => { const start = acc; acc += Math.round(R.limitSec * p.frac); return { k: p.k, name: p.name, text: p.text, start: start, end: acc }; });
+}
+function phaseAt(sec) { const b = phaseBounds(); return b.find(p => sec < p.end) || b[b.length - 1]; }
+
+/* ---------- actions ---------- */
+function startCase() {
+  R = fresh();
+  R.phase = "run"; R.id = P.newId(); R.date = new Date().toISOString();
+  R.label = $("sLabel").value.trim(); R.category = $("sCat").value; R.attempt = $("sAttempt").value; R.source = $("sSource").value;
+  R.limitSec = chosenLen; R.startAt = Date.now();
+  S.lastLen = chosenLen; saveSettings();
+  P.audioInit(); P.sfx("start"); P.keepAwake();
+  $("rulesFold").open = false;
+  persist(); render();
+}
+function pauseResume() {
+  if (R.phase !== "run") return;
+  if (R.pausedAt) { R.pausedTotal += Date.now() - R.pausedAt; R.pausedAt = 0; P.keepAwake(); }
+  else R.pausedAt = Date.now();
+  persist(); render();
+}
+function setPatient(st) { if (R.phase !== "run") return; R.patient = st; if (st === "stable" && !(R.checks.stab && R.checks.stab.state === "done")) R.checks.stab = { state: "na", at: Math.round(elapsed()) }; persist(); render(); }
+function cycleCheck(k) {
+  if (R.phase !== "run" || R.pausedAt) return;
+  const cur = (R.checks[k] && R.checks[k].state) || "";
+  const next = cur === "" ? "done" : cur === "done" ? "na" : "";
+  R.checks[k] = next ? { state: next, at: Math.round(elapsed()) } : undefined;
+  if (!next) delete R.checks[k];
+  if (next === "done") P.sfx("tick");
+  persist(); render();
+}
+function finish(by) {
+  if (R.phase !== "run") return;
+  const now = Date.now();
+  if (R.pausedAt) { R.pausedTotal += now - R.pausedAt; R.pausedAt = 0; }
+  R.endEl = Math.min(R.limitSec, (now - R.startAt - R.pausedTotal) / 1000);
+  if (by === "clock") R.endEl = R.limitSec;
+  R.endedBy = by; R.phase = "done";
+  P.sfx("end"); P.releaseWake();
+  persist(); render();
+}
+function exitCase() {
+  if (R.phase !== "run") return;
+  if (endArmed && Date.now() - endArmed < 3500) { endArmed = 0; finish("me"); return; }
+  endArmed = Date.now(); render();
+  setTimeout(() => { if (endArmed && Date.now() - endArmed >= 3500) { endArmed = 0; render(); } }, 3600);
+}
+function abort() {
+  if (abortArmed && Date.now() - abortArmed < 3500) { abortArmed = 0; R = fresh(); P.releaseWake(); persist(); render(); return; }
+  abortArmed = Date.now(); render();
+  setTimeout(() => { if (abortArmed && Date.now() - abortArmed >= 3500) { abortArmed = 0; render(); } }, 3600);
+}
+function saveCase() {
+  const sc = $("dScore").value.trim(), score = sc === "" ? null : Math.max(0, Math.min(100, parseInt(sc, 10)));
+  R.label = $("dLabel").value.trim();
+  const checks = {};
+  CHECKS.forEach(c => { const v = R.checks[c.k]; checks[c.k] = v ? { state: v.state, at: v.at } : { state: "", at: null }; });
+  const s = {
+    id: R.id, type: "ccs", date: R.date, label: R.label, category: R.category, attempt: R.attempt, source: R.source,
+    limitSec: R.limitSec, timeUsedSec: Math.round(R.endEl), endedBy: R.endedBy, patient: R.patient,
+    score: isNaN(score) ? null : score, missedOrder: $("dMissed").value.trim(), note: $("dNote").value.trim(),
+    checks: checks, firstAdvanceSec: checks.adv.state === "done" ? checks.adv.at : null, counselSec: checks.counsel.state === "done" ? checks.counsel.at : null,
+    missedChecks: CHECKS.filter(c => !checks[c.k].state).map(c => c.k), endedIn: phaseAt(Math.max(0, R.endEl - 0.001)).k
+  };
+  P.saveSession(s); P.syncQuietly();
+  R.saved = true; persist();
+  $("savedMsg").hidden = false; $("savedMsg").textContent = "Saved to Stats.";
+  $("btnSave").textContent = "Saved"; $("btnSave").disabled = true;
+  $("noteLine").textContent = noteLine(score);
+}
+
+/* ---------- tick ---------- */
+function tick() {
+  if (R.phase === "run" && !R.pausedAt) {
+    const el = elapsed(), rem = R.limitSec - el;
+    const ph = phaseAt(el);
+    if (!R.phaseChimed[ph.k]) { R.phaseChimed[ph.k] = true; if (ph.k !== "read") { P.sfx(ph.k === "final" ? "fill" : ph.k === "close" ? "move" : "ahead"); P.vibrate(ph.k === "final" ? [200, 100, 200, 100, 450] : [80]); } persist(); }
+    if (!R.finalFired && rem <= S.finalSec) { R.finalFired = true; P.sfx("fill"); P.vibrate([200, 100, 200]); persist(); }
+    if (rem <= 0) { P.vibrate([600]); finish("clock"); return; }
+  }
+  render();
+}
+
+/* ---------- render ---------- */
+function buildStrip() {
+  const b = phaseBounds(), strip = $("strip"), labels = $("striplabels");
+  strip.innerHTML = ""; labels.innerHTML = "";
+  b.forEach(p => {
+    const i = document.createElement("i"); i.style.flex = String(p.end - p.start); i.dataset.k = p.k; i.className = p.k;
+    const f = document.createElement("b"); i.appendChild(f); strip.appendChild(i);
+    const s = document.createElement("span"); s.style.flex = String(p.end - p.start); s.textContent = p.name; labels.appendChild(s);
+  });
+}
+function buildChecks() {
+  const ul = $("checks"); ul.innerHTML = "";
+  CHECKS.forEach((c, i) => {
+    const li = document.createElement("li"); li.dataset.k = c.k; li.tabIndex = 0; li.setAttribute("role", "button");
+    li.innerHTML = '<span class="box"></span><span class="lbl">' + (i + 1) + ". " + P.esc(c.label) + "<small>" + P.esc(c.sub) + '</small></span><span class="at"></span>';
+    li.addEventListener("click", () => cycleCheck(c.k));
+    li.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cycleCheck(c.k); } });
+    ul.appendChild(li);
+  });
+}
+function renderSetup() {
+  document.querySelectorAll("#presets button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.len === chosenLen)));
+  const b = (() => { let acc = 0; return PHASES.map(p => { const s = acc; acc += Math.round(chosenLen * p.frac); return p.name + " " + fmt(s) + "–" + fmt(acc); }); })();
+  $("sPlan").textContent = fmt(chosenLen) + " of real time: " + b.join(" · ") + ". Final-orders alert at " + fmt(S.finalSec) + " left.";
+}
+function render() {
+  const inSetup = R.phase === "setup", live = R.phase === "run", done = R.phase === "done";
+  $("setup").hidden = !inSetup; $("colL").hidden = !live; $("colR").hidden = inSetup || done; $("done").hidden = !done;
+  $("settingsFs").disabled = live; $("settingsLock").hidden = !live;
+  $("btnSound").textContent = S.sound ? "Sound on" : "Sound off"; $("btnSound").setAttribute("aria-pressed", S.sound ? "true" : "false");
+  if (inSetup) { renderSetup(); return; }
+  const el = elapsed(), rem = Math.max(0, R.limitSec - el), ph = phaseAt(el), bounds = phaseBounds();
+  if (live) {
+    $("clock").textContent = fmt(Math.ceil(rem));
+    const card = $("clockcard");
+    card.dataset.tone = R.pausedAt ? "paused" : rem <= S.finalSec ? "crit" : ph.k === "close" ? "warn" : "normal";
+    $("metaCase").textContent = (R.label ? R.label + " · " : "") + R.category + " · " + (R.attempt === "repeat" ? "repeat" : "first attempt") + " · " + fmt(R.limitSec);
+    $("pill").textContent = R.pausedAt ? "Paused" : ph.name; $("pill").dataset.kind = R.pausedAt ? "idle" : ph.k === "final" ? "crit" : ph.k === "close" ? "warn" : "accent";
+    $("phaseText").textContent = R.pausedAt ? "Paused. The real exam has no pause — practice only." : ph.text;
+    const next = bounds[bounds.findIndex(p => p.k === ph.k) + 1];
+    $("nextline").textContent = next ? next.name + " at " + fmt(R.limitSec - next.start) + " on the clock" : "Real time ends at 0:00. Exit Case when the final orders are in.";
+    Array.from($("strip").children).forEach((i, idx) => {
+      const p = bounds[idx], frac = Math.max(0, Math.min(1, (el - p.start) / (p.end - p.start)));
+      i.querySelector("b").style.width = (frac * 100) + "%"; i.classList.toggle("cur", p.k === ph.k);
+    });
+    const banner = $("banner");
+    if (R.finalFired && rem > 0) { banner.hidden = false; banner.textContent = fmt(S.finalSec) + " left — final orders only. Counseling in? Follow-up in? Then Exit Case."; } else banner.hidden = true;
+    document.querySelectorAll("#statetoggle button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.state === R.patient)));
+    $("btnPause").textContent = R.pausedAt ? "Resume" : "Pause";
+    $("btnEnd").textContent = endArmed ? "Sure? Exit" : "Exit case"; $("btnEnd").classList.toggle("armed", !!endArmed);
+    $("btnAbort").textContent = abortArmed ? "Sure? Discard" : "Discard"; $("btnAbort").classList.toggle("armed", !!abortArmed);
+    Array.from($("checks").children).forEach(li => {
+      const c = CHECKS.find(x => x.k === li.dataset.k), v = R.checks[c.k];
+      li.dataset.state = v ? v.state : "";
+      li.querySelector(".box").textContent = v ? (v.state === "done" ? "✓" : "—") : "";
+      li.querySelector(".at").textContent = v ? fmt(v.at) : "";
+      li.classList.toggle("due", !v && c.phase === ph.k);
+      li.hidden = (c.k === "stab" && R.patient === "stable" && !(v && v.state === "done"));
+    });
+  }
+  if (done && !doneRendered) { doneRendered = true; renderDone(); }
+  if (!done) doneRendered = false;
+}
+let doneRendered = false;
+function noteLine(score) {
+  const d = new Date(R.date), day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const missed = CHECKS.filter(c => !R.checks[c.k]).map(c => c.label.split(" ")[0].toLowerCase());
+  return day + " · CCS " + (R.label || "case") + " · " + R.category + " · " + (R.attempt === "repeat" ? "repeat" : "1st") + (score != null ? " · " + score + "%" : "") + " · " + fmt(R.endEl) + "/" + fmt(R.limitSec) + (R.endedBy === "clock" ? " (clock)" : "") + (missed.length ? " · missed: " + missed.join(", ") : " · checklist complete");
+}
+function renderDone() {
+  $("doneMeta").textContent = (R.label ? R.label + " · " : "") + R.category + " · " + P.fmtDate(R.date, true);
+  const adv = R.checks.adv && R.checks.adv.state === "done" ? R.checks.adv.at : null, cons = R.checks.counsel && R.checks.counsel.state === "done" ? R.checks.counsel.at : null;
+  const endPh = phaseAt(Math.max(0, R.endEl - 0.001));
+  $("doneStats").innerHTML =
+    "<li><b>" + fmt(R.endEl) + "</b> of " + fmt(R.limitSec) + " used — " + (R.endedBy === "clock" ? "the clock ended the case" : "you exited in the " + endPh.name.toLowerCase() + " phase") + "</li>" +
+    "<li>First clock advance at <b>" + (adv != null ? fmt(adv) : "—") + "</b> (target before " + fmt(phaseBounds()[1].end) + ")</li>" +
+    "<li>Counseling and follow-up at <b>" + (cons != null ? fmt(cons) : "—") + "</b>" + (cons != null && cons > R.limitSec - S.finalSec ? " — inside the final-orders window; earlier next time" : "") + "</li>";
+  $("doneChecks").innerHTML = CHECKS.map(c => { const v = R.checks[c.k]; return '<span class="' + (v ? "ok" : "") + '">' + (v ? (v.state === "done" ? "✓ " : "— ") : "✗ ") + P.esc(c.label) + "</span>"; }).join("");
+  $("dLabel").value = R.label; $("dScore").value = ""; $("dMissed").value = ""; $("dNote").value = "";
+  $("btnSave").textContent = "Save case"; $("btnSave").disabled = false; $("savedMsg").hidden = true;
+  $("noteLine").textContent = noteLine(null);
+}
+
+/* ---------- settings ---------- */
+function applySettings() {
+  const f = P.parseMS($("fFinal").value);
+  if (f == null || f < 30 || f > 600) { $("settingsMsg").textContent = "Final-orders alert: 0:30 to 10:00."; return; }
+  S.finalSec = f; saveSettings(); $("settingsMsg").textContent = "Saved."; renderSetup();
+}
+
+/* ---------- wiring ---------- */
+function blurOnClick(btn) { btn.addEventListener("click", e => { if (e.detail > 0) e.currentTarget.blur(); }); }
+function init() {
+  P.applyTheme(); P.renderNav("ccs");
+  loadSettings(); loadRun(); buildChecks();
+  $("fFinal").value = fmt(S.finalSec); $("fTheme").value = P.getTheme();
+  document.querySelectorAll("#presets button").forEach(b => b.addEventListener("click", () => { chosenLen = +b.dataset.len; renderSetup(); }));
+  $("btnStart").addEventListener("click", () => { R.limitSec = chosenLen; startCase(); buildStrip(); render(); });
+  $("btnPause").addEventListener("click", pauseResume);
+  $("btnEnd").addEventListener("click", exitCase);
+  $("btnAbort").addEventListener("click", abort);
+  $("btnSound").addEventListener("click", () => { S.sound = !S.sound; P.setSound(S.sound); saveSettings(); if (S.sound) { P.audioInit(); P.sfx("start"); } render(); });
+  document.querySelectorAll("#statetoggle button").forEach(b => b.addEventListener("click", () => setPatient(b.dataset.state)));
+  $("btnApply").addEventListener("click", applySettings);
+  $("fTheme").addEventListener("change", () => P.setTheme($("fTheme").value));
+  $("btnSave").addEventListener("click", saveCase);
+  $("dScore").addEventListener("input", () => { const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v); });
+  $("dLabel").addEventListener("input", () => { R.label = $("dLabel").value.trim(); const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v); });
+  $("btnCopyLine").addEventListener("click", async e => { const b = e.currentTarget; try { await navigator.clipboard.writeText($("noteLine").textContent); b.textContent = "Copied"; } catch (err) { b.textContent = "Select the line and copy"; } setTimeout(() => { b.textContent = "Copy the line"; }, 2500); });
+  $("btnStats").addEventListener("click", () => { if (!R.saved && R.phase === "done") saveCase(); location.href = "./stats.html"; });
+  ["btnStart", "btnPause", "btnEnd", "btnAbort", "btnSound", "btnSave"].forEach(id => blurOnClick($(id)));
+  document.addEventListener("keydown", e => {
+    const t = e.target, tag = t && t.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || tag === "SUMMARY" || tag === "LI") return;
+    if (R.phase !== "run") return;
+    const k = e.key.toLowerCase();
+    if (k >= "1" && k <= "8") cycleCheck(CHECKS[+k - 1].k);
+    else if (k === "u") setPatient("unstable");
+    else if (k === "s") setPatient("stable");
+    else if (k === "p") pauseResume();
+    else if (k === "x") exitCase();
+  });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { if (R.phase === "run" && !R.pausedAt) P.keepAwake(); tick(); } });
+  if (R.phase !== "setup") buildStrip();
+  setInterval(tick, 250);
+  render();
+}
+init();
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); }); }
+})();
+</script>
+</body>
+</html>

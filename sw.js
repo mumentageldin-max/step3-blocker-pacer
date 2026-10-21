@@ -1,17 +1,19 @@
 /* Step 3 Pacer — service worker.
    Caches the app shell on install so the pacers open offline, then refreshes it in the background.
    Bump VERSION whenever a page changes so installed copies pick up the update. */
-const VERSION = "pacer-v2";
+const VERSION = "pacer-v3";
 const FONT_CACHE = "pacer-fonts";
 const SHELL = [
   "./",
   "./index.html",
   "./review.html",
   "./stats.html",
+  "./ccs.html",
   "./shared.css",
   "./shared.js",
   "./manifest.webmanifest",
   "./manifest-review.webmanifest",
+  "./manifest-ccs.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
@@ -19,7 +21,11 @@ const SHELL = [
   "./icons/review-192.png",
   "./icons/review-512.png",
   "./icons/review-maskable-512.png",
-  "./icons/review-apple-touch-icon.png"
+  "./icons/review-apple-touch-icon.png",
+  "./icons/ccs-192.png",
+  "./icons/ccs-512.png",
+  "./icons/ccs-maskable-512.png",
+  "./icons/ccs-apple-touch-icon.png"
 ];
 
 self.addEventListener("install", event => {

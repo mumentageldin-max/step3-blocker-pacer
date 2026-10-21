@@ -63,6 +63,7 @@
 .sessions .kind{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--line);white-space:nowrap}
 .sessions li[data-type="block"] .kind{background:var(--accent);color:var(--on-accent)}
 .sessions li[data-type="review"] .kind{background:var(--good);color:var(--on-good)}
+.sessions li[data-type="ccs"] .kind{background:var(--t);color:#fff}
 .sessions .what{min-width:0;overflow-wrap:anywhere}
 .sessions .what b{font-family:var(--font-num)}
 .sessions button{min-height:32px;padding:4px 10px;font-size:13px}
@@ -80,7 +81,7 @@ textarea.imp{font-family:var(--font-num);font-size:12px;min-height:80px;width:10
 <div class="wrap">
   <header class="top">
     <h1>Step 3 Pacer Stats</h1>
-    <p class="tag" id="tagline">Every block and review you finish lands here.</p>
+    <p class="tag" id="tagline">Every block, review and CCS case you finish lands here.</p>
   </header>
   <nav id="pnav" aria-label="Pages"></nav>
 
@@ -122,6 +123,19 @@ textarea.imp{font-family:var(--font-num);font-size:12px;min-height:80px;width:10
     <div class="rowhead"><h2>Review discipline</h2><span class="meta">Minutes used per review; the line is the hard stop</span></div>
     <div class="chartwrap" id="rtime"></div>
     <details class="fold"><summary>Table</summary><div class="body" id="rtimeTable"></div></details>
+  </section>
+
+  <section class="card">
+    <div class="rowhead"><h2>CCS cases</h2><span class="meta">Score per case from the feedback; the line is your retry threshold (80%)</span></div>
+    <div class="kpis" id="ccsKpis"></div>
+    <div class="chartwrap" id="ccsScores"></div>
+    <details class="fold"><summary>By category</summary><div class="body" id="ccsCatTable"></div></details>
+  </section>
+
+  <section class="card">
+    <div class="rowhead"><h2>What you skip in a case</h2><span class="meta">Checklist items left untouched, as a share of cases where they applied</span></div>
+    <div class="chartwrap" id="ccsChecks"></div>
+    <details class="fold"><summary>Orders you missed (your own notes)</summary><div class="body"><ul class="sessions" id="ccsMissed"></ul></div></details>
   </section>
 
   <section class="card">
@@ -358,6 +372,7 @@ function renderInsights(list, tagsInfo) {
     const a = mean(recent), b = mean(earlier);
     if (a != null && b != null) add(a >= b ? "good" : "accent", "Scores", "Last three blocks average " + Math.round(a) + "% vs " + Math.round(b) + "% for the three before. One block's percentage is noise; the review is the part that pays.");
   } else if (rows.length) add("accent", "Scores", rows.length + " scored block" + (rows.length === 1 ? "" : "s") + ". Scores in a new system move on the third and fourth block; the climb is not visible inside one day.");
+  ccsInsights(list, add);
   const days = new Set(list.map(s => P.todayKey(s.date)));
   const bothDays = Array.from(days).filter(d => list.some(s => s.type === "block" && P.todayKey(s.date) === d) && list.some(s => s.type === "review" && P.todayKey(s.date) === d)).length;
   if (days.size) add("accent", "Sequence", days.size + " study day" + (days.size === 1 ? "" : "s") + " in range, " + bothDays + " with a block and its review. A reviewed block counts; an unreviewed one is half a day.");
@@ -415,6 +430,78 @@ function renderScores(list) {
   tbl.innerHTML = '<table class="t"><thead><tr><th>System / label</th><th class="n">Blocks</th><th class="n">Average</th></tr></thead><tbody>' +
     arr.map(s => "<tr><td>" + esc(s.name) + '</td><td class="n">' + s.n + '</td><td class="n">' + Math.round(s.sum / s.n) + "%</td></tr>").join("") + "</tbody></table>";
 }
+const CCS_CHECKS = [
+  ["stab", "Stabilized first"], ["exam", "Exam done"], ["adv", "Advanced the clock"], ["reassess", "Reassessed"],
+  ["move", "Moved the patient"], ["consult", "Consult"], ["counsel", "Counseling · vaccines · follow-up"], ["stop", "Stopped what's finished"]
+];
+const CCS_FIX = {
+  stab: "Unstable patient → IV access, O2, cardiac monitor, pulse ox before anything else. Say it out loud at the start of every ED case.",
+  exam: "Exam before orders: focused if unstable, complete if stable. It is on the score sheet of almost every case.",
+  adv: "Nothing is carried out until simulated time moves. Advance the clock right after the first orders — \"with next available result\".",
+  reassess: "After treatment: interval history and a repeat exam. The case checks that you looked again.",
+  move: "Change the location: ED → ward or ICU, office → home. An admitted patient in the ED all case long loses points.",
+  consult: "Decide the consult early (surgery, cardiology, psychiatry, obstetrics) or mark it not needed; don't leave it for the warning.",
+  counsel: "Counseling, vaccines and the follow-up appointment go in as soon as the plan is settled, not after the two-minute warning.",
+  stop: "Discontinue what's finished — IV fluids, the monitor, oxygen — when the patient leaves the ED or goes home."
+};
+function ccsStats(list) {
+  const cases = list.filter(s => s.type === "ccs");
+  const scored = cases.filter(c => c.score != null), first = scored.filter(c => c.attempt !== "repeat");
+  const applied = {}, missed = {};
+  CCS_CHECKS.forEach(([k]) => { applied[k] = 0; missed[k] = 0; });
+  cases.forEach(c => { CCS_CHECKS.forEach(([k]) => { const v = c.checks && c.checks[k]; if (!v || v.state === "na") { if (!v) { applied[k]++; missed[k]++; } } else applied[k]++; }); });
+  return { cases, scored, first, applied, missed,
+    byClock: cases.filter(c => c.endedBy === "clock").length,
+    advTimes: cases.filter(c => c.firstAdvanceSec != null).map(c => c.firstAdvanceSec / (c.limitSec || 750)),
+    lateCounsel: cases.filter(c => c.counselSec != null && c.counselSec > (c.limitSec || 750) - 150).length,
+    under80: first.filter(c => c.score < 80) };
+}
+function renderCcs(list) {
+  const st = ccsStats(list);
+  const kp = $("ccsKpis"), wrap = $("ccsScores"), tbl = $("ccsCatTable"), cw = $("ccsChecks"), ml = $("ccsMissed");
+  if (!st.cases.length) { kp.innerHTML = ""; wrap.innerHTML = '<p class="empty">No CCS cases yet. Run one in the CCS pacer and save its log.</p>'; tbl.innerHTML = ""; cw.innerHTML = '<p class="empty">No cases yet.</p>'; ml.innerHTML = ""; return; }
+  const avgFirst = mean(st.first.map(c => c.score)), last5 = mean(st.scored.slice(-5).map(c => c.score));
+  const advAvg = mean(st.advTimes);
+  const today = P.todayKey();
+  kp.innerHTML = [
+    { l: "Cases", v: st.cases.length, d: st.cases.filter(c => P.todayKey(c.date) === today).length + " today" },
+    { l: "First-attempt average", v: avgFirst == null ? "—" : Math.round(avgFirst) + "%", d: st.first.length + " scored first attempt" + (st.first.length === 1 ? "" : "s") },
+    { l: "Last 5 scored", v: last5 == null ? "—" : Math.round(last5) + "%", d: "retry below 80%, once" },
+    { l: "First clock advance", v: advAvg == null ? "—" : Math.round(advAvg * 100) + "%", d: "of the case clock · target under 28%" },
+    { l: "Ended by the clock", v: st.cases.length ? Math.round(st.byClock / st.cases.length * 100) + "%" : "—", d: st.byClock + " of " + st.cases.length }
+  ].map(k => '<div class="kpi"><div class="l">' + esc(k.l) + '</div><div class="v">' + esc(k.v) + '</div><div class="d">' + esc(k.d) + "</div></div>").join("");
+  if (st.scored.length) {
+    const points = st.scored.map((c, i) => ({ v: c.score, tip: P.fmtDate(c.date) + " · " + (c.label || c.category) + " · " + c.score + "%" + (c.attempt === "repeat" ? " (repeat)" : ""), xLabel: (i === 0 || i === st.scored.length - 1) ? P.fmtDate(c.date) : null }));
+    lineChart(wrap, { points: points, yMin: 0, yMax: 100, ticks: [0, 50, 100], ref: [{ y: 80, label: "80" }], yFmt: v => Math.round(v) + "%", aria: "CCS score per case" });
+  } else wrap.innerHTML = '<p class="empty">Cases saved, no scores entered yet. The score field is on the case log.</p>';
+  const by = {};
+  st.cases.forEach(c => { const k = c.category || "Other"; by[k] = by[k] || { n: 0, firstSum: 0, firstN: 0, bestSum: 0, bestN: 0 }; by[k].n++; if (c.score != null) { if (c.attempt !== "repeat") { by[k].firstSum += c.score; by[k].firstN++; } by[k].bestSum += c.score; by[k].bestN++; } });
+  tbl.innerHTML = '<table class="t"><thead><tr><th>Category</th><th class="n">Cases</th><th class="n">First attempt</th><th class="n">All attempts</th></tr></thead><tbody>' +
+    Object.keys(by).sort((a, b) => by[b].n - by[a].n).map(k => "<tr><td>" + esc(k) + '</td><td class="n">' + by[k].n + '</td><td class="n ' + (by[k].firstN && by[k].firstSum / by[k].firstN < 70 ? "behind" : "") + '">' + (by[k].firstN ? Math.round(by[k].firstSum / by[k].firstN) + "%" : "—") + '</td><td class="n">' + (by[k].bestN ? Math.round(by[k].bestSum / by[k].bestN) + "%" : "—") + "</td></tr>").join("") + "</tbody></table>";
+  const items = CCS_CHECKS.map(([k, name]) => { const share = st.applied[k] ? Math.round(st.missed[k] / st.applied[k] * 100) : 0; return { label: name, total: share, capLabel: st.applied[k] ? share + "%" : null, parts: [{ v: share, color: share >= 30 ? "var(--warn)" : "var(--accent)", name: "skipped", tip: name + " · skipped in " + st.missed[k] + " of " + st.applied[k] + " cases" }], xLabel: name.split(" ")[0] }; });
+  columnChart(cw, { items: items, yMax: 100, ticks: [0, 50, 100], yFmt: v => Math.round(v) + "%", ref: [{ y: 30, label: "30" }], aria: "Share of cases where each checklist item was skipped" });
+  const notes = st.cases.filter(c => c.missedOrder).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 25);
+  ml.innerHTML = notes.length ? notes.map(c => '<li data-type="ccs"><span class="kind">' + esc(c.category || "ccs") + '</span><span class="what"><b>' + esc(c.missedOrder) + "</b> · " + esc(c.label || "") + " · " + esc(P.fmtDate(c.date)) + "</span><span></span></li>").join("") : '<li class="empty">No missed-order notes yet.</li>';
+}
+function ccsInsights(list, add) {
+  const st = ccsStats(list);
+  if (!st.cases.length) return;
+  const n = st.cases.length;
+  if (n >= 3) {
+    const advAvg = mean(st.advTimes);
+    if (advAvg != null && advAvg > 0.3) add("warn", "CCS", "First clock advance comes at " + Math.round(advAvg * 100) + "% of the case clock on average (about " + fmt(advAvg * 750) + " on a 12:30 case). Orders don't run until time moves: first orders, then advance, then read results.");
+    if (st.byClock / n >= 0.3) add("warn", "CCS", "The clock ended " + st.byClock + " of " + n + " cases. The two-minute warning should find you with nothing left but Exit Case — counseling and follow-up go in during the close phase.");
+    if (st.lateCounsel >= 2) add("warn", "CCS", "Counseling and follow-up landed inside the final-orders window in " + st.lateCounsel + " cases. Put them in as soon as the plan is settled.");
+    const worst = CCS_CHECKS.map(([k, name]) => ({ k, name, share: st.applied[k] ? st.missed[k] / st.applied[k] : 0, n: st.applied[k] })).filter(x => x.n >= 3 && x.share >= 0.3).sort((a, b) => b.share - a.share).slice(0, 2);
+    worst.forEach(w => add("warn", "CCS", w.name + " skipped in " + Math.round(w.share * 100) + "% of cases. " + CCS_FIX[w.k]));
+    if (!worst.length && st.byClock / n < 0.3 && (advAvg == null || advAvg <= 0.3)) add("good", "CCS", "Case mechanics are holding: checklist mostly complete, clock advanced early, cases finished before real time ran out.");
+  }
+  const cats = {};
+  st.first.forEach(c => { const k = c.category || "Other"; cats[k] = cats[k] || []; cats[k].push(c.score); });
+  Object.keys(cats).forEach(k => { if (cats[k].length >= 2 && mean(cats[k]) < 70) add("warn", "CCS", k + " first attempts average " + Math.round(mean(cats[k])) + "% over " + cats[k].length + " cases. Put the next new cases there; the order matters more than the count."); });
+  if (st.under80.length) add("accent", "CCS", "Retry once, a few days later (first attempt under 80%): " + st.under80.slice(-6).map(c => c.label || c.category).join(", ") + ".");
+  if (n > 0 && n < 3) add("accent", "CCS", n + " case" + (n === 1 ? "" : "s") + " logged. Checklist patterns show after three or four.");
+}
 function renderReviewTime(list) {
   const reviews = list.filter(s => s.type === "review" && s.mode !== "eo");
   const wrap = $("rtime"), tbl = $("rtimeTable");
@@ -438,6 +525,8 @@ function weeklyReport() {
       if (s.type === "block") {
         const cps = (s.checkpoints || []).map(c => "Q" + c.q + " " + P.fmtSigned(Math.round(c.delta))).join(" ");
         lines.push("  Block " + (s.label ? s.label + " " : "") + (s.correct != null ? s.correct + "/" + s.nQ + " " : "") + "· " + cps + " · " + (s.flagged || 0) + " flagged" + ((s.answered || 0) < s.nQ ? " · " + (s.nQ - (s.answered || 0)) + " untapped" : ""));
+      } else if (s.type === "ccs") {
+        lines.push("  CCS " + (s.label || "case") + " · " + (s.category || "") + " · " + (s.attempt === "repeat" ? "repeat" : "1st") + (s.score != null ? " · " + s.score + "%" : "") + " · " + fmt(s.timeUsedSec || 0) + "/" + fmt(s.limitSec || 750) + (s.endedBy === "clock" ? " (clock)" : "") + ((s.missedChecks || []).length ? " · skipped: " + s.missedChecks.join(", ") : "") + (s.missedOrder ? " · missed order: " + s.missedOrder : ""));
       } else {
         const t = s.tags || {};
         lines.push("  Review " + (s.label ? s.label + " " : "") + (s.correct != null ? s.correct + "/" + s.nQ + " " : "") + "· K" + (t.K || 0) + " M" + (t.M || 0) + " T" + (t.T || 0) + " G" + (t.G || 0) + " · " + fmt(s.timeUsedSec || 0) + " used" + (s.stopped ? " · hard stop, " + (s.swept || 0) + " swept" : "") + (s.extensions ? " · " + s.extensions + " ext" : "") + (s.mode === "eo" ? " · EO only" : ""));
@@ -445,9 +534,9 @@ function weeklyReport() {
     });
   });
   if (!list.length) lines.push("", "No sessions in the last 7 days.");
-  const blocks = list.filter(s => s.type === "block"), reviews = list.filter(s => s.type === "review");
-  const scores = blockScoreRows(list).map(r => r.score);
-  lines.push("", "Totals: " + blocks.length + " blocks, " + reviews.length + " reviews" + (scores.length ? ", average score " + Math.round(mean(scores)) + "%" : ""));
+  const blocks = list.filter(s => s.type === "block"), reviews = list.filter(s => s.type === "review"), ccs = list.filter(s => s.type === "ccs");
+  const scores = blockScoreRows(list).map(r => r.score), ccsFirst = ccs.filter(c => c.score != null && c.attempt !== "repeat").map(c => c.score);
+  lines.push("", "Totals: " + blocks.length + " blocks, " + reviews.length + " reviews, " + ccs.length + " CCS cases" + (scores.length ? ", average block score " + Math.round(mean(scores)) + "%" : "") + (ccsFirst.length ? ", CCS first-attempt average " + Math.round(mean(ccsFirst)) + "%" : ""));
   const tags = { K: 0, M: 0, T: 0, G: 0 }; reviews.forEach(r => { if (r.tags) ["K", "M", "T", "G"].forEach(l => tags[l] += r.tags[l] || 0); });
   lines.push("Letters: K" + tags.K + " M" + tags.M + " T" + tags.T + " G" + tags.G);
   const ins = lastInsights.map(o => "- " + o.k + ": " + o.t);
@@ -460,7 +549,8 @@ function renderSessions() {
   if (!list.length) { ul.innerHTML = '<li class="empty">No sessions saved on this device.</li>'; return; }
   ul.innerHTML = list.map(s => {
     let what;
-    if (s.type === "block") what = esc(P.fmtDate(s.date, true)) + (s.label ? " · " + esc(s.label) : "") + (s.correct != null ? " · <b>" + s.correct + "/" + s.nQ + "</b>" : "") + " · " + (s.checkpoints || []).map(c => "Q" + c.q + " " + P.fmtSigned(Math.round(c.delta))).join(" ") + " · " + (s.flagged || 0) + " flagged";
+    if (s.type === "ccs") what = esc(P.fmtDate(s.date, true)) + " · " + esc(s.label || s.category || "case") + (s.score != null ? " · <b>" + s.score + "%</b>" : "") + " · " + fmt(s.timeUsedSec || 0) + "/" + fmt(s.limitSec || 750) + ((s.missedChecks || []).length ? " · skipped " + esc(s.missedChecks.join(", ")) : "");
+    else if (s.type === "block") what = esc(P.fmtDate(s.date, true)) + (s.label ? " · " + esc(s.label) : "") + (s.correct != null ? " · <b>" + s.correct + "/" + s.nQ + "</b>" : "") + " · " + (s.checkpoints || []).map(c => "Q" + c.q + " " + P.fmtSigned(Math.round(c.delta))).join(" ") + " · " + (s.flagged || 0) + " flagged";
     else { const t = s.tags || {}; what = esc(P.fmtDate(s.date, true)) + (s.label ? " · " + esc(s.label) : "") + (s.correct != null ? " · <b>" + s.correct + "/" + s.nQ + "</b>" : "") + " · K" + (t.K || 0) + " M" + (t.M || 0) + " T" + (t.T || 0) + " G" + (t.G || 0) + " · " + fmt(s.timeUsedSec || 0) + (s.mode === "eo" ? " · EO only" : ""); }
     return '<li data-type="' + s.type + '"><span class="kind">' + s.type + '</span><span class="what">' + what + '</span><button type="button" data-del="' + esc(s.id) + '">Delete</button></li>';
   }).join("");
@@ -484,7 +574,7 @@ function refresh() {
   document.querySelectorAll("#filters button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.range === +range)));
   const tagsInfo = renderKpis(list, prevList);
   renderInsights(list, tagsInfo);
-  renderPacing(list); renderLetters(list); renderScores(list); renderReviewTime(list);
+  renderPacing(list); renderLetters(list); renderScores(list); renderReviewTime(list); renderCcs(list);
   $("report").textContent = weeklyReport();
   $("dataMeta").textContent = ALL.length + " session" + (ALL.length === 1 ? "" : "s") + " on this device";
   renderSessions(); renderSync();
