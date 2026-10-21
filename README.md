@@ -3,17 +3,11 @@
 This folder is a complete web app (PWA). Once it is hosted at a web address it installs to the home
 screen of the iPad Pro and the Galaxy Z Fold 7, opens full-screen with its own icon, and works offline.
 
-## 1. Host it (one time, about two minutes)
+## 1. Where it lives
 
-GitHub Pages is free and permanent:
-
-1. Sign in at github.com → **New repository** → name it `step3-block-pacer`, keep it Public → Create.
-2. On the empty repo page choose **uploading an existing file**, drag in everything in this folder
-   (`index.html`, `manifest.webmanifest`, `sw.js`, `README.md` and the `icons` folder) → **Commit changes**.
-3. Repo **Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: main / (root)** → Save.
-4. After a minute the page shows your address: `https://<your-username>.github.io/step3-block-pacer/`
-
-Any other static host works too (Netlify, Cloudflare Pages). Keep the files together in one folder.
+Live at **https://mumentageldin-max.github.io/step3-blocker-pacer/** — served by GitHub Pages from the
+`gh-pages` branch of this repository. To update the app, change the files, bump `VERSION` in `sw.js`,
+and push the same commit to both `main` and `gh-pages`.
 
 ## 2. Install on the iPad Pro
 
@@ -32,4 +26,4 @@ On the cover screen it runs as a normal phone-width app.
 - Sound and vibration cues need the app to be visible on screen. A hidden app is paused by the phone,
   which is why split screen is the intended setup.
 - Settings (block length, checkpoint targets, theme) are saved on each device.
-- To update the app later, replace the files on GitHub and change `VERSION` in `sw.js`; installed copies refresh on their next open.
+- Installed copies pick up a new `VERSION` of `sw.js` on their next open.
