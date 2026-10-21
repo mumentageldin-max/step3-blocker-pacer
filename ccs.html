@@ -55,6 +55,7 @@
 .legend{font-size:12px;color:var(--muted);margin:0}
 .presets button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .setup .primary{width:100%}
+.setup .row2{display:flex;gap:8px;flex-wrap:wrap}
 .done .row2{display:flex;gap:8px;flex-wrap:wrap}
 .done .row2 button{min-height:44px;padding:10px 14px}
 .done .line{font-family:var(--font-num);font-size:14px;padding:10px 12px;border:1px dashed var(--line);border-radius:8px;background:var(--bg);overflow-x:auto;white-space:nowrap;margin:0}
@@ -100,6 +101,8 @@
     </div>
     <p class="note" id="sPlan"></p>
     <button class="primary" id="btnStart" type="button">Start case</button>
+    <div class="row2"><button id="btnReviewOnly" type="button" class="small" style="min-height:46px">Feedback review only — case already run (<span id="revOnlyLen">10:00</span>)</button></div>
+    <p class="note">The review timer also appears by itself on the Case log screen after every case you run here.</p>
   </section>
 
   <div class="colL" id="colL" hidden>
@@ -231,7 +234,7 @@ let chosenLen = 750, abortArmed = 0, endArmed = 0;
 
 function fresh() {
   return { phase: "setup", id: "", date: "", label: "", category: "", attempt: "first", source: "ccscases", limitSec: 750,
-    startAt: 0, pausedAt: 0, pausedTotal: 0, patient: "", checks: {}, phaseChimed: {}, finalFired: false, endEl: 0, endedBy: "", saved: false,
+    startAt: 0, pausedAt: 0, pausedTotal: 0, patient: "", checks: {}, phaseChimed: {}, finalFired: false, endEl: 0, endedBy: "", saved: false, caseTimed: true,
     history: [], rev: { startAt: 0, limitSec: 0, endAt: 0, warned: false, rang: false } };
 }
 function loadSettings() { const p = P.readJSON(LS_S, null); if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p); P.setSound(S.sound); chosenLen = S.lastLen || 750; }
@@ -310,6 +313,16 @@ function resumeCase() { // exited by mistake; real time never stopped
   P.keepAwake(); persist(); render();
 }
 function revLimit() { return R.limitSec > 750 ? S.revLongSec : S.revShortSec; }
+function startReviewOnly() { // a case run without the pacer: log + feedback timer, no case clock
+  R = fresh();
+  R.phase = "done"; R.id = P.newId(); R.date = new Date().toISOString();
+  R.label = $("sLabel").value.trim(); R.category = $("sCat").value; R.attempt = $("sAttempt").value; R.source = $("sSource").value;
+  R.limitSec = chosenLen; R.startAt = Date.now(); R.endEl = 0; R.endedBy = "none"; R.caseTimed = false;
+  S.lastLen = chosenLen; saveSettings();
+  P.audioInit();
+  persist(); render();
+  startReview();
+}
 function startReview() {
   if (R.phase !== "done" || R.rev.startAt) return;
   R.rev = { startAt: Date.now(), limitSec: revLimit(), endAt: 0, warned: false, rang: false };
@@ -347,7 +360,8 @@ function saveCase() {
     limitSec: R.limitSec, timeUsedSec: Math.round(R.endEl), endedBy: R.endedBy, patient: R.patient,
     score: isNaN(score) ? null : score, missedOrder: $("dMissed").value.trim(), note: $("dNote").value.trim(),
     checks: checks, firstAdvanceSec: checks.adv.state === "done" ? checks.adv.at : null, counselSec: checks.counsel.state === "done" ? checks.counsel.at : null,
-    missedChecks: CHECKS.filter(c => !checks[c.k].state).map(c => c.k), endedIn: phaseAt(Math.max(0, R.endEl - 0.001)).k,
+    caseTimed: R.caseTimed !== false,
+    missedChecks: R.caseTimed === false ? [] : CHECKS.filter(c => !checks[c.k].state).map(c => c.k), endedIn: R.caseTimed === false ? null : phaseAt(Math.max(0, R.endEl - 0.001)).k,
     reviewSec: R.rev.startAt ? Math.round(revElapsed()) : null, reviewLimitSec: R.rev.startAt ? R.rev.limitSec : null
   };
   P.saveSession(s); P.syncQuietly();
@@ -400,6 +414,7 @@ function renderSetup() {
   document.querySelectorAll("#presets button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.len === chosenLen)));
   const b = (() => { let acc = 0; return PHASES.map(p => { const s = acc; acc += Math.round(chosenLen * p.frac); return p.name + " " + fmt(s) + "–" + fmt(acc); }); })();
   $("sPlan").textContent = fmt(chosenLen) + " of real time: " + b.join(" · ") + ". Final-orders alert at " + fmt(S.finalSec) + " left.";
+  $("revOnlyLen").textContent = fmt(chosenLen > 750 ? S.revLongSec : S.revShortSec);
 }
 function render() {
   const inSetup = R.phase === "setup", live = R.phase === "run", done = R.phase === "done";
@@ -466,10 +481,19 @@ let doneRendered = false;
 function noteLine(score) {
   const d = new Date(R.date), day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const missed = CHECKS.filter(c => !R.checks[c.k]).map(c => c.label.split(" ")[0].toLowerCase());
+  if (R.caseTimed === false) return day + " · CCS " + (R.label || "case") + " · " + R.category + " · " + (R.attempt === "repeat" ? "repeat" : "1st") + (score != null ? " · " + score + "%" : "") + " · " + fmt(R.limitSec) + " case, run outside the pacer";
   return day + " · CCS " + (R.label || "case") + " · " + R.category + " · " + (R.attempt === "repeat" ? "repeat" : "1st") + (score != null ? " · " + score + "%" : "") + " · " + fmt(R.endEl) + "/" + fmt(R.limitSec) + (R.endedBy === "clock" ? " (clock)" : "") + (missed.length ? " · missed: " + missed.join(", ") : " · checklist complete");
 }
 function renderDone() {
   $("doneMeta").textContent = (R.label ? R.label + " · " : "") + R.category + " · " + P.fmtDate(R.date, true);
+  if (R.caseTimed === false) {
+    $("doneStats").innerHTML = "<li>Case run outside the pacer — no case clock or checklist for this one.</li>";
+    $("doneChecks").innerHTML = "";
+    $("dLabel").value = R.label; $("dScore").value = ""; $("dMissed").value = ""; $("dNote").value = "";
+    $("btnSave").textContent = "Save case"; $("btnSave").disabled = false; $("savedMsg").hidden = true; $("btnResume").hidden = true;
+    $("noteLine").textContent = noteLine(null);
+    return;
+  }
   const adv = R.checks.adv && R.checks.adv.state === "done" ? R.checks.adv.at : null, cons = R.checks.counsel && R.checks.counsel.state === "done" ? R.checks.counsel.at : null;
   const endPh = phaseAt(Math.max(0, R.endEl - 0.001));
   $("doneStats").innerHTML =
@@ -510,6 +534,7 @@ function init() {
   $("btnUndo").addEventListener("click", undoTap);
   $("btnResume").addEventListener("click", resumeCase);
   $("btnRevStart").addEventListener("click", startReview);
+  $("btnReviewOnly").addEventListener("click", startReviewOnly);
   ["dScore", "dLabel", "dMissed", "dNote"].forEach(id => $(id).addEventListener("input", markDirty));
   $("dScore").addEventListener("input", () => { const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v); });
   $("dLabel").addEventListener("input", () => { R.label = $("dLabel").value.trim(); const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v); });

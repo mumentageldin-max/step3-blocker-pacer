@@ -446,14 +446,15 @@ const CCS_FIX = {
 };
 function ccsStats(list) {
   const cases = list.filter(s => s.type === "ccs");
+  const timed = cases.filter(c => c.caseTimed !== false);
   const scored = cases.filter(c => c.score != null), first = scored.filter(c => c.attempt !== "repeat");
   const applied = {}, missed = {};
   CCS_CHECKS.forEach(([k]) => { applied[k] = 0; missed[k] = 0; });
-  cases.forEach(c => { CCS_CHECKS.forEach(([k]) => { const v = c.checks && c.checks[k]; if (!v || v.state === "na") { if (!v) { applied[k]++; missed[k]++; } } else applied[k]++; }); });
-  return { cases, scored, first, applied, missed,
-    byClock: cases.filter(c => c.endedBy === "clock").length,
-    advTimes: cases.filter(c => c.firstAdvanceSec != null).map(c => c.firstAdvanceSec / (c.limitSec || 750)),
-    lateCounsel: cases.filter(c => c.counselSec != null && c.counselSec > (c.limitSec || 750) - 150).length,
+  timed.forEach(c => { CCS_CHECKS.forEach(([k]) => { const v = c.checks && c.checks[k]; if (!v || v.state === "na") { if (!v) { applied[k]++; missed[k]++; } } else applied[k]++; }); });
+  return { cases, timed, scored, first, applied, missed,
+    byClock: timed.filter(c => c.endedBy === "clock").length,
+    advTimes: timed.filter(c => c.firstAdvanceSec != null).map(c => c.firstAdvanceSec / (c.limitSec || 750)),
+    lateCounsel: timed.filter(c => c.counselSec != null && c.counselSec > (c.limitSec || 750) - 150).length,
     under80: first.filter(c => c.score < 80) };
 }
 function renderCcs(list) {
@@ -468,7 +469,7 @@ function renderCcs(list) {
     { l: "First-attempt average", v: avgFirst == null ? "—" : Math.round(avgFirst) + "%", d: st.first.length + " scored first attempt" + (st.first.length === 1 ? "" : "s") },
     { l: "Last 5 scored", v: last5 == null ? "—" : Math.round(last5) + "%", d: "retry below 80%, once" },
     { l: "First clock advance", v: advAvg == null ? "—" : Math.round(advAvg * 100) + "%", d: "of the case clock · target under 28%" },
-    { l: "Ended by the clock", v: st.cases.length ? Math.round(st.byClock / st.cases.length * 100) + "%" : "—", d: st.byClock + " of " + st.cases.length }
+    { l: "Ended by the clock", v: st.timed.length ? Math.round(st.byClock / st.timed.length * 100) + "%" : "—", d: st.byClock + " of " + st.timed.length + " timed" }
   ].map(k => '<div class="kpi"><div class="l">' + esc(k.l) + '</div><div class="v">' + esc(k.v) + '</div><div class="d">' + esc(k.d) + "</div></div>").join("");
   if (st.scored.length) {
     const points = st.scored.map((c, i) => ({ v: c.score, tip: P.fmtDate(c.date) + " · " + (c.label || c.category) + " · " + c.score + "%" + (c.attempt === "repeat" ? " (repeat)" : ""), xLabel: (i === 0 || i === st.scored.length - 1) ? P.fmtDate(c.date) : null }));
@@ -486,7 +487,7 @@ function renderCcs(list) {
 function ccsInsights(list, add) {
   const st = ccsStats(list);
   if (!st.cases.length) return;
-  const n = st.cases.length;
+  const n = st.timed.length;
   if (n >= 3) {
     const advAvg = mean(st.advTimes);
     if (advAvg != null && advAvg > 0.3) add("warn", "CCS", "First clock advance comes at " + Math.round(advAvg * 100) + "% of the case clock on average (about " + fmt(advAvg * 750) + " on a 12:30 case). Orders don't run until time moves: first orders, then advance, then read results.");
@@ -500,7 +501,7 @@ function ccsInsights(list, add) {
   st.first.forEach(c => { const k = c.category || "Other"; cats[k] = cats[k] || []; cats[k].push(c.score); });
   Object.keys(cats).forEach(k => { if (cats[k].length >= 2 && mean(cats[k]) < 70) add("warn", "CCS", k + " first attempts average " + Math.round(mean(cats[k])) + "% over " + cats[k].length + " cases. Put the next new cases there; the order matters more than the count."); });
   if (st.under80.length) add("accent", "CCS", "Retry once, a few days later (first attempt under 80%): " + st.under80.slice(-6).map(c => c.label || c.category).join(", ") + ".");
-  if (n > 0 && n < 3) add("accent", "CCS", n + " case" + (n === 1 ? "" : "s") + " logged. Checklist patterns show after three or four.");
+  if (st.cases.length > 0 && n < 3) add("accent", "CCS", st.cases.length + " case" + (st.cases.length === 1 ? "" : "s") + " logged, " + n + " timed in the pacer. Checklist patterns show after three or four timed cases.");
 }
 function renderReviewTime(list) {
   const reviews = list.filter(s => s.type === "review" && s.mode !== "eo");
