@@ -71,6 +71,48 @@
 .revbox .ring{position:relative;width:100%;height:10px;border-radius:5px;background:var(--line);overflow:hidden}
 .revbox .ring i{position:absolute;inset:0 auto 0 0;width:0;background:var(--good);border-radius:5px}
 .revbox[data-tone="crit"] .ring i{background:var(--crit)}
+/* Pre-case card (setup), protocol lines (live) and the spelling drill (setup). Phase colors: R blue, E red, A green, C amber, T violet. */
+:root{--ph-read:#2458D6;--ph-emerg:#B8262F;--ph-assess:#167A4E;--ph-close:#9A6400;--ph-term:#7A3DB8}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ph-read:#7EA2FF;--ph-emerg:#FF6B70;--ph-assess:#4FCF8E;--ph-close:#F2B13F;--ph-term:#C4A6FF}}
+:root[data-theme="dark"]{--ph-read:#7EA2FF;--ph-emerg:#FF6B70;--ph-assess:#4FCF8E;--ph-close:#F2B13F;--ph-term:#C4A6FF}
+.precase{display:grid;gap:6px}
+.precase .st{display:grid;grid-template-columns:30px 1fr;gap:8px;align-items:start;border:1px solid var(--line);border-left-width:6px;border-radius:10px;padding:8px 10px;background:var(--bg);font-size:14px;line-height:1.35}
+.precase .st b.l{font-family:var(--font-num);font-size:17px;line-height:1.1}
+.precase .st[data-ph="read"]{border-left-color:var(--ph-read)} .precase .st[data-ph="read"] b.l{color:var(--ph-read)}
+.precase .st[data-ph="emerg"]{border-left-color:var(--ph-emerg)} .precase .st[data-ph="emerg"] b.l{color:var(--ph-emerg)}
+.precase .st[data-ph="assess"]{border-left-color:var(--ph-assess)} .precase .st[data-ph="assess"] b.l{color:var(--ph-assess)}
+.precase .st[data-ph="close"]{border-left-color:var(--ph-close)} .precase .st[data-ph="close"] b.l{color:var(--ph-close)}
+.precase .st[data-ph="term"]{border-left-color:var(--ph-term)} .precase .st[data-ph="term"] b.l{color:var(--ph-term)}
+.precase .st[data-ph="key"]{border-left-color:var(--muted)} .precase .st[data-ph="key"] b.l{color:var(--muted)}
+.precase .st .k{font-family:var(--font-num);font-weight:700;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:0 5px;white-space:nowrap}
+.breath{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.breath .ring{width:46px;height:46px;border-radius:50%;border:4px solid var(--line);display:grid;place-items:center;font-family:var(--font-num);font-weight:700;font-size:17px;transition:transform .9s ease-in-out,border-color .9s}
+.breath .ring.in{transform:scale(1.22);border-color:var(--good)} .breath .ring.out{transform:scale(.9);border-color:var(--accent)}
+@media (prefers-reduced-motion: reduce){.breath .ring{transition:none}}
+.cps{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:6px}
+.cps div{border-radius:8px;padding:6px 8px;border:1px solid var(--line);font-size:12px;line-height:1.25;color:var(--muted)}
+.cps div b{display:block;font-family:var(--font-num);font-size:16px;color:var(--fg)}
+.proto{list-style:none;margin:0;padding:0;display:grid;gap:4px;width:100%;text-align:left}
+.proto li{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:14px;line-height:1.35}
+.proto li b{font-family:var(--font-num);font-size:12px;white-space:nowrap;padding-top:2px}
+.proto li[data-ph="read"] b{color:var(--ph-read)} .proto li[data-ph="emerg"] b{color:var(--ph-emerg)} .proto li[data-ph="assess"] b{color:var(--ph-assess)} .proto li[data-ph="close"] b{color:var(--ph-close)} .proto li[data-ph="term"] b{color:var(--ph-term)}
+.proto li.hint{border-style:dashed;color:var(--muted)}
+.proto .k{font-family:var(--font-num);font-weight:700;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:0 5px;white-space:nowrap;font-size:13px}
+.keysearch{display:grid;gap:8px}
+.keysearch input{font:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%;min-width:0}
+.keysearch input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.keylist{display:grid;gap:4px;max-height:280px;overflow:auto}
+.keylist div{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--bg)}
+.keylist div .k{font-family:var(--font-num);font-weight:700;color:var(--accent)}
+.keylist div small{grid-column:1/-1;color:var(--muted);font-size:12px}
+.drill{display:grid;gap:8px}
+.drill .prompt{font-size:20px;font-weight:700;min-height:1.3em;text-wrap:balance}
+.drill .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drill input{font:inherit;font-family:var(--font-num);font-size:20px;padding:10px 12px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--fg);flex:1 1 160px;min-width:0;text-transform:lowercase}
+.drill input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.drill .fb{font-size:15px;min-height:1.4em}
+.drill .fb.ok{color:var(--good)} .drill .fb.bad{color:var(--crit)}
+.drill .score{font-family:var(--font-num);font-size:14px;color:var(--muted)}
 @media (min-width:820px) and (min-height:520px){
   .clockcard{padding:22px 20px 18px}
 }
@@ -86,6 +128,26 @@
 
   <!-- SETUP -->
   <section class="card setup full" id="setup">
+    <details class="fold" id="precaseFold" open>
+      <summary>Pre-case card · read once, then Start</summary>
+      <div class="body">
+        <div class="breath">
+          <div class="ring" id="ring">5</div>
+          <div style="flex:1 1 180px;min-width:0"><b>Anchor breath · 5 s</b><p class="note">In while the circle grows, out while it shrinks. The last case is over.</p></div>
+          <button type="button" class="small" id="btnBreath">Breathe</button>
+        </div>
+        <div class="precase">
+          <div class="st" data-ph="read"><b class="l">R</b><div><b>Read once.</b> Who · how sick · where → <b>Unstable</b> (ED/ICU) or <b>Stable</b> (office/ward). Pulse ox is not in the vitals: order it. Home meds <span class="k">Day 1 @00:00</span>: keep or cancel.</div></div>
+          <div class="st" data-ph="emerg"><b class="l">E</b><div><b>Unstable → HAVOC</b> as one list (Hurting · Access IV + NS + fingerstick · Vitals · Oxygen + pulse ox · Cardiac monitor + ECG) + 5-box exam. <b>Stable → full exam.</b> Then <b>3-3-3 + HUE</b> (CBC CMP CXR · Trop Tox TSH · Fasting Fingerstick Fluids · hCG UA ECG) + the one proving test.</div></div>
+          <div class="st" data-ph="key"><b class="l">✎</b><div><b>Type 3–4 letters → pick from the list.</b> No verbs, no doses, drug by name (<span class="k">metop</span> not "beta blocker"), pick the route, no PRN. Not found? Type another name.</div></div>
+          <div class="st" data-ph="assess"><b class="l">A</b><div><b>Advance the clock</b> "with next available result" — nothing happens until you do. Each result: <b>treat → interval hx + re-exam → move</b> (ED → ward/ICU · office → home) → consult if it changes care. ADMIT CORT.</div></div>
+          <div class="st" data-ph="close"><b class="l">C</b><div><b>SAVE before the warning:</b> Stop finished orders · Appointment · Vaccines/screening · Educate (<span class="k">coun</span>). Long-term meds in.</div></div>
+          <div class="st" data-ph="term"><b class="l">T</b><div><b>Warning ≈ 2:00 left: orders only.</b> No exam, no moves, no clock. Write what's missing, cancel pending, <b>Exit Case</b>. Early is fine → break time.</div></div>
+        </div>
+        <div class="cps" id="cps" aria-label="Exam-clock checkpoints"></div>
+        <p class="note">Lost? Advance the clock → read the result → reassess. One bad case cannot sink you. Full sheet: your "CCS Pre-Case Card" artifact.</p>
+      </div>
+    </details>
     <div class="rowhead"><h2>This case</h2><span class="meta">The case start screen shows the maximum real time. Match it here, then press both Starts.</span></div>
     <div class="presets" id="presets" aria-label="Case length">
       <button type="button" data-len="750" aria-pressed="true">12:30 · short case</button>
@@ -103,6 +165,26 @@
     <button class="primary" id="btnStart" type="button">Start case</button>
     <div class="row2"><button id="btnReviewOnly" type="button" class="small" style="min-height:46px">Feedback review only — case already run (<span id="revOnlyLen">10:00</span>)</button></div>
     <p class="note">The review timer also appears by itself on the Case log screen after every case you run here.</p>
+    <details class="fold" id="keysFold">
+      <summary>Spelling keys · look up or drill</summary>
+      <div class="body">
+        <div class="keysearch">
+          <input type="search" id="keyQ" placeholder="Type an order: pulse, ceft, hydral…" autocomplete="off" aria-label="Search spelling keys">
+          <div class="keylist" id="keyList"></div>
+        </div>
+        <div class="drill" id="drill">
+          <div class="rowhead"><h2>Drill · 10 orders</h2><span class="score" id="drillScore"></span></div>
+          <p class="note">I show the order, you type the letters you would type in Primum (the key or more). Enter to check. Same rule as the exam: enough letters to beat the look-alikes.</p>
+          <div class="prompt" id="drillPrompt">Press Start drill.</div>
+          <div class="row">
+            <input type="text" id="drillIn" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="latin" aria-label="Letters you would type" disabled>
+            <button type="button" class="small" id="btnDrillCheck" disabled>Check</button>
+            <button type="button" class="small" id="btnDrill">Start drill</button>
+          </div>
+          <div class="fb" id="drillFb"></div>
+        </div>
+      </div>
+    </details>
   </section>
 
   <div class="colL" id="colL" hidden>
@@ -119,6 +201,7 @@
       </div>
       <p class="phaseText" id="phaseText"></p>
       <p class="nextline" id="nextline"></p>
+      <ul class="proto" id="proto" aria-label="Protocol for this phase"></ul>
       <div class="statetoggle" id="statetoggle">
         <button type="button" data-state="unstable" aria-pressed="false">Unstable · ED</button>
         <button type="button" data-state="stable" aria-pressed="false">Stable · office / ward</button>
@@ -143,14 +226,14 @@
       <summary>Rules for a CCS case</summary>
       <div class="body">
         <ol class="rules">
-          <li><b>Real time is the only clock that can end the case.</b> Simulated time moves only when you advance it, and no order is carried out until it does. Advance early, in small steps ("with next available result", "call me as needed").</li>
-          <li><b>Read once:</b> intro, vitals, history. One line: who, how sick, where. Unstable → the ED protocol. Stable → the office protocol.</li>
-          <li><b>Unstable:</b> IV access, O2, cardiac monitor, pulse ox, then a focused exam, then treat. <b>Stable:</b> complete exam, then labs and first treatment.</li>
-          <li><b>Orders as a list, confirm the exact item.</b> Primum has many look-alike names; pick the specific one. Doses are automatic; you choose the route.</li>
-          <li><b>After every batch of results:</b> treat → interval history + repeat exam → move the patient (ward / ICU / home) → consult if indicated. Then advance again.</li>
-          <li><b>Counseling, vaccines and the follow-up appointment go in as soon as the plan is settled</b>, not at the warning. Stop what's finished (fluids, monitor, IV).</li>
-          <li><b>The software warns you at about two minutes of real time.</b> From then on: no exam, no location change, no clock. Only final orders. Then Exit Case.</li>
-          <li><b>Finishing early is fine.</b> Unused case time becomes break time on exam day. Don't use the clock up for its own sake.</li>
+          <li><b>Real time is the only clock that can end the case.</b> Simulated time moves only when you advance it, and no order is carried out until it does. In the ED advance "with next available result", in small steps. <b>"Call / see me as needed" sends the patient home and effectively ends the case</b> — only when you are done.</li>
+          <li><b>Read once:</b> intro, vitals, history. One line: who, how sick, where. Unstable → HAVOC + 5-box exam. Stable → full exam. Pulse ox is not in the vitals. Home meds show as Day 1 @00:00: keep or cancel.</li>
+          <li><b>Order entry (USMLE):</b> the clerk recognizes the <b>first three characters</b> and shows a list — type 3–4 letters, read, pick. No verbs, no doses. Drugs by trade or generic name, never a class. You pick the route (IV, PO, IM, SQ, IN…). No PRN; IV fluids are continuous. Not recognized? Retype it another way.</li>
+          <li><b>After every batch of results:</b> treat → interval history + repeat exam → move the patient (ward / ICU / home) → consult if it changes care. Then advance again. Admission = ADMIT CORT.</li>
+          <li><b>SAVE before the warning:</b> Stop finished orders, Appointment, Vaccines/screening, Educate. After the Case-end screen you can no longer examine, change location, schedule a follow-up or advance the clock — only write and cancel orders.</li>
+          <li><b>Scoring (USMLE):</b> indicated actions earn, risky non-indicated actions subtract, timing and sequence count ("after a delay in simulated time may receive no credit"), restraint is scored when it is the standard. Counseling carries little weight unless relevant, but is not penalized.</li>
+          <li><b>The software warns you at about two minutes of real time.</b> From then on: final orders only. Then Exit Case — the case does not end until you click it or real time runs out.</li>
+          <li><b>Finishing early is fine.</b> Unused case time becomes break time on exam day (your letter: 85 min + unused time). Don't use the clock up for its own sake.</li>
         </ol>
         <p class="note">Exam day 4: 13–14 cases, about half of them long ones. ~4½ hours of case time, 85 minutes of breaks: 10 after case 3, lunch 25 after case 7, 10 after case 10, 10 after case 12, 30 spare.</p>
         <p class="note">After the case: the feedback review timer is 10:00 for a 12:30 case and 15:00 for a 25:00 case (Settings). Read the feedback once, write the one order you missed, score, save. A retry is a different day.</p>
@@ -210,7 +293,280 @@
 (() => {
 const P = window.Pacer, $ = id => document.getElementById(id), fmt = P.fmt;
 const LS_S = "step3pacer.ccs.settings.v1", LS_R = "step3pacer.ccs.run.v1";
-const DEFAULTS = { finalSec: 150, sound: true, lastLen: 750, revShortSec: 600, revLongSec: 900 };
+const DEFAULTS = { finalSec: 150, sound: true, lastLen: 750, revShortSec: 600, revLongSec: 900, precaseOpen: true };
+const LS_D = "step3pacer.ccs.drill.v1";
+/* Spelling keys: o = order · k = letters to type · g = group · w = watch out */
+const ORDERS = [
+  /* ---- stabilize / monitor ---- */
+  { o: "Pulse oximetry", k: "pul", g: "stab", w: "Not in the vitals. Order it yourself in every case." },
+  { o: "Cardiac monitor", k: "card", g: "stab", w: "List also shows cardiac enzymes, cardiac cath, cardiology consult. Pick 'monitor'." },
+  { o: "IV access", k: "iv a", g: "stab", w: "Before any IV drug or fluid." },
+  { o: "Oxygen", k: "oxy", g: "stab", w: "'oxyt' = oxytocin. Stop at 'oxyg'." },
+  { o: "Normal saline (0.9% NaCl)", k: "norm", g: "stab", w: "'nor' alone also shows norepinephrine. IV fluids run continuous (no one-time bolus option)." },
+  { o: "Lactated Ringer", k: "lact", g: "stab", w: "'lacta' also = lactate (the lab). Read the list." },
+  { o: "Vital signs (repeat / q1h)", k: "vit", g: "stab", w: "'vita' also = vitamin. Pick vital signs." },
+  { o: "Fingerstick glucose (glucometer)", k: "gluc", g: "stab", w: "Pick the fingerstick / glucometer one, not serum glucose, not glucagon." },
+  { o: "Urine output (monitor)", k: "urine o", g: "stab", w: "Eclampsia, sepsis, shock. 'urin' also = urinalysis." },
+  { o: "Naloxone", k: "nalo", g: "stab", w: "Opioid overdose, unexplained coma." },
+  { o: "Dextrose 50% IV", k: "dext", g: "stab", w: "'dexa' = dexamethasone. Different drug." },
+  { o: "Thiamine", k: "thia", g: "stab", w: "Before glucose in alcoholics / malnourished." },
+  { o: "Cervical spine immobilization", k: "cerv", g: "stab", w: "Trauma only." },
+  { o: "Intubation / mechanical ventilation", k: "intub", g: "stab", w: "Only if GCS ≤ 8 or failing airway. Unneeded intubation is penalized." },
+  { o: "NPO", k: "npo", g: "stab", w: "Surgery, pancreatitis, GI bleed, stroke until swallow screen." },
+  { o: "Type and screen / crossmatch", k: "type", g: "stab", w: "Bleeding, surgery, dissection." },
+  { o: "Foley catheter", k: "fole", g: "stab", w: "'foli' = folic acid." },
+  { o: "Nasogastric tube", k: "naso", g: "stab", w: "'nasa' also = nasal cannula." },
+  { o: "Central venous line", k: "centr", g: "stab", w: "Shock needing pressors." },
+  { o: "Sequential compression device", k: "seq", g: "stab", w: "DVT prophylaxis when heparin is contraindicated." },
+  { o: "Heparin SQ (DVT prophylaxis)", k: "hepar", g: "stab", w: "Same word as treatment heparin. The ROUTE decides: SQ = prophylaxis, IV = treatment." },
+  { o: "Diet (regular / diabetic / low sodium / NPO)", k: "diet", g: "stab", w: "Admission order. Little weight, but part of ADMIT." },
+  { o: "Activity (bed rest / ambulate)", k: "bed", g: "stab", w: "Type 'bed' or 'activ'." },
+  { o: "Restraints / 1:1 sitter", k: "restr", g: "stab", w: "Suicide precautions: type 'suic'." },
+
+  /* ---- labs ---- */
+  { o: "CBC (complete blood count)", k: "cbc", g: "lab", w: "With differential if infection." },
+  { o: "BMP (basic metabolic panel)", k: "bmp", g: "lab", w: "Or 'basic'." },
+  { o: "CMP (comprehensive metabolic panel)", k: "cmp", g: "lab", w: "Or 'compr'. Includes LFTs + calcium." },
+  { o: "Troponin", k: "trop", g: "lab", w: "Repeat in 3–6 h." },
+  { o: "Creatine kinase (CK, CK-MB)", k: "creatine", g: "lab", w: "'creati' also = creatinine. Read the word." },
+  { o: "BNP", k: "bnp", g: "lab", w: "Dyspnea, heart failure." },
+  { o: "Lipase", k: "lipa", g: "lab", w: "'lipi' = lipid panel." },
+  { o: "Amylase", k: "amyl", g: "lab", w: "" },
+  { o: "Hepatic function panel (LFTs)", k: "hepat", g: "lab", w: "'hepar' = heparin. One letter apart." },
+  { o: "PT / INR", k: "proth", g: "lab", w: "Or 'inr'. Bleeding, warfarin, liver." },
+  { o: "PTT (partial thromboplastin time)", k: "ptt", g: "lab", w: "Or 'partial'. Heparin monitoring." },
+  { o: "ABG (arterial blood gas)", k: "abg", g: "lab", w: "Or 'arter'. Not instead of a repeat lung exam in asthma." },
+  { o: "Lactate (lactic acid)", k: "lacti", g: "lab", w: "'lacta' also = lactated Ringer." },
+  { o: "Blood cultures ×2", k: "blood c", g: "lab", w: "BEFORE antibiotics. Order it, then antibiotics." },
+  { o: "Urine culture", k: "urine c", g: "lab", w: "" },
+  { o: "Urinalysis (UA)", k: "urinaly", g: "lab", w: "Or 'ua'." },
+  { o: "Urine pregnancy test / serum hCG", k: "hcg", g: "lab", w: "Or 'preg'. Every woman of childbearing age before imaging/drugs." },
+  { o: "TSH", k: "tsh", g: "lab", w: "Free T4: type 'thyrox' or 't4'." },
+  { o: "Hemoglobin A1c", k: "a1c", g: "lab", w: "Or 'hemog' then pick A1c." },
+  { o: "Magnesium (serum)", k: "magn", g: "lab", w: "The list also shows magnesium sulfate (the drug)." },
+  { o: "Phosphorus", k: "phos", g: "lab", w: "" },
+  { o: "Calcium (serum / ionized)", k: "calc", g: "lab", w: "Also shows calcium gluconate / chloride (drugs)." },
+  { o: "Ammonia", k: "ammo", g: "lab", w: "Hepatic encephalopathy." },
+  { o: "Ethanol level", k: "etha", g: "lab", w: "Or 'alcoh'." },
+  { o: "Acetaminophen level", k: "acetam", g: "lab", w: "Pick 'level/serum', not the drug. Every overdose." },
+  { o: "Salicylate level", k: "sali", g: "lab", w: "Every overdose." },
+  { o: "Urine drug screen (tox screen)", k: "drug", g: "lab", w: "Or 'tox'." },
+  { o: "ESR", k: "esr", g: "lab", w: "Or 'sed'. CRP: 'crp'." },
+  { o: "Procalcitonin", k: "proc", g: "lab", w: "" },
+  { o: "D-dimer", k: "d-di", g: "lab", w: "Low-probability PE only." },
+  { o: "Iron / ferritin / TIBC", k: "ferr", g: "lab", w: "" },
+  { o: "Vitamin B12 / folate", k: "b12", g: "lab", w: "Folate: 'fola'." },
+  { o: "Peripheral blood smear", k: "smear", g: "lab", w: "Or 'perip'. Not a substitute for CBC." },
+  { o: "Reticulocyte count", k: "reti", g: "lab", w: "" },
+  { o: "LDH / haptoglobin", k: "ldh", g: "lab", w: "Hemolysis. Haptoglobin: 'hapt'." },
+  { o: "Uric acid", k: "uric", g: "lab", w: "" },
+  { o: "Lipid panel", k: "lipi", g: "lab", w: "'lipa' = lipase." },
+  { o: "Cortisol (AM / random)", k: "corti", g: "lab", w: "Also shows corticotropin." },
+  { o: "Ketones / beta-hydroxybutyrate", k: "keto", g: "lab", w: "'ketor' = ketorolac (drug)." },
+  { o: "Serum osmolality", k: "osmo", g: "lab", w: "Toxic alcohols." },
+  { o: "Rheumatoid factor / anti-CCP / ANA", k: "rheu", g: "lab", w: "ANA: 'antinuc'. anti-CCP: 'ccp'." },
+  { o: "HIV test", k: "hiv", g: "lab", w: "RPR: 'rpr'. Hepatitis panel: 'hepat' then pick." },
+  { o: "Monospot (heterophile antibody)", k: "mono", g: "lab", w: "Or 'heter'." },
+  { o: "Rapid strep / throat culture", k: "strep", g: "lab", w: "" },
+  { o: "Urine protein / creatinine ratio", k: "prote", g: "lab", w: "Preeclampsia." },
+  { o: "Synovial fluid analysis", k: "synov", g: "lab", w: "Comes with arthrocentesis (cell count, crystals, gram stain, culture)." },
+  { o: "CSF analysis", k: "csf", g: "lab", w: "Or 'cerebro'. Cell count, protein, glucose, gram stain, culture." },
+  { o: "Sputum gram stain / culture", k: "sput", g: "lab", w: "" },
+  { o: "Stool studies (culture, ova, C. diff)", k: "stool", g: "lab", w: "Type 'stool' and pick everything relevant." },
+  { o: "Blood type and Rh", k: "rh", g: "lab", w: "Pregnant bleeding → Rh type + Rho(D)." },
+  { o: "Peak expiratory flow", k: "peak", g: "lab", w: "Asthma in older children / adults." },
+  { o: "Carboxyhemoglobin", k: "carbox", g: "lab", w: "Fire, headache in winter." },
+  { o: "Methemoglobin", k: "methem", g: "lab", w: "'meth' alone shows methotrexate, methadone, methylpred." },
+  { o: "AFB smear / QuantiFERON", k: "afb", g: "lab", w: "TB." },
+
+  /* ---- imaging ---- */
+  { o: "Chest x-ray (portable if unstable)", k: "chest x", g: "img", w: "Or 'x-ray' then pick chest. 'cxr' usually works too." },
+  { o: "12-lead ECG", k: "ecg", g: "img", w: "Or 'ekg' / 'electro'. Every chest pain, syncope, overdose, hyperkalemia." },
+  { o: "CT head without contrast", k: "ct head", g: "img", w: "Stroke, trauma, altered mental status before LP." },
+  { o: "CT angiography chest (PE protocol)", k: "ct ang", g: "img", w: "Or 'cta'. Needs creatinine." },
+  { o: "CT abdomen / pelvis with contrast", k: "ct abd", g: "img", w: "Abscess, diverticulitis, appendicitis in adults." },
+  { o: "CT chest with contrast", k: "ct chest", g: "img", w: "Dissection (or CTA). Not before decompressing a pneumothorax." },
+  { o: "MRI brain", k: "mri", g: "img", w: "After CT in stroke; MS; tumor." },
+  { o: "Ultrasound abdomen (RUQ)", k: "ultra", g: "img", w: "Or 'sono'. Cholecystitis, pancreatitis, pregnancy." },
+  { o: "Transvaginal ultrasound", k: "transv", g: "img", w: "Ectopic. 'trans' alone also shows transfusion." },
+  { o: "Echocardiogram (TTE)", k: "echo", g: "img", w: "Pericarditis, HF, dissection (TEE)." },
+  { o: "Venous Doppler lower extremities", k: "dopp", g: "img", w: "DVT." },
+  { o: "Abdominal x-ray (KUB)", k: "kub", g: "img", w: "Or 'abdom x'." },
+  { o: "X-ray extremity / joint", k: "x-ray", g: "img", w: "Then pick the site." },
+  { o: "V/Q lung scan", k: "lung sc", g: "img", w: "PE when CT contrast is contraindicated." },
+  { o: "HIDA scan", k: "hida", g: "img", w: "Cholecystitis when US is unclear." },
+  { o: "Fetal heart monitoring (continuous)", k: "fetal", g: "img", w: "Every pregnant emergency ≥ 20–24 wk." },
+  { o: "EEG", k: "eeg", g: "img", w: "Or 'electroenc'." },
+  { o: "Mammogram", k: "mamm", g: "img", w: "Screening ≥ 40–50." },
+
+  /* ---- procedures ---- */
+  { o: "Needle thoracostomy (decompression)", k: "needle", g: "proc", w: "Tension pneumothorax: this FIRST, before any test." },
+  { o: "Chest tube (tube thoracostomy)", k: "chest t", g: "proc", w: "After needle decompression; then CXR to confirm." },
+  { o: "Thoracentesis", k: "thoracen", g: "proc", w: "'thoracos' = thoracostomy (chest tube). Different." },
+  { o: "Lumbar puncture", k: "lumb", g: "proc", w: "Or 'lp'. Antibiotics first if LP will be delayed." },
+  { o: "Paracentesis", k: "parac", g: "proc", w: "Ascites, SBP." },
+  { o: "Pericardiocentesis", k: "pericardio", g: "proc", w: "Tamponade only." },
+  { o: "Arthrocentesis", k: "arthro", g: "proc", w: "Any acute monoarthritis." },
+  { o: "Synchronized cardioversion", k: "cardiov", g: "proc", w: "Unstable tachyarrhythmia. 'defib' for VF / pulseless VT." },
+  { o: "Transcutaneous pacing", k: "pacing", g: "proc", w: "Unstable bradycardia / 3rd-degree block." },
+  { o: "Cardiac catheterization / PCI", k: "cath", g: "proc", w: "STEMI. Use NICE PTS first." },
+  { o: "Upper endoscopy (EGD)", k: "egd", g: "proc", w: "Or 'endos'. GI bleed after stabilizing." },
+  { o: "Colonoscopy", k: "colon", g: "proc", w: "" },
+  { o: "Bronchoscopy", k: "bronch", g: "proc", w: "" },
+  { o: "Hemodialysis", k: "hemodi", g: "proc", w: "Or 'dialy'. Refractory hyperkalemia, toxic alcohol, uremia." },
+  { o: "Cesarean section", k: "cesar", g: "proc", w: "Or OB/GYN consult + delivery." },
+  { o: "Induction of labor / oxytocin", k: "oxyt", g: "proc", w: "'oxyg' = oxygen." },
+  { o: "Incision and drainage", k: "incis", g: "proc", w: "Abscess of skin." },
+  { o: "Percutaneous (IR) drainage", k: "percut", g: "proc", w: "Deep abscess: CT-guided drainage + antibiotics." },
+  { o: "Appendectomy", k: "append", g: "proc", w: "Surgery consult + NICE PTS." },
+  { o: "Cholecystectomy", k: "cholecystec", g: "proc", w: "'cholecysti' = cholecystitis. Read to the end." },
+  { o: "Exploratory laparotomy", k: "lapar", g: "proc", w: "'laparos' = laparoscopy." },
+  { o: "Splint / cast", k: "splint", g: "proc", w: "" },
+  { o: "Packed red blood cells (transfusion)", k: "packed", g: "proc", w: "Or 'transfu'. Hb < 7, active bleeding." },
+  { o: "Fresh frozen plasma / platelets", k: "fresh", g: "proc", w: "Platelets: 'platel' then pick the transfusion, not the count." },
+  { o: "Mechanical ventilation", k: "mech", g: "proc", w: "After intubation." },
+  { o: "Physical therapy / occupational therapy", k: "physical t", g: "proc", w: "'phys' alone also shows physostigmine." },
+
+  /* ---- medications ---- */
+  { o: "Aspirin", k: "aspi", g: "med", w: "Chest pain (after CT in stroke)." },
+  { o: "Nitroglycerin", k: "nitrog", g: "med", w: "'nitrop' = nitroprusside. 'nitrof' = nitrofurantoin." },
+  { o: "Morphine", k: "morp", g: "med", w: "Pain, pulmonary edema." },
+  { o: "Metoprolol", k: "metop", g: "med", w: "'met' shows metformin, metronidazole, methylpred, metoclopramide. Type 5 letters." },
+  { o: "Atorvastatin", k: "ator", g: "med", w: "'atro' = atropine." },
+  { o: "Heparin IV (treatment)", k: "hepar", g: "med", w: "Choose route IV + continuous. NOT in aortic dissection." },
+  { o: "Enoxaparin", k: "enox", g: "med", w: "SQ. DVT / PE / NSTEMI." },
+  { o: "Clopidogrel", k: "clop", g: "med", w: "" },
+  { o: "Alteplase (tPA)", k: "alte", g: "med", w: "'alpr' = alprazolam. Stroke ≤ 4.5 h after CT; massive PE." },
+  { o: "Lisinopril", k: "lisi", g: "med", w: "" },
+  { o: "Furosemide", k: "furo", g: "med", w: "" },
+  { o: "Amiodarone", k: "amio", g: "med", w: "'amit' = amitriptyline. 'amin' = aminophylline." },
+  { o: "Adenosine", k: "aden", g: "med", w: "Stable SVT." },
+  { o: "Atropine", k: "atro", g: "med", w: "'ator' = atorvastatin." },
+  { o: "Epinephrine", k: "epin", g: "med", w: "Anaphylaxis = IM. Arrest = IV. Pick the route." },
+  { o: "Norepinephrine", k: "norep", g: "med", w: "'norm' = normal saline. Septic shock after fluids." },
+  { o: "Labetalol", k: "labe", g: "med", w: "Hypertensive emergency, preeclampsia, dissection (IV)." },
+  { o: "Hydralazine", k: "hydral", g: "med", w: "'hyd' shows hydrocortisone, HCTZ, hydromorphone, hydroxyzine. Type 6 letters." },
+  { o: "Hydrocortisone", k: "hydroc", g: "med", w: "Adrenal crisis, myxedema coma (before levothyroxine)." },
+  { o: "Nifedipine", k: "nife", g: "med", w: "PO option in preeclampsia." },
+  { o: "Magnesium sulfate", k: "magnes", g: "med", w: "Pick 'sulfate', not the lab. Eclampsia, torsades, severe asthma." },
+  { o: "Potassium chloride", k: "potas", g: "med", w: "DKA when K < 5.2. Hold insulin if K < 3.3." },
+  { o: "Calcium gluconate", k: "gluco", g: "med", w: "'gluc' shows glucose/glucagon too. Hyperkalemia with ECG changes." },
+  { o: "Insulin regular IV", k: "insul", g: "med", w: "DKA = IV continuous, not SQ." },
+  { o: "Sodium bicarbonate", k: "bicar", g: "med", w: "TCA overdose with wide QRS; severe acidosis." },
+  { o: "Glucagon", k: "gluca", g: "med", w: "Beta-blocker overdose; hypoglycemia without IV." },
+  { o: "Ondansetron", k: "onda", g: "med", w: "" },
+  { o: "Metoclopramide", k: "metoc", g: "med", w: "" },
+  { o: "Pantoprazole", k: "pant", g: "med", w: "IV in GI bleed." },
+  { o: "Octreotide", k: "octr", g: "med", w: "Variceal bleed (+ ceftriaxone)." },
+  { o: "Ceftriaxone", k: "ceftr", g: "med", w: "'cefa' = cefazolin. 'cefe' = cefepime." },
+  { o: "Vancomycin", k: "vanc", g: "med", w: "" },
+  { o: "Piperacillin-tazobactam", k: "pipe", g: "med", w: "Abscess, cholecystitis, sepsis unknown source." },
+  { o: "Azithromycin", k: "azit", g: "med", w: "CAP (+ ceftriaxone)." },
+  { o: "Levofloxacin", k: "levof", g: "med", w: "'levot' = levothyroxine. 'levet' = levetiracetam." },
+  { o: "Levothyroxine", k: "levot", g: "med", w: "See above." },
+  { o: "Levetiracetam", k: "levet", g: "med", w: "Status epilepticus 2nd line." },
+  { o: "Ampicillin", k: "ampi", g: "med", w: "Meningitis > 50 y / newborn / immunocompromised (Listeria)." },
+  { o: "Acyclovir", k: "acyc", g: "med", w: "HSV encephalitis." },
+  { o: "Metronidazole", k: "metro", g: "med", w: "" },
+  { o: "Doxycycline", k: "doxy", g: "med", w: "" },
+  { o: "Amoxicillin", k: "amox", g: "med", w: "NEVER in mononucleosis (rash)." },
+  { o: "Nitrofurantoin", k: "nitrof", g: "med", w: "Cystitis." },
+  { o: "TMP-SMX", k: "trime", g: "med", w: "Or 'sulfam'. PCP pneumonia." },
+  { o: "Dexamethasone", k: "dexa", g: "med", w: "Meningitis before/with first antibiotic. 'dext' = dextrose." },
+  { o: "Methylprednisolone", k: "methylp", g: "med", w: "" },
+  { o: "Prednisone", k: "predn", g: "med", w: "Asthma / COPD exacerbation (PO). Children: prednisolone." },
+  { o: "Albuterol (nebulized)", k: "albu", g: "med", w: "Route = inhaled. Never IM/PO." },
+  { o: "Ipratropium", k: "ipra", g: "med", w: "With albuterol, not alone." },
+  { o: "Lorazepam", k: "lora", g: "med", w: "'lorat' = loratadine. Seizure, withdrawal, agitation." },
+  { o: "Diazepam / midazolam", k: "diaz", g: "med", w: "Midazolam: 'mida'." },
+  { o: "Haloperidol", k: "halo", g: "med", w: "" },
+  { o: "Fosphenytoin / phenytoin", k: "fosph", g: "med", w: "'phenob' = phenobarbital." },
+  { o: "Flumazenil", k: "flum", g: "med", w: "Rarely. Not in mixed/TCA overdose." },
+  { o: "N-acetylcysteine", k: "acetylc", g: "med", w: "'acetam' = acetaminophen. Order both: level + antidote." },
+  { o: "Activated charcoal", k: "charc", g: "med", w: "Within 1–2 h, protected airway." },
+  { o: "Fomepizole", k: "fome", g: "med", w: "Methanol / ethylene glycol." },
+  { o: "Physostigmine", k: "physos", g: "med", w: "Anticholinergic toxicity only; never TCA." },
+  { o: "Diphenhydramine", k: "diphen", g: "med", w: "" },
+  { o: "Famotidine", k: "famo", g: "med", w: "" },
+  { o: "Acetaminophen", k: "acetam", g: "med", w: "Pick the drug; the level is a separate line." },
+  { o: "Ibuprofen / ketorolac", k: "ibup", g: "med", w: "Ketorolac: 'ketor'. Pericarditis: NSAID + colchicine." },
+  { o: "Colchicine", k: "colch", g: "med", w: "" },
+  { o: "Warfarin", k: "warf", g: "med", w: "Vitamin K: 'vitamin k'." },
+  { o: "Rho(D) immune globulin", k: "rho", g: "med", w: "Rh-negative bleeding pregnancy." },
+  { o: "Betamethasone", k: "betam", g: "med", w: "Fetal lungs 24–34 wk." },
+  { o: "Methotrexate", k: "methot", g: "med", w: "Ectopic (stable), RA." },
+  { o: "Thiamine / folic acid / multivitamin", k: "thia", g: "med", w: "Alcohol withdrawal bundle." },
+  { o: "Nicotine patch", k: "nico", g: "med", w: "Plus smoking counseling." },
+  { o: "Tetanus toxoid (Tdap)", k: "teta", g: "med", w: "Or 'tdap'. Every wound." },
+  { o: "Propranolol", k: "propr", g: "med", w: "'propy' = propylthiouracil. Thyroid storm uses both." },
+  { o: "Mannitol / hypertonic saline", k: "mann", g: "med", w: "Herniation." },
+  { o: "Oseltamivir", k: "osel", g: "med", w: "" },
+  { o: "Penicillin G", k: "penic", g: "med", w: "Syphilis, GBS." },
+  { o: "Ciprofloxacin", k: "cipr", g: "med", w: "" },
+  { o: "Clindamycin", k: "clin", g: "med", w: "" },
+  { o: "Sertraline / fluoxetine", k: "sert", g: "med", w: "Fluoxetine: 'fluox' ('fluc' = fluconazole)." },
+
+  /* ---- close: consults, counseling, vaccines ---- */
+  { o: "Consult (type the specialty)", k: "cons", g: "close", w: "'cons' shows the whole list: cardiology, surgery, GI, OB/GYN, psychiatry, neurology, ID, nephrology, IR, social work, nutrition, poison control…" },
+  { o: "Counseling (type 'coun' for the list)", k: "coun", g: "close", w: "Smoking, alcohol, diet, exercise, safe sex, seat belt, medication compliance, disease education, no contact sports (mono)." },
+  { o: "Vaccine (type 'vacc' for the list)", k: "vacc", g: "close", w: "Or 'immun'. Influenza, pneumococcal, Tdap, hepatitis B, HPV, zoster, meningococcal." },
+  { o: "Smoking cessation counseling", k: "smok", g: "close", w: "" },
+  { o: "Alcohol cessation counseling", k: "alcoh", g: "close", w: "" },
+  { o: "Medication compliance / side effects", k: "medic", g: "close", w: "Pick 'counsel' lines." },
+  { o: "Pap smear", k: "pap", g: "close", w: "21–65 y." },
+  { o: "Colonoscopy (screening)", k: "colon", g: "close", w: "45+ y." },
+  { o: "Social work / case management", k: "social", g: "close", w: "Abuse, homelessness, elderly living alone." },
+  { o: "Physical therapy / rehab", k: "physical", g: "close", w: "Stroke, fractures, RA." },
+  { o: "Dietitian / nutrition consult", k: "nutri", g: "close", w: "Diabetes, CF, celiac, malnutrition." },
+  { o: "Discontinue (cancel) an order", k: "—", g: "close", w: "Click the order on the order sheet → confirm. Stop IV fluids, monitor, O2, home NSAID, OCP, metformin before contrast." },
+  { o: "Follow-up appointment", k: "—", g: "close", w: "Not typed. Change Location → Office → schedule appointment (or clock 'On/In'). Before the warning." }
+];
+/* What to do in each phase, shown under the clock. Unstable and stable patients get different first orders. */
+function protoLines(ph, patient) {
+  const k = s => '<span class="k">' + s + "</span>";
+  if (ph === "read") return [
+    ["read", "R", "Who · how sick · where. Then tap <b>Unstable</b> or <b>Stable</b>."],
+    ["read", "⚠", "Pulse ox is not in the vitals: order " + k("pul") + ". Home meds " + k("Day 1 @00:00") + ": keep or cancel."]
+  ];
+  if (ph === "first") {
+    if (patient === "unstable") return [
+      ["emerg", "HAVOC", "One list: " + k("morp") + " · " + k("iv a") + " · " + k("norm") + " saline · " + k("gluc") + " fingerstick · " + k("vit") + " · " + k("oxyg") + " · " + k("pul") + " · " + k("card") + " monitor · " + k("ecg") + ". Confirm each, pick the route."],
+      ["emerg", "EXAM", "5 boxes: General · Chest/Lungs · Heart · Abdomen · Neuro + the complaint's system."],
+      ["emerg", "3-3-3", k("cbc") + " " + k("cmp") + " " + k("chest x") + " · " + k("trop") + " " + k("drug") + " screen " + k("tsh") + " · " + k("lipi") + " · HUE: " + k("hcg") + " " + k("urinaly") + " ECG. Then the one proving test."],
+      ["assess", "CLOCK", "Advance: <b>with next available result</b>."]
+    ];
+    if (patient === "stable") return [
+      ["emerg", "EXAM", "Tick every box once (a missing exam is penalized in every official case)."],
+      ["emerg", "3-3-3", k("cbc") + " " + k("cmp") + " " + k("chest x") + " · " + k("trop") + " " + k("drug") + " screen " + k("tsh") + " · fasting " + k("lipi") + " / glucose · HUE: " + k("hcg") + " " + k("urinaly") + " " + k("ecg") + ". Then the one proving test."],
+      ["emerg", "MEDS", "First treatment now if the diagnosis is clear. Home meds: keep or cancel."],
+      ["assess", "CLOCK", "Advance: next result, or <b>In</b> hours / <b>On</b> a date for an office visit. Red flags → Change Location to the ED."]
+    ];
+    return [["emerg", "?", "Tap <b>Unstable</b> (HAVOC + 5-box exam) or <b>Stable</b> (full exam) to see the list."]];
+  }
+  if (ph === "loop") return [
+    ["assess", "LOOP", "Result → <b>treat</b> (the specific drug / procedure) → <b>interval hx + re-exam</b> → <b>move</b> (ED → ward/ICU · office → home) → consult if it changes care → advance."],
+    ["assess", "ADMIT", "ADMIT CORT: location · Diet · Meds · IV fluids + DVT ppx · Tests to repeat · Consult · O2/monitor · Re-examine · Time."],
+    ["assess", "PROC", "Before any procedure, NICE PTS: NPO · consent · cefazolin · ECG · PT/PTT · type & screen · surgery by name."]
+  ];
+  if (ph === "close") return [
+    ["close", "SAVE", "<b>S</b>top finished orders (fluids, monitor, O2; IV → PO) · <b>A</b>ppointment (Change Location → office → schedule) · <b>V</b>accines + screening (" + k("vacc") + ") · <b>E</b>ducate (" + k("coun") + ")."],
+    ["close", "MEDS", "Long-term meds in: statin, ACE inhibitor, inhaler + spacer, DMARD… Cancel pending orders that will never matter."]
+  ];
+  return [
+    ["term", "FINAL", "Orders only. Write what is missing, cancel what is pending. No exam, no moves, no clock."],
+    ["term", "EXIT", "Click <b>Exit Case</b>. Early is fine: unused time is break time."]
+  ];
+}
+function cpsFor(len) { // exam-clock checkpoints: time LEFT when each phase should be done
+  let acc = 0; const ends = PHASES.map(p => { acc += Math.round(len * p.frac); return acc; });
+  return [
+    ["read", fmt(len - ends[0]), "Read done, unstable / stable decided"],
+    ["emerg", fmt(len - ends[1]), "First orders + exam in, clock advanced"],
+    ["assess", fmt(len - ends[2]), "Treated and moved, start SAVE"],
+    ["close", fmt(len - ends[3]), "SAVE in, appointment scheduled"],
+    ["term", "0:00", "Exit Case before this"]
+  ];
+}
 const PHASES = [
   { k: "read",  name: "Read",          frac: .12, text: "Intro, vitals, history — once. One line: who, how sick, where. Then tap Unstable or Stable." },
   { k: "first", name: "First orders",  frac: .16, text: "Unstable: IV · O2 · monitor · pulse ox, focused exam, treat. Stable: complete exam, labs, first treatment. Advance the clock." },
@@ -415,6 +771,14 @@ function renderSetup() {
   const b = (() => { let acc = 0; return PHASES.map(p => { const s = acc; acc += Math.round(chosenLen * p.frac); return p.name + " " + fmt(s) + "–" + fmt(acc); }); })();
   $("sPlan").textContent = fmt(chosenLen) + " of real time: " + b.join(" · ") + ". Final-orders alert at " + fmt(S.finalSec) + " left.";
   $("revOnlyLen").textContent = fmt(chosenLen > 750 ? S.revLongSec : S.revShortSec);
+  $("cps").innerHTML = cpsFor(chosenLen).map(c => '<div><b style="color:var(--ph-' + c[0] + ')">' + c[1] + " left</b>" + P.esc(c[2]) + "</div>").join("");
+}
+function renderProto(ph) {
+  const ul = $("proto"), lines = protoLines(ph.k, R.patient);
+  const sig = ph.k + "|" + R.patient;
+  if (ul.dataset.sig === sig) return;
+  ul.dataset.sig = sig;
+  ul.innerHTML = lines.map(l => '<li data-ph="' + l[0] + '"' + (l[1] === "?" ? ' class="hint"' : "") + "><b>" + l[1] + "</b><span>" + l[2] + "</span></li>").join("");
 }
 function render() {
   const inSetup = R.phase === "setup", live = R.phase === "run", done = R.phase === "done";
@@ -430,6 +794,7 @@ function render() {
     $("metaCase").textContent = (R.label ? R.label + " · " : "") + R.category + " · " + (R.attempt === "repeat" ? "repeat" : "first attempt") + " · " + fmt(R.limitSec);
     $("pill").textContent = R.pausedAt ? "Paused" : ph.name; $("pill").dataset.kind = R.pausedAt ? "idle" : ph.k === "final" ? "crit" : ph.k === "close" ? "warn" : "accent";
     $("phaseText").textContent = R.pausedAt ? "Paused. The real exam has no pause — practice only." : ph.text;
+    renderProto(ph);
     const next = bounds[bounds.findIndex(p => p.k === ph.k) + 1];
     $("nextline").textContent = next ? next.name + " at " + fmt(R.limitSec - next.start) + " on the clock" : "Real time ends at 0:00. Exit Case when the final orders are in.";
     Array.from($("strip").children).forEach((i, idx) => {
@@ -515,11 +880,80 @@ function applySettings() {
   S.finalSec = f; S.revShortSec = rs; S.revLongSec = rl; saveSettings(); $("settingsMsg").textContent = "Saved."; renderSetup();
 }
 
+/* ---------- pre-case card: breath, fold memory ---------- */
+let breathTimer = null;
+function breathe() {
+  if (breathTimer) return;
+  const ring = $("ring"), btn = $("btnBreath");
+  let t = 5; ring.textContent = t; ring.className = "ring in"; btn.textContent = "In…";
+  breathTimer = setInterval(() => {
+    t -= 1;
+    if (t === 2) { ring.className = "ring out"; btn.textContent = "…out"; }
+    if (t <= 0) { clearInterval(breathTimer); breathTimer = null; ring.className = "ring"; ring.textContent = "✓"; btn.textContent = "Again"; return; }
+    ring.textContent = t;
+  }, 1000);
+}
+
+/* ---------- spelling keys: lookup + drill ---------- */
+const norm = s => String(s || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+function renderKeyList() {
+  const q = norm($("keyQ").value), box = $("keyList");
+  if (!q) { box.innerHTML = '<div><span>Type 3 letters to look up an order.</span><span class="k">' + ORDERS.length + '</span><small>Keys are the letters you type in Primum before you pick from the list.</small></div>'; return; }
+  const rows = ORDERS.filter(o => (norm(o.o) + " " + norm(o.k) + " " + norm(o.w)).includes(q)).slice(0, 30);
+  box.innerHTML = rows.length ? rows.map(o => "<div><span>" + P.esc(o.o) + '</span><span class="k">' + P.esc(o.k) + "</span>" + (o.w ? "<small>" + P.esc(o.w) + "</small>" : "") + "</div>").join("") : "<div><span>Nothing. Try another name (x-ray / radiograph, ECG / EKG).</span></div>";
+}
+let D = { items: [], i: 0, right: 0, answered: false };
+function drillable() { return ORDERS.filter(o => o.k !== "—" && o.g !== "close"); }
+function startDrill() {
+  const pool = drillable().slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  D = { items: pool.slice(0, 10), i: 0, right: 0, answered: false };
+  $("drillIn").disabled = false; $("btnDrillCheck").disabled = false; $("btnDrill").textContent = "Restart";
+  $("drillFb").textContent = ""; $("drillFb").className = "fb";
+  showDrill();
+}
+function showDrill() {
+  if (D.i >= D.items.length) {
+    const best = (() => { try { const d = P.readJSON(LS_D, {}); return d && d.best || 0; } catch (e) { return 0; } })();
+    const b = Math.max(best, D.right); try { P.writeJSON(LS_D, { best: b, last: D.right, at: Date.now() }); } catch (e) {}
+    $("drillPrompt").textContent = D.right + " / 10" + (D.right === 10 ? " — clean." : D.right >= 8 ? " — good. The misses are tomorrow's first three." : " — write the misses on the wall sheet.");
+    $("drillScore").textContent = "best " + b + " / 10";
+    $("drillIn").disabled = true; $("btnDrillCheck").disabled = true; $("btnDrill").textContent = "Start drill";
+    return;
+  }
+  const o = D.items[D.i];
+  $("drillPrompt").textContent = (D.i + 1) + ". " + o.o.replace(/\s*\(.*?\)\s*/g, " ").trim();
+  $("drillScore").textContent = D.right + " right · " + D.i + " done";
+  $("drillIn").value = ""; $("drillFb").textContent = ""; $("drillFb").className = "fb"; D.answered = false;
+  $("drillIn").focus();
+}
+function checkDrill() {
+  if (D.i >= D.items.length) return;
+  const o = D.items[D.i], typed = norm($("drillIn").value), key = norm(o.k), name = norm(o.o);
+  if (D.answered) { D.i += 1; showDrill(); return; }
+  if (!typed) return;
+  const ok = typed.length >= key.length && (typed.startsWith(key) || name.startsWith(typed));
+  D.answered = true;
+  if (ok) { D.right += 1; P.sfx("tick"); $("drillFb").className = "fb ok"; $("drillFb").textContent = "✓ " + o.k + (o.w ? " — " + o.w : ""); }
+  else { P.sfx("behind"); $("drillFb").className = "fb bad"; $("drillFb").textContent = "✗ type " + o.k + (typed.length < key.length && name.startsWith(typed) ? " — too short, the list would show look-alikes." : "") + (o.w ? " — " + o.w : ""); }
+  $("drillScore").textContent = D.right + " right · " + (D.i + 1) + " done";
+  $("btnDrillCheck").textContent = "Next";
+  setTimeout(() => { $("btnDrillCheck").textContent = "Check"; }, 1400);
+}
+
 /* ---------- wiring ---------- */
 function blurOnClick(btn) { btn.addEventListener("click", e => { if (e.detail > 0) e.currentTarget.blur(); }); }
 function init() {
   P.applyTheme(); P.renderNav("ccs");
   loadSettings(); loadRun(); buildChecks();
+  $("precaseFold").open = S.precaseOpen !== false;
+  $("precaseFold").addEventListener("toggle", () => { S.precaseOpen = $("precaseFold").open; saveSettings(); });
+  $("btnBreath").addEventListener("click", breathe);
+  $("keyQ").addEventListener("input", renderKeyList); renderKeyList();
+  $("btnDrill").addEventListener("click", startDrill);
+  $("btnDrillCheck").addEventListener("click", checkDrill);
+  $("drillIn").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); checkDrill(); } });
+  (() => { try { const d = P.readJSON(LS_D, null); if (d && d.best != null) $("drillScore").textContent = "best " + d.best + " / 10"; } catch (e) {} })();
   $("fFinal").value = fmt(S.finalSec); $("fRevShort").value = fmt(S.revShortSec); $("fRevLong").value = fmt(S.revLongSec); $("fTheme").value = P.getTheme();
   document.querySelectorAll("#presets button").forEach(b => b.addEventListener("click", () => { chosenLen = +b.dataset.len; renderSetup(); }));
   $("btnStart").addEventListener("click", () => { R.limitSec = chosenLen; startCase(); buildStrip(); render(); });

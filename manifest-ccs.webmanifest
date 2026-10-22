@@ -1,7 +1,7 @@
 {
   "name": "Step 3 CCS Pacer",
   "short_name": "CCS",
-  "description": "Real-time pacer for Step 3 CCS cases at 12:30 or 25:00 (1.25x): read, first orders, reassess loop, close, final orders, with an order checklist and case log.",
+  "description": "Real-time pacer for Step 3 CCS cases at 12:30 or 25:00 (1.25x): pre-case card, REACT phases with protocol lines, order checklist, case log, and a spelling-keys drill.",
   "id": "./ccs",
   "start_url": "./ccs.html",
   "scope": "./",
