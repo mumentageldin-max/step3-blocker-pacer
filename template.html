@@ -14,7 +14,7 @@
   --r:#2458D6;--e:#B8262F;--a:#167A4E;--c:#9A6400;--t:#7A3DB8;--star:#B8262F}
 *{box-sizing:border-box}
 html{background:var(--bg)}
-body{margin:0;color:var(--fg);font-family:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;font-size:9.6pt;line-height:1.24;background:var(--bg);-webkit-text-size-adjust:100%;color-scheme:light}
+body{margin:0;color:var(--fg);font-family:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;font-size:9.5pt;line-height:1.18;background:var(--bg);-webkit-text-size-adjust:100%;color-scheme:light}
 .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));font-size:14px}
 .bar a,.bar button{font:inherit;font-weight:700;min-height:40px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--fg);text-decoration:none;cursor:pointer}
 .bar button.primary{background:var(--fg);color:#fff;border-color:var(--fg)}
@@ -34,7 +34,7 @@ body{margin:0;color:var(--fg);font-family:"Atkinson Hyperlegible","Segoe UI",sys
 .clock div[data-ph="r"] b{color:var(--r)} .clock div[data-ph="e"] b{color:var(--e)} .clock div[data-ph="a"] b{color:var(--a)} .clock div[data-ph="c"] b{color:var(--c)} .clock div[data-ph="t"] b{color:var(--t)}
 .clock .alt{color:var(--muted);font-size:7.3pt;display:block}
 .cols{display:grid;grid-template-columns:21fr 20fr 25fr 21fr 13fr;gap:5px}
-.col{border:1.5px solid var(--line);border-radius:5px;padding:4px 5px 5px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.col{border:1.5px solid var(--line);border-radius:5px;padding:4px 5px 5px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .col h2{margin:0 -5px 2px;padding:3px 6px;font-size:10pt;color:#fff;border-radius:3px 3px 0 0;line-height:1.15}
 .col h2 .win{display:block;font-weight:400;font-size:7.9pt;opacity:.95;font-family:"Martian Mono",Menlo,Consolas,monospace;letter-spacing:0;margin-top:1px}
 .col[data-ph="r"]{border-color:var(--r)} .col[data-ph="r"] h2{background:var(--r)}
@@ -48,8 +48,16 @@ p{margin:0}
 .row{display:flex;flex-wrap:wrap;gap:1px 6px;align-items:baseline}
 .cb{display:inline-block;width:9px;height:9px;border:1.3px solid var(--fg);border-radius:2px;vertical-align:-1px;margin-right:3px;flex:0 0 auto}
 .L{display:inline-block;font-family:"Martian Mono",Menlo,Consolas,monospace;font-weight:700;min-width:1.1em}
-.fill{display:inline-block;flex:1 1 .6in;min-width:.4in;border-bottom:1px dotted #6B7A8C;height:1em;vertical-align:baseline}
-.line{display:flex;gap:4px;align-items:baseline}
+.fill{display:inline-block;flex:1 1 .5in;min-width:.25in;border-bottom:1px dotted #6B7A8C;height:1em;vertical-align:baseline}
+.line{display:flex;gap:4px;align-items:baseline;min-width:0}
+.col{overflow:hidden}
+/* vitals as the exam shows them: fill each as it comes in */
+.vitals{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;font-size:9pt}
+.vitals .v{display:flex;gap:3px;align-items:baseline;min-width:0}
+.vitals .v b{white-space:nowrap}
+.vitals .v .fill{flex:1 1 .3in;min-width:.3in}
+/* ruled space that soaks up the rest of the column, so the page is full and the handwriting has lines */
+.lines{flex:1 1 .3in;min-height:.3in;background:repeating-linear-gradient(to bottom,transparent 0 17px,#B9C2CE 17px 18px);background-origin:content-box}
 .line .lab{font-weight:800;white-space:nowrap}
 .tick{display:inline-flex;align-items:baseline;gap:0;white-space:nowrap}
 table{border-collapse:collapse;width:100%;font-size:8.2pt}
@@ -61,14 +69,16 @@ td{height:19px}
 .muted{color:var(--muted)}
 .foot{margin-top:4px;border-top:1px solid var(--line);padding-top:3px;font-size:7.8pt;color:var(--muted);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .foot b{color:var(--fg)}
-.col[data-ph="t"] .fb{display:grid;gap:3px;margin-top:2px;border-top:1px solid var(--line);padding-top:3px}
+.col[data-ph="t"] .fb{display:flex;flex-direction:column;gap:3px;margin-top:2px;border-top:1px solid var(--line);padding-top:3px;flex:1 1 auto}
 @media print{
   @page{size:letter landscape;margin:.3in}
   html,body{background:#fff}
   .bar{display:none}
   .sheetwrap{overflow:visible;padding:0}
   .sheet{width:auto;min-width:0;border:0;padding:0;margin:0}
-  .mn,.col h2,th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .mn,.col h2,th,.lines{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .cols{height:6.42in}
+  .lines{flex:1 1 0;min-height:.12in}
 }
 </style>
 </head>
@@ -109,7 +119,14 @@ td{height:19px}
       <div class="line"><span class="lab"><span class="L">CC</span> Chief complaint</span><span class="fill"></span></div>
       <div class="line"><span class="lab"><span class="L">TA</span> Temporal association</span><span class="fill"></span></div>
       <div class="line"><span class="lab"><span class="L">GA</span> Grossly abnormal</span><span class="fill"></span></div>
-      <div class="line"><span class="lab muted">vitals</span><span class="fill"></span><span class="lab muted">exam</span><span class="fill"></span><span class="lab muted">labs</span><span class="fill"></span></div>
+      <div class="vitals" aria-label="Vitals">
+        <div class="v"><b>T</b><span class="fill"></span></div><div class="v"><b>HR</b><span class="fill"></span></div>
+        <div class="v"><b>RR</b><span class="fill"></span></div><div class="v"><b>BP</b><span class="fill"></span>/<span class="fill"></span></div>
+        <div class="v"><b>Ht</b><span class="fill"></span></div><div class="v"><b>Wt</b><span class="fill"></span></div>
+        <div class="v"><b>BMI</b><span class="fill"></span></div><div class="v"><b>SpO₂</b><span class="fill"></span></div>
+      </div>
+      <div class="line"><span class="lab muted">exam</span><span class="fill"></span></div>
+      <div class="line"><span class="lab muted">labs</span><span class="fill"></span></div>
       <p><span class="mn">TOP 3 DIFFERENTIALS</span></p>
       <table>
         <tr><th>#</th><th>Diagnosis</th><th>Definitive test</th><th>System</th></tr>
@@ -119,10 +136,8 @@ td{height:19px}
       </table>
       <div class="line"><span class="lab">Working Dx</span><span class="fill"></span></div>
       <div class="row"><span class="tick"><i class="cb"></i>Pulse ox (not in the vitals)</span><span class="tick"><i class="cb"></i>Home meds: keep / cancel</span></div>
-      <div class="line" style="margin-top:2px"><span class="lab">Notes</span><span class="fill"></span></div>
-      <div class="line"><span class="fill"></span></div>
-      <div class="line"><span class="fill"></span></div>
-      <div class="line"><span class="fill"></span></div>
+      <p class="sub" style="margin-top:2px">Notes</p>
+      <div class="lines"></div>
     </section>
 
     <!-- E -->
@@ -145,6 +160,7 @@ td{height:19px}
       <div class="row"><span class="tick"><i class="cb"></i>hCG</span><span class="tick"><i class="cb"></i>UA</span><span class="tick"><i class="cb"></i>ECG</span></div>
       <div class="line"><i class="cb"></i><span class="lab">+1 proving test</span><span class="fill"></span></div>
       <div class="line"><i class="cb"></i><span class="lab">ADVANCE</span><span class="muted">"with next available result"</span></div>
+      <div class="lines"></div>
     </section>
 
     <!-- A -->
@@ -165,7 +181,9 @@ td{height:19px}
       <p><span class="mn">NICE PTS</span> <span class="muted">before any procedure</span></p>
       <div class="row"><span class="tick"><i class="cb"></i><span class="L">N</span>NPO</span><span class="tick"><i class="cb"></i><span class="L">I</span>Informed consent</span><span class="tick"><i class="cb"></i><span class="L">C</span>Cefazolin</span><span class="tick"><i class="cb"></i><span class="L">E</span>ECG</span><span class="tick"><i class="cb"></i><span class="L">P</span>PT/PTT</span><span class="tick"><i class="cb"></i><span class="L">T</span>Type &amp; screen</span><span class="tick"><i class="cb"></i><span class="L">S</span>Surgery by name</span></div>
       <div class="row"><span class="tick"><i class="cb"></i>+ consults:</span><span class="muted">surgery · GI · ID · social work · cardiology · psych</span></div>
-      <p class="warn">Read the line before Confirm — CPR · intubation · ventilation · endoscopy only with an indication you can say out loud.</p>
+      <p class="sub" style="margin-top:2px">Results as they come in</p>
+      <div class="lines"></div>
+      <p class="warn">Before Confirm, read the line: CPR · intubation · ventilation · endoscopy only with a reason you can say.</p>
     </section>
 
     <!-- C -->
@@ -186,6 +204,7 @@ td{height:19px}
       <p><span class="mn">NO list</span></p>
       <div class="row"><span class="tick"><i class="cb"></i>no aspirin (child, viral) <span class="star">★</span></span><span class="tick"><i class="cb"></i>no NSAIDs (GI) <span class="star">★</span></span><span class="tick"><i class="cb"></i>no alcohol <span class="star">★</span></span><span class="tick"><i class="cb"></i>no drugs <span class="star">★</span></span><span class="tick"><i class="cb"></i>rest at home <span class="star">★</span></span></div>
       <div class="line"><span class="lab">Long-term meds</span><span class="fill"></span></div>
+      <div class="lines"></div>
       <p class="sub"><span class="star">★</span> = missed in my own cases, Oct 13–26</p>
     </section>
 
@@ -206,8 +225,7 @@ td{height:19px}
         <div class="row"><span class="lab">Appropriate</span><span class="tick"><i class="cb"></i>100</span><span class="tick"><i class="cb"></i>0</span></div>
         <div class="row"><span class="lab">Location</span><span class="tick"><i class="cb"></i>ok</span><span class="tick"><i class="cb"></i>wrong</span></div>
         <div class="line"><span class="lab">Missed</span><span class="fill"></span></div>
-        <div class="line"><span class="fill"></span></div>
-        <div class="line"><span class="fill"></span></div>
+        <div class="lines" style="min-height:.6in"></div>
       </div>
     </section>
   </div>
