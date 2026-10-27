@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F3F5F8">
+<title>12:30 case tracker · REACT</title>
+<link rel="manifest" href="./manifest-ccs.webmanifest">
+<link rel="icon" href="./icons/ccs-192.png">
+<style>
+/* Screen chrome (toolbar + light page) and one landscape Letter page for print. Phase colors match the CCS pacer:
+   R blue, E red, A green, C amber, T violet. Everything is forced light so the printout is the same on every device. */
+:root{--bg:#F3F5F8;--fg:#13202C;--muted:#5A6A7B;--line:#B9C2CE;--accent:#2458D6;--hi:#FFF2A8;
+  --r:#2458D6;--e:#B8262F;--a:#167A4E;--c:#9A6400;--t:#7A3DB8;--star:#B8262F}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;color:var(--fg);font-family:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;font-size:9.6pt;line-height:1.24;background:var(--bg);-webkit-text-size-adjust:100%;color-scheme:light}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));font-size:14px}
+.bar a,.bar button{font:inherit;font-weight:700;min-height:40px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--fg);text-decoration:none;cursor:pointer}
+.bar button.primary{background:var(--fg);color:#fff;border-color:var(--fg)}
+.bar .note{color:var(--muted);font-size:13px;flex:1 1 220px}
+.sheetwrap{overflow:auto;padding:0 12px 24px;-webkit-overflow-scrolling:touch}
+.sheet{width:10.4in;min-width:10.4in;background:#fff;border:1px solid var(--line);padding:.14in .16in .12in;margin:0 auto}
+.head{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-bottom:2px solid var(--fg);padding-bottom:3px;margin-bottom:4px}
+.head h1{margin:0;font-size:13pt;letter-spacing:.02em}
+.head h1 small{font-weight:400;color:var(--muted);font-size:9pt;letter-spacing:0}
+.head .case{display:flex;gap:10px;align-items:baseline;font-size:9pt;white-space:nowrap}
+.head .case .fill{min-width:.7in}
+.clock{display:grid;grid-template-columns:repeat(7,1fr);gap:0;margin:2px 0 5px;font-size:8.2pt}
+.clock div{border:1px solid var(--line);border-left:0;padding:2px 5px;line-height:1.15}
+.clock div:first-child{border-left:1px solid var(--line);border-radius:4px 0 0 4px}
+.clock div:last-child{border-radius:0 4px 4px 0}
+.clock b{display:block;font-size:10.5pt;font-family:"Martian Mono",Menlo,Consolas,monospace}
+.clock div[data-ph="r"] b{color:var(--r)} .clock div[data-ph="e"] b{color:var(--e)} .clock div[data-ph="a"] b{color:var(--a)} .clock div[data-ph="c"] b{color:var(--c)} .clock div[data-ph="t"] b{color:var(--t)}
+.clock .alt{color:var(--muted);font-size:7.3pt;display:block}
+.cols{display:grid;grid-template-columns:21fr 20fr 25fr 21fr 13fr;gap:5px}
+.col{border:1.5px solid var(--line);border-radius:5px;padding:4px 5px 5px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.col h2{margin:0 -5px 2px;padding:3px 6px;font-size:10pt;color:#fff;border-radius:3px 3px 0 0;line-height:1.15}
+.col h2 .win{display:block;font-weight:400;font-size:7.9pt;opacity:.95;font-family:"Martian Mono",Menlo,Consolas,monospace;letter-spacing:0;margin-top:1px}
+.col[data-ph="r"]{border-color:var(--r)} .col[data-ph="r"] h2{background:var(--r)}
+.col[data-ph="e"]{border-color:var(--e)} .col[data-ph="e"] h2{background:var(--e)}
+.col[data-ph="a"]{border-color:var(--a)} .col[data-ph="a"] h2{background:var(--a)}
+.col[data-ph="c"]{border-color:var(--c)} .col[data-ph="c"] h2{background:var(--c)}
+.col[data-ph="t"]{border-color:var(--t)} .col[data-ph="t"] h2{background:var(--t)}
+.mn{font-weight:800;background:var(--hi);padding:0 4px;border-radius:3px;display:inline-block;letter-spacing:.02em}
+.sub{font-size:7.6pt;color:var(--muted);margin:0;line-height:1.15}
+p{margin:0}
+.row{display:flex;flex-wrap:wrap;gap:1px 6px;align-items:baseline}
+.cb{display:inline-block;width:9px;height:9px;border:1.3px solid var(--fg);border-radius:2px;vertical-align:-1px;margin-right:3px;flex:0 0 auto}
+.L{display:inline-block;font-family:"Martian Mono",Menlo,Consolas,monospace;font-weight:700;min-width:1.1em}
+.fill{display:inline-block;flex:1 1 .6in;min-width:.4in;border-bottom:1px dotted #6B7A8C;height:1em;vertical-align:baseline}
+.line{display:flex;gap:4px;align-items:baseline}
+.line .lab{font-weight:800;white-space:nowrap}
+.tick{display:inline-flex;align-items:baseline;gap:0;white-space:nowrap}
+table{border-collapse:collapse;width:100%;font-size:8.2pt}
+th,td{border:1px solid var(--line);padding:2px 3px;text-align:left;vertical-align:top}
+th{background:#EEF1F5;font-size:7.4pt;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+td{height:19px}
+.star{color:var(--star);font-weight:800}
+.warn{border:1px dashed var(--e);border-radius:4px;padding:2px 4px;font-size:8pt;color:var(--e)}
+.muted{color:var(--muted)}
+.foot{margin-top:4px;border-top:1px solid var(--line);padding-top:3px;font-size:7.8pt;color:var(--muted);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.foot b{color:var(--fg)}
+.col[data-ph="t"] .fb{display:grid;gap:3px;margin-top:2px;border-top:1px solid var(--line);padding-top:3px}
+@media print{
+  @page{size:letter landscape;margin:.3in}
+  html,body{background:#fff}
+  .bar{display:none}
+  .sheetwrap{overflow:visible;padding:0}
+  .sheet{width:auto;min-width:0;border:0;padding:0;margin:0}
+  .mn,.col h2,th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div class="bar">
+  <a href="./ccs.html">← CCS pacer</a>
+  <button type="button" class="primary" id="btnPrint">Print · Save as PDF</button>
+  <span class="note">Landscape, one page. On the iPad: Share → Print → pinch the preview → Share as PDF. Fill the red pen parts during the case; tick as you order.</span>
+</div>
+<div class="sheetwrap">
+<div class="sheet" id="sheet">
+  <div class="head">
+    <h1>12:30 CASE TRACKER <small>· REACT · tick = ordered · time shown is time LEFT</small></h1>
+    <div></div>
+    <div class="case">Case #<span class="fill"></span> Dx <span class="fill" style="min-width:1.4in"></span> Date <span class="fill"></span></div>
+  </div>
+  <div class="clock" aria-label="Clock checkpoints">
+    <div data-ph="r"><b>12:30</b>READ<span class="alt">25:00 case: 25:00</span></div>
+    <div data-ph="e"><b>11:00</b>EMERGENCY / EXAM<span class="alt">22:00</span></div>
+    <div data-ph="a"><b>9:00</b>ADVANCE &amp; ASSESS<span class="alt">18:00</span></div>
+    <div data-ph="c"><b>4:00</b>CLOSE · SAVE<span class="alt">8:00</span></div>
+    <div data-ph="t"><b>2:30</b>TERMINATE<span class="alt">4:00</span></div>
+    <div data-ph="t"><b>2:00</b>warning → orders only<span class="alt">2:00</span></div>
+    <div data-ph="t"><b>0:00</b>EXIT CASE before this<span class="alt">0:00</span></div>
+  </div>
+
+  <div class="cols">
+    <!-- R -->
+    <section class="col" data-ph="r">
+      <h2>R · READ <span class="win">12:30 → 11:00 · 1:30 min</span></h2>
+      <p class="sub">Read once. Who · how sick · where → decide, then move on.</p>
+      <div class="line"><span class="lab">who</span><span class="fill"></span><span class="lab">how sick</span><span class="fill"></span></div>
+      <div class="line"><span class="lab">where</span><span class="fill"></span></div>
+      <div class="row"><span class="tick"><i class="cb"></i><b>UNSTABLE</b>&nbsp;→ ED / ICU</span><span class="tick"><i class="cb"></i><b>STABLE</b>&nbsp;→ office / ward</span></div>
+      <p><span class="mn">D / T / CC / TA / GA</span></p>
+      <div class="line"><span class="lab"><span class="L">D</span> Demographics</span><span class="fill"></span></div>
+      <div class="line"><span class="lab"><span class="L">T</span> Timeline</span><span class="fill"></span></div>
+      <div class="line"><span class="lab"><span class="L">CC</span> Chief complaint</span><span class="fill"></span></div>
+      <div class="line"><span class="lab"><span class="L">TA</span> Temporal association</span><span class="fill"></span></div>
+      <div class="line"><span class="lab"><span class="L">GA</span> Grossly abnormal</span><span class="fill"></span></div>
+      <div class="line"><span class="lab muted">vitals</span><span class="fill"></span><span class="lab muted">exam</span><span class="fill"></span><span class="lab muted">labs</span><span class="fill"></span></div>
+      <p><span class="mn">TOP 3 DIFFERENTIALS</span></p>
+      <table>
+        <tr><th>#</th><th>Diagnosis</th><th>Definitive test</th><th>System</th></tr>
+        <tr><td>1</td><td></td><td></td><td></td></tr>
+        <tr><td>2</td><td></td><td></td><td></td></tr>
+        <tr><td>3</td><td></td><td></td><td></td></tr>
+      </table>
+      <div class="line"><span class="lab">Working Dx</span><span class="fill"></span></div>
+      <div class="row"><span class="tick"><i class="cb"></i>Pulse ox (not in the vitals)</span><span class="tick"><i class="cb"></i>Home meds: keep / cancel</span></div>
+      <div class="line" style="margin-top:2px"><span class="lab">Notes</span><span class="fill"></span></div>
+      <div class="line"><span class="fill"></span></div>
+      <div class="line"><span class="fill"></span></div>
+      <div class="line"><span class="fill"></span></div>
+    </section>
+
+    <!-- E -->
+    <section class="col" data-ph="e">
+      <h2>E · EMERGENCY / EXAM <span class="win">11:00 → 9:00 · 2 min</span></h2>
+      <p><span class="mn">UNSTABLE → HAVOC</span> <span class="muted">one list, confirm each, pick the route</span></p>
+      <div class="line"><i class="cb"></i><span class="L">H</span>Hurting — morphine · acetaminophen · ondansetron</div>
+      <div class="line"><i class="cb"></i><span class="L">A</span>Access IV · NS · fingerstick glucose · (ABG)</div>
+      <div class="line"><i class="cb"></i><span class="L">V</span>Vitals — repeat</div>
+      <div class="line"><i class="cb"></i><span class="L">O</span>Oxygen · pulse ox · (naloxone)</div>
+      <div class="line"><i class="cb"></i><span class="L">C</span>Cardiac monitor · 12-lead ECG · (C-spine)</div>
+      <p class="sub">+ 5-box exam</p>
+      <div class="row"><span class="tick"><i class="cb"></i>General</span><span class="tick"><i class="cb"></i>Chest</span><span class="tick"><i class="cb"></i>Heart</span><span class="tick"><i class="cb"></i>Abdomen</span><span class="tick"><i class="cb"></i>Neuro</span><span class="tick"><i class="cb"></i>+ complaint system</span></div>
+      <div class="row"><span class="lab"><b>Location</b></span><span class="tick"><i class="cb"></i>ED</span><span class="tick"><i class="cb"></i>ICU</span><span class="tick"><i class="cb"></i>Ward</span></div>
+      <p><span class="mn">STABLE → FULL EXAM</span> <span class="tick"><i class="cb"></i>every box once</span></p>
+      <p><span class="mn">3-3-3 + HUE</span></p>
+      <div class="row"><span class="tick"><i class="cb"></i>CBC</span><span class="tick"><i class="cb"></i>CMP</span><span class="tick"><i class="cb"></i>CXR</span></div>
+      <div class="row"><span class="tick"><i class="cb"></i>Troponin</span><span class="tick"><i class="cb"></i>Tox screen</span><span class="tick"><i class="cb"></i>TSH</span></div>
+      <div class="row"><span class="tick"><i class="cb"></i>Fasting lipids / glucose</span><span class="tick"><i class="cb"></i>Fingerstick</span><span class="tick"><i class="cb"></i>Fluids (NS)</span></div>
+      <div class="row"><span class="tick"><i class="cb"></i>hCG</span><span class="tick"><i class="cb"></i>UA</span><span class="tick"><i class="cb"></i>ECG</span></div>
+      <div class="line"><i class="cb"></i><span class="lab">+1 proving test</span><span class="fill"></span></div>
+      <div class="line"><i class="cb"></i><span class="lab">ADVANCE</span><span class="muted">"with next available result"</span></div>
+    </section>
+
+    <!-- A -->
+    <section class="col" data-ph="a">
+      <h2>A · ADVANCE &amp; ASSESS <span class="win">9:00 → 4:00 · 5 min · the loop</span></h2>
+      <div class="row"><span class="muted">each result:</span><span class="tick"><i class="cb"></i>treat</span>→<span class="tick"><i class="cb"></i>interval hx + re-exam</span>→<span class="tick"><i class="cb"></i>move</span>→<span class="tick"><i class="cb"></i>consult if it changes care</span>→<span class="tick"><i class="cb"></i>advance</span></div>
+      <div class="line"><i class="cb"></i><span class="lab">TREAT NOW</span><span class="fill"></span></div>
+      <p class="sub">the specific drug / procedure — antibiotic · anticoagulant · drainage — at the first advance, not after the cultures</p>
+      <p><span class="mn">I BOUGHT + Micro</span> <span class="muted">diagnostic orders</span></p>
+      <div class="line"><i class="cb"></i><span class="L">I</span>Imaging<span class="fill"></span><i class="cb"></i><span class="L">B</span>Blood<span class="fill"></span></div>
+      <div class="line"><i class="cb"></i><span class="L">O</span>Other<span class="fill"></span><i class="cb"></i><span class="L">U</span>Urine<span class="fill"></span></div>
+      <div class="line"><i class="cb"></i><span class="L">G</span><span class="fill"></span><i class="cb"></i><span class="L">H</span><span class="fill"></span></div>
+      <div class="line"><i class="cb"></i><span class="L">T</span>Toxins<span class="fill"></span><i class="cb"></i><span class="L">M</span>Micro<span class="fill"></span></div>
+      <p class="sub">CCC · UAE · H · LUSCENT — urine · ABG · glucose | LOC · LFT · PT/PTT/INR | stool · troponin</p>
+      <p><span class="mn">ADMIT CORT</span></p>
+      <div class="row"><span class="tick"><i class="cb"></i><span class="L">A</span>Admit — location</span><span class="tick"><i class="cb"></i><span class="L">D</span>Diet</span><span class="tick"><i class="cb"></i><span class="L">M</span>Meds</span><span class="tick"><i class="cb"></i><span class="L">I</span>IV fluids + DVT ppx</span><span class="tick"><i class="cb"></i><span class="L">T</span>Tests to repeat</span></div>
+      <div class="row"><span class="tick"><i class="cb"></i><span class="L">C</span>Consult</span><span class="tick"><i class="cb"></i><span class="L">O</span>O2 / monitor</span><span class="tick"><i class="cb"></i><span class="L">R</span>Re-examine</span><span class="tick"><i class="cb"></i><span class="L">T</span>Time → advance</span></div>
+      <p><span class="mn">NICE PTS</span> <span class="muted">before any procedure</span></p>
+      <div class="row"><span class="tick"><i class="cb"></i><span class="L">N</span>NPO</span><span class="tick"><i class="cb"></i><span class="L">I</span>Informed consent</span><span class="tick"><i class="cb"></i><span class="L">C</span>Cefazolin</span><span class="tick"><i class="cb"></i><span class="L">E</span>ECG</span><span class="tick"><i class="cb"></i><span class="L">P</span>PT/PTT</span><span class="tick"><i class="cb"></i><span class="L">T</span>Type &amp; screen</span><span class="tick"><i class="cb"></i><span class="L">S</span>Surgery by name</span></div>
+      <div class="row"><span class="tick"><i class="cb"></i>+ consults:</span><span class="muted">surgery · GI · ID · social work · cardiology · psych</span></div>
+      <p class="warn">Read the line before Confirm — CPR · intubation · ventilation · endoscopy only with an indication you can say out loud.</p>
+    </section>
+
+    <!-- C -->
+    <section class="col" data-ph="c">
+      <h2>C · CLOSE <span class="win">4:00 → 2:30 · 1:30 · before the warning</span></h2>
+      <p><span class="mn">SAVE</span></p>
+      <div class="line"><i class="cb"></i><span class="L">S</span>Stop finished orders — fluids · monitor · O2 · IV → PO</div>
+      <div class="line"><i class="cb"></i><span class="L">A</span>Appointment / D/C home — Change location → office → schedule</div>
+      <div class="line"><i class="cb"></i><span class="L">V</span>Vaccines + screening</div>
+      <div class="line"><i class="cb"></i><span class="L">E</span>Educate — <b>coun</b></div>
+      <p><span class="mn">P-MIST</span> <span class="muted">vaccines</span></p>
+      <div class="row"><span class="tick"><i class="cb"></i>Pneumococcal</span><span class="tick"><i class="cb"></i>Meningococcal</span><span class="tick"><i class="cb"></i>Influenza</span><span class="tick"><i class="cb"></i>Shingles</span><span class="tick"><i class="cb"></i>Tdap <span class="star">★</span></span></div>
+      <p><span class="mn">PMCs-CREASS</span> <span class="muted">screening + counseling</span></p>
+      <div class="row"><span class="tick"><i class="cb"></i>Pap <span class="star">★</span></span><span class="tick"><i class="cb"></i>Mammogram <span class="star">★</span></span><span class="tick"><i class="cb"></i>Colonoscopy 45+</span></div>
+      <div class="row"><span class="tick"><i class="cb"></i>Counsel: med side effects <span class="star">★</span></span><span class="tick"><i class="cb"></i>compliance <span class="star">★</span></span><span class="tick"><i class="cb"></i>disease</span></div>
+      <div class="row"><span class="tick"><i class="cb"></i>Reassure</span><span class="tick"><i class="cb"></i>Exercise <span class="star">★</span></span><span class="tick"><i class="cb"></i>Diet</span><span class="tick"><i class="cb"></i>Alcohol <span class="star">★</span></span></div>
+      <div class="row"><span class="tick"><i class="cb"></i>Safe sex</span><span class="tick"><i class="cb"></i>Seatbelt</span><span class="tick"><i class="cb"></i>Smoking <span class="star">★</span></span><span class="tick"><i class="cb"></i>Social work <span class="star">★</span></span></div>
+      <p><span class="mn">NO list</span></p>
+      <div class="row"><span class="tick"><i class="cb"></i>no aspirin (child, viral) <span class="star">★</span></span><span class="tick"><i class="cb"></i>no NSAIDs (GI) <span class="star">★</span></span><span class="tick"><i class="cb"></i>no alcohol <span class="star">★</span></span><span class="tick"><i class="cb"></i>no drugs <span class="star">★</span></span><span class="tick"><i class="cb"></i>rest at home <span class="star">★</span></span></div>
+      <div class="line"><span class="lab">Long-term meds</span><span class="fill"></span></div>
+      <p class="sub"><span class="star">★</span> = missed in my own cases, Oct 13–26</p>
+    </section>
+
+    <!-- T -->
+    <section class="col" data-ph="t">
+      <h2>T · TERMINATE <span class="win">2:30 → 0:00</span></h2>
+      <div class="line"><i class="cb"></i><b>2:00 warning</b></div>
+      <p class="sub">→ orders only: no exam · no moves · no clock</p>
+      <div class="line"><i class="cb"></i>Write what is missing</div>
+      <div class="line"><i class="cb"></i>Cancel pending</div>
+      <div class="line"><i class="cb"></i><b>EXIT CASE</b></div>
+      <p class="sub">Early is fine — unused time is break time.</p>
+      <p class="sub"><b>Lost?</b> Advance → read → reassess. One bad case cannot sink you.</p>
+      <div class="fb">
+        <p><span class="mn">AFTER · feedback</span></p>
+        <div class="line"><span class="lab">Score</span><span class="fill"></span>%</div>
+        <div class="row"><span class="lab">Timing</span><span class="tick"><i class="cb"></i>100</span><span class="tick"><i class="cb"></i>0</span></div>
+        <div class="row"><span class="lab">Appropriate</span><span class="tick"><i class="cb"></i>100</span><span class="tick"><i class="cb"></i>0</span></div>
+        <div class="row"><span class="lab">Location</span><span class="tick"><i class="cb"></i>ok</span><span class="tick"><i class="cb"></i>wrong</span></div>
+        <div class="line"><span class="lab">Missed</span><span class="fill"></span></div>
+        <div class="line"><span class="fill"></span></div>
+        <div class="line"><span class="fill"></span></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="foot">
+    <span>Exam day, before case 1, on the scratch paper: <b>REACT · HAVOC · 3-3-3 + HUE · I BOUGHT · ADMIT CORT · NICE PTS · SAVE · P-MIST · pul / coun / cons / vacc</b></span>
+    <span>Type 3–4 letters → read the list → pick · no verbs, no doses, drug by name, pick the route · orders run only when the clock moves</span>
+  </div>
+</div>
+</div>
+<script>
+document.getElementById("btnPrint").addEventListener("click", () => window.print());
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); }); }
+</script>
+</body>
+</html>

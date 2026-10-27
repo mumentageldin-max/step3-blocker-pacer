@@ -52,6 +52,13 @@ a{color:var(--accent)}
 .pnav a[aria-current="page"]{background:var(--fg);color:var(--bg)}
 .pnav a:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
 
+/* quick links to the cards and sheets that live outside the app */
+.quicklinks{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.quicklinks .ql{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-right:2px}
+.quicklinks a{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--fg);text-decoration:none;font-weight:700;font-size:14px;min-height:40px;white-space:nowrap}
+.quicklinks a:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.quicklinks a[data-kind="in"]{border-color:var(--accent);color:var(--accent)}
+
 /* cards */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px;min-width:0}
 .rowhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}

@@ -113,6 +113,11 @@
 .drill .fb{font-size:15px;min-height:1.4em}
 .drill .fb.ok{color:var(--good)} .drill .fb.bad{color:var(--crit)}
 .drill .score{font-family:var(--font-num);font-size:14px;color:var(--muted)}
+.drill .drillopts{grid-template-columns:1fr 1fr 90px}
+@media (max-width:520px){.drill .drillopts{grid-template-columns:1fr 1fr}}
+.drill .hint{margin:0;font-size:15px;letter-spacing:.06em;color:var(--muted);overflow-wrap:anywhere}
+.drill .hint b{color:var(--fg);letter-spacing:.12em}
+.keylist div .m{grid-column:1/-1;font-size:12px;color:var(--crit);font-weight:700}
 @media (min-width:820px) and (min-height:520px){
   .clockcard{padding:22px 20px 18px}
 }
@@ -145,9 +150,15 @@
           <div class="st" data-ph="term"><b class="l">T</b><div><b>Warning ≈ 2:00 left: orders only.</b> No exam, no moves, no clock. Write what's missing, cancel pending, <b>Exit Case</b>. Early is fine → break time.</div></div>
         </div>
         <div class="cps" id="cps" aria-label="Exam-clock checkpoints"></div>
-        <p class="note">Lost? Advance the clock → read the result → reassess. One bad case cannot sink you. Full sheet: your "CCS Pre-Case Card" artifact.</p>
+        <p class="note">Lost? Advance the clock → read the result → reassess. One bad case cannot sink you.</p>
       </div>
     </details>
+    <div class="quicklinks" aria-label="Shortcuts">
+      <span class="ql">Open</span>
+      <a href="./template.html" data-kind="in">📋 Case template · print</a>
+      <a href="https://claude.ai/artifact/Cwf9KyimSGTQvzEjEBr3HG" target="_blank" rel="noopener">CCS cheat sheet</a>
+      <a href="https://claude.ai/artifact/CkBRBNXXbywkG2HdLAcEbe" target="_blank" rel="noopener">Daily card</a>
+    </div>
     <div class="rowhead"><h2>This case</h2><span class="meta">The case start screen shows the maximum real time. Match it here, then press both Starts.</span></div>
     <div class="presets" id="presets" aria-label="Case length">
       <button type="button" data-len="750" aria-pressed="true">12:30 · short case</button>
@@ -173,15 +184,35 @@
           <div class="keylist" id="keyList"></div>
         </div>
         <div class="drill" id="drill">
-          <div class="rowhead"><h2>Drill · 10 orders</h2><span class="score" id="drillScore"></span></div>
-          <p class="note">I show the order, you type the letters you would type in Primum (the key or more). Enter to check. Same rule as the exam: enough letters to beat the look-alikes.</p>
+          <div class="rowhead"><h2>Drill</h2><span class="score" id="drillScore"></span></div>
+          <div class="form drillopts">
+            <label>Set<select id="drillSet">
+              <option value="missed">Missed in my cases · Oct 13–26</option>
+              <option value="all">All orders</option>
+              <option value="proc">Procedures &amp; surgeries</option>
+              <option value="med">Drugs</option>
+              <option value="lab">Labs</option>
+              <option value="img">Imaging</option>
+              <option value="close">Consults · counseling · vaccines</option>
+              <option value="stab">Stabilize · monitor</option>
+            </select></label>
+            <label>Mode<select id="drillMode">
+              <option value="keys">Keys · letters to type</option>
+              <option value="spell">Spelling · whole word</option>
+            </select></label>
+            <label>How many<select id="drillN"><option value="10">10</option><option value="20">20</option><option value="40">40</option></select></label>
+          </div>
+          <p class="note" id="drillHelp">Keys: I show the order, you type the letters you would type (the key or more) — enough to beat the look-alikes. Spelling: I say the order and show its shape; you type the whole name, every letter. Enter to check.</p>
           <div class="prompt" id="drillPrompt">Press Start drill.</div>
+          <p class="hint num" id="drillHint" hidden></p>
           <div class="row">
             <input type="text" id="drillIn" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="latin" aria-label="Letters you would type" disabled>
+            <button type="button" class="small" id="btnSay" hidden>🔊 Say it</button>
             <button type="button" class="small" id="btnDrillCheck" disabled>Check</button>
             <button type="button" class="small" id="btnDrill">Start drill</button>
           </div>
           <div class="fb" id="drillFb"></div>
+          <p class="note" id="drillMissList" hidden></p>
         </div>
       </div>
     </details>
@@ -298,7 +329,7 @@ const LS_D = "step3pacer.ccs.drill.v1";
 /* Spelling keys: o = order · k = letters to type · g = group · w = watch out */
 const ORDERS = [
   /* ---- stabilize / monitor ---- */
-  { o: "Pulse oximetry", k: "pul", g: "stab", w: "Not in the vitals. Order it yourself in every case." },
+  { o: "Pulse oximetry", k: "pul", g: "stab", w: "Not in the vitals. Order it yourself in every case.", m: "15,55" },
   { o: "Cardiac monitor", k: "card", g: "stab", w: "List also shows cardiac enzymes, cardiac cath, cardiology consult. Pick 'monitor'." },
   { o: "IV access", k: "iv a", g: "stab", w: "Before any IV drug or fluid." },
   { o: "Oxygen", k: "oxy", g: "stab", w: "'oxyt' = oxytocin. Stop at 'oxyg'." },
@@ -311,9 +342,9 @@ const ORDERS = [
   { o: "Dextrose 50% IV", k: "dext", g: "stab", w: "'dexa' = dexamethasone. Different drug." },
   { o: "Thiamine", k: "thia", g: "stab", w: "Before glucose in alcoholics / malnourished." },
   { o: "Cervical spine immobilization", k: "cerv", g: "stab", w: "Trauma only." },
-  { o: "Intubation / mechanical ventilation", k: "intub", g: "stab", w: "Only if GCS ≤ 8 or failing airway. Unneeded intubation is penalized." },
-  { o: "NPO", k: "npo", g: "stab", w: "Surgery, pancreatitis, GI bleed, stroke until swallow screen." },
-  { o: "Type and screen / crossmatch", k: "type", g: "stab", w: "Bleeding, surgery, dissection." },
+  { o: "Intubation / mechanical ventilation", k: "intub", g: "stab", w: "Only if GCS ≤ 8 or failing airway. Ordered in case 93 with no indication — cost 10%. Read the line before Confirm.", m: "93" },
+  { o: "NPO", k: "npo", g: "stab", w: "Surgery, pancreatitis, GI bleed, stroke until swallow screen.", m: "32,39" },
+  { o: "Type and screen / crossmatch", k: "type", g: "stab", w: "Bleeding, surgery, dissection.", m: "32" },
   { o: "Foley catheter", k: "fole", g: "stab", w: "'foli' = folic acid." },
   { o: "Nasogastric tube", k: "naso", g: "stab", w: "'nasa' also = nasal cannula." },
   { o: "Central venous line", k: "centr", g: "stab", w: "Shock needing pressors." },
@@ -330,24 +361,24 @@ const ORDERS = [
   { o: "Troponin", k: "trop", g: "lab", w: "Repeat in 3–6 h." },
   { o: "Creatine kinase (CK, CK-MB)", k: "creatine", g: "lab", w: "'creati' also = creatinine. Read the word." },
   { o: "BNP", k: "bnp", g: "lab", w: "Dyspnea, heart failure." },
-  { o: "Lipase", k: "lipa", g: "lab", w: "'lipi' = lipid panel." },
+  { o: "Lipase", k: "lipa", g: "lab", w: "'lipi' = lipid panel. Missed in 39 — every abdominal pain.", m: "39" },
   { o: "Amylase", k: "amyl", g: "lab", w: "" },
   { o: "Hepatic function panel (LFTs)", k: "hepat", g: "lab", w: "'hepar' = heparin. One letter apart." },
   { o: "PT / INR", k: "proth", g: "lab", w: "Or 'inr'. Bleeding, warfarin, liver." },
   { o: "PTT (partial thromboplastin time)", k: "ptt", g: "lab", w: "Or 'partial'. Heparin monitoring." },
   { o: "ABG (arterial blood gas)", k: "abg", g: "lab", w: "Or 'arter'. Not instead of a repeat lung exam in asthma." },
-  { o: "Lactate (lactic acid)", k: "lacti", g: "lab", w: "'lacta' also = lactated Ringer." },
-  { o: "Blood cultures ×2", k: "blood c", g: "lab", w: "BEFORE antibiotics. Order it, then antibiotics." },
-  { o: "Urine culture", k: "urine c", g: "lab", w: "" },
-  { o: "Urinalysis (UA)", k: "urinaly", g: "lab", w: "Or 'ua'." },
+  { o: "Lactate (lactic acid)", k: "lacti", g: "lab", w: "'lacta' also = lactated Ringer.", m: "93" },
+  { o: "Blood cultures ×2", k: "blood c", g: "lab", w: "BEFORE antibiotics. Order it, then antibiotics.", m: "93" },
+  { o: "Urine culture", k: "urine c", g: "lab", w: "", m: "9" },
+  { o: "Urinalysis (UA)", k: "urinaly", g: "lab", w: "Or 'ua'.", m: "5,39" },
   { o: "Urine pregnancy test / serum hCG", k: "hcg", g: "lab", w: "Or 'preg'. Every woman of childbearing age before imaging/drugs." },
   { o: "TSH", k: "tsh", g: "lab", w: "Free T4: type 'thyrox' or 't4'." },
   { o: "Hemoglobin A1c", k: "a1c", g: "lab", w: "Or 'hemog' then pick A1c." },
-  { o: "Magnesium (serum)", k: "magn", g: "lab", w: "The list also shows magnesium sulfate (the drug)." },
+  { o: "Magnesium (serum)", k: "magn", g: "lab", w: "The list also shows magnesium sulfate (the drug) and citrate (the laxative). Missed in 35 (critical) and 39.", m: "35,39" },
   { o: "Phosphorus", k: "phos", g: "lab", w: "" },
   { o: "Calcium (serum / ionized)", k: "calc", g: "lab", w: "Also shows calcium gluconate / chloride (drugs)." },
   { o: "Ammonia", k: "ammo", g: "lab", w: "Hepatic encephalopathy." },
-  { o: "Ethanol level", k: "etha", g: "lab", w: "Or 'alcoh'." },
+  { o: "Ethanol level", k: "etha", g: "lab", w: "Or 'alcoh'. Missed in 39 twice (critical).", m: "39" },
   { o: "Acetaminophen level", k: "acetam", g: "lab", w: "Pick 'level/serum', not the drug. Every overdose." },
   { o: "Salicylate level", k: "sali", g: "lab", w: "Every overdose." },
   { o: "Urine drug screen (tox screen)", k: "drug", g: "lab", w: "Or 'tox'." },
@@ -360,12 +391,12 @@ const ORDERS = [
   { o: "Reticulocyte count", k: "reti", g: "lab", w: "" },
   { o: "LDH / haptoglobin", k: "ldh", g: "lab", w: "Hemolysis. Haptoglobin: 'hapt'." },
   { o: "Uric acid", k: "uric", g: "lab", w: "" },
-  { o: "Lipid panel", k: "lipi", g: "lab", w: "'lipa' = lipase." },
+  { o: "Lipid panel", k: "lipi", g: "lab", w: "'lipa' = lipase.", m: "39" },
   { o: "Cortisol (AM / random)", k: "corti", g: "lab", w: "Also shows corticotropin." },
   { o: "Ketones / beta-hydroxybutyrate", k: "keto", g: "lab", w: "'ketor' = ketorolac (drug)." },
   { o: "Serum osmolality", k: "osmo", g: "lab", w: "Toxic alcohols." },
-  { o: "Rheumatoid factor / anti-CCP / ANA", k: "rheu", g: "lab", w: "ANA: 'antinuc'. anti-CCP: 'ccp'." },
-  { o: "HIV test", k: "hiv", g: "lab", w: "RPR: 'rpr'. Hepatitis panel: 'hepat' then pick." },
+  { o: "Rheumatoid factor / anti-CCP / ANA", k: "rheu", g: "lab", w: "ANA: 'antinuc'. anti-CCP: 'ccp'.", m: "15" },
+  { o: "HIV test", k: "hiv", g: "lab", w: "RPR: 'rpr'. Hepatitis panel: 'hepat' then pick.", m: "93" },
   { o: "Monospot (heterophile antibody)", k: "mono", g: "lab", w: "Or 'heter'." },
   { o: "Rapid strep / throat culture", k: "strep", g: "lab", w: "" },
   { o: "Urine protein / creatinine ratio", k: "prote", g: "lab", w: "Preeclampsia." },
@@ -380,24 +411,24 @@ const ORDERS = [
   { o: "AFB smear / QuantiFERON", k: "afb", g: "lab", w: "TB." },
 
   /* ---- imaging ---- */
-  { o: "Chest x-ray (portable if unstable)", k: "chest x", g: "img", w: "Or 'x-ray' then pick chest. 'cxr' usually works too." },
+  { o: "Chest x-ray (portable if unstable)", k: "chest x", g: "img", w: "Or 'x-ray' then pick chest. 'cxr' usually works too.", m: "5,9,93" },
   { o: "12-lead ECG", k: "ecg", g: "img", w: "Or 'ekg' / 'electro'. Every chest pain, syncope, overdose, hyperkalemia." },
   { o: "CT head without contrast", k: "ct head", g: "img", w: "Stroke, trauma, altered mental status before LP." },
   { o: "CT angiography chest (PE protocol)", k: "ct ang", g: "img", w: "Or 'cta'. Needs creatinine." },
-  { o: "CT abdomen / pelvis with contrast", k: "ct abd", g: "img", w: "Abscess, diverticulitis, appendicitis in adults." },
+  { o: "CT abdomen / pelvis with contrast", k: "ct abd", g: "img", w: "Abscess, diverticulitis, appendicitis in adults.", m: "39" },
   { o: "CT chest with contrast", k: "ct chest", g: "img", w: "Dissection (or CTA). Not before decompressing a pneumothorax." },
   { o: "MRI brain", k: "mri", g: "img", w: "After CT in stroke; MS; tumor." },
   { o: "Ultrasound abdomen (RUQ)", k: "ultra", g: "img", w: "Or 'sono'. Cholecystitis, pancreatitis, pregnancy." },
   { o: "Transvaginal ultrasound", k: "transv", g: "img", w: "Ectopic. 'trans' alone also shows transfusion." },
-  { o: "Echocardiogram (TTE)", k: "echo", g: "img", w: "Pericarditis, HF, dissection (TEE)." },
-  { o: "Venous Doppler lower extremities", k: "dopp", g: "img", w: "DVT." },
+  { o: "Echocardiogram (TTE)", k: "echo", g: "img", w: "Pericarditis (missed in 15 — critical), HF, dissection (TEE).", m: "15" },
+  { o: "Venous Doppler lower extremities", k: "dopp", g: "img", w: "DVT.", m: "55" },
   { o: "Abdominal x-ray (KUB)", k: "kub", g: "img", w: "Or 'abdom x'." },
   { o: "X-ray extremity / joint", k: "x-ray", g: "img", w: "Then pick the site." },
   { o: "V/Q lung scan", k: "lung sc", g: "img", w: "PE when CT contrast is contraindicated." },
   { o: "HIDA scan", k: "hida", g: "img", w: "Cholecystitis when US is unclear." },
   { o: "Fetal heart monitoring (continuous)", k: "fetal", g: "img", w: "Every pregnant emergency ≥ 20–24 wk." },
   { o: "EEG", k: "eeg", g: "img", w: "Or 'electroenc'." },
-  { o: "Mammogram", k: "mamm", g: "img", w: "Screening ≥ 40–50." },
+  { o: "Mammography (mammogram)", k: "mamm", s: "mammography", d: "breast cancer screening, 40–74", g: "img", w: "Screening ≥ 40–50.", m: "5,32" },
 
   /* ---- procedures ---- */
   { o: "Needle thoracostomy (decompression)", k: "needle", g: "proc", w: "Tension pneumothorax: this FIRST, before any test." },
@@ -410,7 +441,7 @@ const ORDERS = [
   { o: "Synchronized cardioversion", k: "cardiov", g: "proc", w: "Unstable tachyarrhythmia. 'defib' for VF / pulseless VT." },
   { o: "Transcutaneous pacing", k: "pacing", g: "proc", w: "Unstable bradycardia / 3rd-degree block." },
   { o: "Cardiac catheterization / PCI", k: "cath", g: "proc", w: "STEMI. Use NICE PTS first." },
-  { o: "Upper endoscopy (EGD)", k: "egd", g: "proc", w: "Or 'endos'. GI bleed after stabilizing." },
+  { o: "Upper endoscopy (EGD)", k: "egd", g: "proc", w: "Or 'endos'. GI bleed after stabilizing. Ordered in pancreatitis (case 39) — inappropriate, cost 10%.", m: "39" },
   { o: "Colonoscopy", k: "colon", g: "proc", w: "" },
   { o: "Bronchoscopy", k: "bronch", g: "proc", w: "" },
   { o: "Hemodialysis", k: "hemodi", g: "proc", w: "Or 'dialy'. Refractory hyperkalemia, toxic alcohol, uremia." },
@@ -424,7 +455,7 @@ const ORDERS = [
   { o: "Splint / cast", k: "splint", g: "proc", w: "" },
   { o: "Packed red blood cells (transfusion)", k: "packed", g: "proc", w: "Or 'transfu'. Hb < 7, active bleeding." },
   { o: "Fresh frozen plasma / platelets", k: "fresh", g: "proc", w: "Platelets: 'platel' then pick the transfusion, not the count." },
-  { o: "Mechanical ventilation", k: "mech", g: "proc", w: "After intubation." },
+  { o: "Mechanical ventilation", k: "mech", g: "proc", w: "After intubation.", m: "93" },
   { o: "Physical therapy / occupational therapy", k: "physical t", g: "proc", w: "'phys' alone also shows physostigmine." },
 
   /* ---- medications ---- */
@@ -434,7 +465,7 @@ const ORDERS = [
   { o: "Metoprolol", k: "metop", g: "med", w: "'met' shows metformin, metronidazole, methylpred, metoclopramide. Type 5 letters." },
   { o: "Atorvastatin", k: "ator", g: "med", w: "'atro' = atropine." },
   { o: "Heparin IV (treatment)", k: "hepar", g: "med", w: "Choose route IV + continuous. NOT in aortic dissection." },
-  { o: "Enoxaparin", k: "enox", g: "med", w: "SQ. DVT / PE / NSTEMI." },
+  { o: "Enoxaparin", k: "enox", g: "med", w: "Heparin, low molecular weight. SQ. DVT / PE / NSTEMI. Missed in 55 — the clock ran out before it went in.", m: "55" },
   { o: "Clopidogrel", k: "clop", g: "med", w: "" },
   { o: "Alteplase (tPA)", k: "alte", g: "med", w: "'alpr' = alprazolam. Stroke ≤ 4.5 h after CT; massive PE." },
   { o: "Lisinopril", k: "lisi", g: "med", w: "" },
@@ -460,7 +491,7 @@ const ORDERS = [
   { o: "Octreotide", k: "octr", g: "med", w: "Variceal bleed (+ ceftriaxone)." },
   { o: "Ceftriaxone", k: "ceftr", g: "med", w: "'cefa' = cefazolin. 'cefe' = cefepime." },
   { o: "Vancomycin", k: "vanc", g: "med", w: "" },
-  { o: "Piperacillin-tazobactam", k: "pipe", g: "med", w: "Abscess, cholecystitis, sepsis unknown source." },
+  { o: "Piperacillin-tazobactam", k: "pipe", g: "med", w: "Abscess, cholecystitis, cholangitis, sepsis of unknown source. Missed in 39 (critical).", m: "39" },
   { o: "Azithromycin", k: "azit", g: "med", w: "CAP (+ ceftriaxone)." },
   { o: "Levofloxacin", k: "levof", g: "med", w: "'levot' = levothyroxine. 'levet' = levetiracetam." },
   { o: "Levothyroxine", k: "levot", g: "med", w: "See above." },
@@ -488,16 +519,16 @@ const ORDERS = [
   { o: "Physostigmine", k: "physos", g: "med", w: "Anticholinergic toxicity only; never TCA." },
   { o: "Diphenhydramine", k: "diphen", g: "med", w: "" },
   { o: "Famotidine", k: "famo", g: "med", w: "" },
-  { o: "Acetaminophen", k: "acetam", g: "med", w: "Pick the drug; the level is a separate line." },
+  { o: "Acetaminophen", k: "acetam", g: "med", w: "Pick the drug; the level is a separate line.", m: "9,13" },
   { o: "Ibuprofen / ketorolac", k: "ibup", g: "med", w: "Ketorolac: 'ketor'. Pericarditis: NSAID + colchicine." },
-  { o: "Colchicine", k: "colch", g: "med", w: "" },
+  { o: "Colchicine", k: "colch", g: "med", w: "Pericarditis: NSAID + colchicine. Missed in 15 (critical).", m: "15" },
   { o: "Warfarin", k: "warf", g: "med", w: "Vitamin K: 'vitamin k'." },
   { o: "Rho(D) immune globulin", k: "rho", g: "med", w: "Rh-negative bleeding pregnancy." },
   { o: "Betamethasone", k: "betam", g: "med", w: "Fetal lungs 24–34 wk." },
   { o: "Methotrexate", k: "methot", g: "med", w: "Ectopic (stable), RA." },
   { o: "Thiamine / folic acid / multivitamin", k: "thia", g: "med", w: "Alcohol withdrawal bundle." },
   { o: "Nicotine patch", k: "nico", g: "med", w: "Plus smoking counseling." },
-  { o: "Tetanus toxoid (Tdap)", k: "teta", g: "med", w: "Or 'tdap'. Every wound." },
+  { o: "Tetanus toxoid (Tdap)", k: "teta", g: "med", w: "Or 'tdap'. Every wound.", m: "35,13" },
   { o: "Propranolol", k: "propr", g: "med", w: "'propy' = propylthiouracil. Thyroid storm uses both." },
   { o: "Mannitol / hypertonic saline", k: "mann", g: "med", w: "Herniation." },
   { o: "Oseltamivir", k: "osel", g: "med", w: "" },
@@ -506,20 +537,250 @@ const ORDERS = [
   { o: "Clindamycin", k: "clin", g: "med", w: "" },
   { o: "Sertraline / fluoxetine", k: "sert", g: "med", w: "Fluoxetine: 'fluox' ('fluc' = fluconazole)." },
 
+
+  /* ---- procedures (added Oct 27, 2026: surgeries and studies that are typed by name) ---- */
+  { o: "Needle drainage, abscess, imaging-guided", k: "needle dr", s: "needle drainage", d: "deep abscess: drain it after the CT, plus antibiotics", g: "proc", w: "'needle' alone also shows needle thoracostomy. Deep abscess = drainage + antibiotics.", m: "9" },
+  { o: "ERCP (endoscopic retrograde cholangiopancreatography)", k: "ercp", s: "endoscopic retrograde cholangiopancreatography", d: "the scope that clears a stone from the bile duct", g: "proc", w: "Or 'endoscopic r'. Cholangitis / stone in the duct: antibiotics + ERCP + surgery consult.", m: "39" },
+  { o: "Cardiopulmonary resuscitation (CPR)", k: "cardiop", s: "cardiopulmonary resuscitation", d: "chest compressions — pulseless patients only", g: "proc", w: "Pulseless only. Picked by mistake in case 6 (cost 10%). Read the list line before Confirm.", m: "6" },
+  { o: "Cricothyroidotomy", k: "crico", d: "surgical airway through the neck when intubation fails", g: "proc", w: "Failed airway only." },
+  { o: "Fasciotomy", k: "fasci", d: "cutting the muscle compartment open — compartment syndrome", g: "proc", w: "Compartment syndrome: this, not imaging." },
+  { o: "Escharotomy", k: "eschar", d: "cutting the burned skin that is strangling a limb or the chest", g: "proc", w: "Circumferential burn with poor circulation or breathing." },
+  { o: "Debridement (wound)", k: "debri", d: "surgical cleaning of dead tissue from a wound", g: "proc", w: "Necrotizing fasciitis: surgery consult + this + broad antibiotics." },
+  { o: "Suture (laceration repair)", k: "sutur", s: "suture", d: "closing a cut with stitches", g: "proc", w: "Or 'lacer' / 'wound'. Tdap with every wound." },
+  { o: "Reduction, fracture / dislocation", k: "reduc", s: "reduction", d: "putting a broken or dislocated bone back in place", g: "proc", w: "Then splint, then x-ray again." },
+  { o: "Bone marrow biopsy", k: "bone m", s: "bone marrow biopsy", d: "the marrow sample for leukemia / pancytopenia", g: "proc", w: "After the smear and the CBC with differential." },
+  { o: "Liver biopsy", k: "liver b", s: "liver biopsy", d: "tissue from the liver", g: "proc", w: "" },
+  { o: "Skin biopsy", k: "skin b", s: "skin biopsy", d: "tissue from a skin lesion", g: "proc", w: "Melanoma: excisional, never shave." },
+  { o: "Endometrial biopsy", k: "endome", s: "endometrial biopsy", d: "sample of the uterine lining — postmenopausal bleeding", g: "proc", w: "Postmenopausal bleeding after the ultrasound." },
+  { o: "Dilation and curettage (D&C)", k: "dilat", s: "dilation and curettage", d: "scraping the uterus — retained products, incomplete abortion", g: "proc", w: "" },
+  { o: "Cystoscopy", k: "cysto", d: "camera into the bladder — painless hematuria", g: "proc", w: "'cyst' alone also shows cystic fibrosis tests." },
+  { o: "Lithotripsy (ESWL)", k: "litho", s: "lithotripsy", d: "shock waves that break a kidney stone", g: "proc", w: "'lith' alone also shows lithium. Stone > 10 mm or not passing." },
+  { o: "Carotid endarterectomy", k: "endart", s: "carotid endarterectomy", d: "surgery that cleans a narrowed neck artery after a TIA", g: "proc", w: "Symptomatic stenosis 70–99%. TIA cases." },
+  { o: "Coronary artery bypass graft (CABG)", k: "coronary a", s: "coronary artery bypass graft", d: "heart bypass surgery", g: "proc", w: "Or 'cabg'. Left main / 3-vessel disease: cardiology consult first." },
+  { o: "Pacemaker, permanent", k: "pacem", s: "pacemaker", d: "the implanted device for slow rhythms", g: "proc", w: "Symptomatic bradycardia / complete heart block after temporary pacing." },
+  { o: "Implantable cardioverter-defibrillator (ICD)", k: "implant", s: "implantable cardioverter defibrillator", d: "implanted shock device for VT / low EF", g: "proc", w: "EF ≤ 35% after medical therapy; survived VF." },
+  { o: "Electrophysiology study / ablation", k: "ablat", s: "ablation", d: "burning the extra pathway — WPW, SVT", g: "proc", w: "WPW with symptoms: cardiology consult + this. You missed WPW twice in UWorld." },
+  { o: "Tilt table test", k: "tilt", s: "tilt table test", d: "the test that provokes fainting on a tilting bed", g: "proc", w: "Recurrent syncope with a normal workup." },
+  { o: "Carotid sinus massage", k: "carotid s", s: "carotid sinus massage", d: "pressing the neck to test / break a rhythm", g: "proc", w: "Carotid sinus hypersensitivity (the UWorld miss)." },
+  { o: "Exercise stress test (treadmill ECG)", k: "stress", s: "stress test", d: "walking on the treadmill with ECG leads on", g: "proc", w: "Stable chest pain with a normal resting ECG. 'exerc' also shows exercise counseling." },
+  { o: "Pulmonary function tests (spirometry)", k: "pulmonary f", s: "pulmonary function tests", d: "the breathing-into-a-tube test for asthma / COPD", g: "proc", w: "Or 'spiro' — which also shows spironolactone. Read the list." },
+  { o: "Holter monitor (24-hour)", k: "holt", s: "holter monitor", d: "the 24-hour portable ECG", g: "proc", w: "Palpitations with a normal ECG." },
+  { o: "Polysomnography (sleep study)", k: "polyso", s: "polysomnography", d: "the overnight sleep study", g: "proc", w: "'polys' also shows sodium polystyrene. Type 6 letters." },
+  { o: "Electromyography / nerve conduction study", k: "electromy", s: "electromyography", d: "needle electrodes in the muscle — neuropathy, myasthenia", g: "proc", w: "Or 'nerve'." },
+  { o: "Electroconvulsive therapy (ECT)", k: "electroc", s: "electroconvulsive therapy", d: "the treatment for catatonia / refractory depression", g: "proc", w: "Catatonia, depression with refusal to eat, pregnancy." },
+  { o: "Plasmapheresis (plasma exchange)", k: "plasmap", s: "plasmapheresis", d: "filtering the plasma — TTP, Guillain-Barré, myasthenic crisis", g: "proc", w: "'plasma' alone also shows fresh frozen plasma." },
+  { o: "Immune globulin, intravenous (IVIG)", k: "immunog", s: "immune globulin", d: "pooled antibodies by vein — ITP, Guillain-Barré, Kawasaki", g: "proc", w: "Or 'ivig'. 'immun' also shows immunizations." },
+  { o: "Exchange transfusion", k: "exchan", s: "exchange transfusion", d: "replacing the baby's blood — severe neonatal jaundice", g: "proc", w: "Bilirubin above the exchange line after phototherapy." },
+  { o: "Phototherapy", k: "photot", d: "blue lights for the jaundiced newborn", g: "proc", w: "Case 54 'Yellow baby' lives here." },
+  { o: "Amniocentesis", k: "amnio", d: "needle sample of the fluid around the fetus", g: "proc", w: "Fetal lung maturity; chromosomes after a positive screen." },
+  { o: "Cerclage (cervical)", k: "cercl", s: "cerclage", d: "stitch that closes an incompetent cervix", g: "proc", w: "Painless cervical dilation 14–24 wk." },
+  { o: "Salpingectomy (laparoscopy for ectopic)", k: "salpin", s: "salpingectomy", d: "removing the tube — ruptured ectopic", g: "proc", w: "Unstable ectopic: OB/GYN consult + surgery, not methotrexate." },
+  { o: "Gastric lavage", k: "gastric l", s: "gastric lavage", d: "washing out the stomach — within 1 h of a lethal ingestion, rarely", g: "proc", w: "Rare. Protected airway first." },
+  { o: "Tracheostomy", k: "trache", d: "a long-term airway through the neck", g: "proc", w: "Prolonged ventilation. 'trach' alone also shows tracheal cultures." },
+  { o: "Hysterectomy", k: "hyster", d: "removing the uterus", g: "proc", w: "Postpartum hemorrhage refractory to everything else." },
+  { o: "Orchiopexy (scrotal exploration)", k: "orchi", s: "orchiopexy", d: "untwisting and fixing the testicle — torsion", g: "proc", w: "Torsion: urology consult + this within 6 h." },
+  { o: "Bronchoalveolar lavage", k: "bronchoa", s: "bronchoalveolar lavage", d: "washing the lung through the bronchoscope — PCP, TB", g: "proc", w: "'bronch' alone = bronchoscopy." },
+  { o: "Colectomy (bowel resection)", k: "colect", s: "colectomy", d: "removing part of the colon", g: "proc", w: "Toxic megacolon, perforation, cancer." },
+  { o: "Splenectomy", k: "splen", d: "removing the spleen — refractory ITP, trauma", g: "proc", w: "Vaccinate (P-MIST) 2 weeks before or after." },
+  { o: "Thyroidectomy", k: "thyroidec", d: "removing the thyroid", g: "proc", w: "'thyro' also shows the thyroid labs. Type to the end." },
+  { o: "Parathyroidectomy", k: "parathyroidec", d: "removing the overactive parathyroid gland", g: "proc", w: "" },
+  { o: "Adrenalectomy", k: "adrenalec", d: "removing the adrenal gland", g: "proc", w: "" },
+  { o: "Nephrectomy", k: "nephrec", d: "removing a kidney", g: "proc", w: "" },
+  { o: "Prostatectomy (TURP)", k: "prostatec", s: "prostatectomy", d: "removing the prostate", g: "proc", w: "TURP: 'transur'." },
+  { o: "Mastectomy (lumpectomy)", k: "mastec", s: "mastectomy", d: "removing the breast", g: "proc", w: "Breast cancer: biopsy first, surgery consult." },
+  { o: "Lymph node biopsy (excisional)", k: "lymph node b", s: "lymph node biopsy", d: "taking out a swollen node — lymphoma", g: "proc", w: "Excisional, not needle, for lymphoma." },
+  { o: "Temporal artery biopsy", k: "temporal a", s: "temporal artery biopsy", d: "the artery sample in giant cell arteritis", g: "proc", w: "Start prednisone first; biopsy within 1–2 weeks." },
+  { o: "Renal biopsy", k: "renal b", s: "renal biopsy", d: "tissue from the kidney — nephritic syndrome", g: "proc", w: "After serologies; nephrology consult." },
+
+  /* ---- medications (added Oct 27, 2026: the hard-to-spell ones and look-alikes) ---- */
+  { o: "Ampicillin-sulbactam (Unasyn)", k: "ampicillin s", s: "ampicillin sulbactam", d: "the two-part antibiotic for cholecystitis / aspiration", g: "med", w: "'ampi' alone = plain ampicillin. Type to 'ampicillin s' and pick sulbactam. Missed in 32 (critical).", m: "32" },
+  { o: "Meropenem", k: "mero", d: "carbapenem antibiotic for severe abdominal infection", g: "med", w: "Severe / ESBL. 'mer' also shows mercaptopurine.", m: "9" },
+  { o: "Cefepime", k: "cefe", d: "4th-generation cephalosporin — Pseudomonas, neutropenic fever", g: "med", w: "'ceft' = ceftriaxone. 'cefa' = cefazolin." },
+  { o: "Cefazolin", k: "cefaz", d: "surgical-prophylaxis cephalosporin (the C in NICE PTS)", g: "med", w: "Before every surgery." },
+  { o: "Gentamicin", k: "genta", d: "aminoglycoside antibiotic — pyelonephritis, endocarditis", g: "med", w: "" },
+  { o: "Esomeprazole", k: "esom", d: "proton pump inhibitor", g: "med", w: "Or pantoprazole IV in bleeds. Missed in 15.", m: "15" },
+  { o: "Omeprazole", k: "omep", d: "proton pump inhibitor", g: "med", w: "" },
+  { o: "Dronabinol", k: "dron", d: "appetite / nausea cannabinoid pill the sim keeps wanting", g: "med", w: "ccscases grades it in nausea / poor intake. Missed in 9, 32, 39.", m: "9,32,39" },
+  { o: "Naltrexone", k: "naltr", d: "anti-craving drug for alcohol / opioid use", g: "med", w: "'nalo' = naloxone. Alcohol bundle at discharge. Missed in 35.", m: "35" },
+  { o: "Acamprosate", k: "acam", d: "anti-craving drug for alcohol use", g: "med", w: "With counseling at discharge. Missed in 35.", m: "35" },
+  { o: "Disulfiram", k: "disul", d: "the alcohol-aversion drug", g: "med", w: "" },
+  { o: "Magnesium citrate", k: "magnesium c", s: "magnesium citrate", d: "the laxative magnesium", g: "med", w: "Not the serum level, not the sulfate. Missed in 35.", m: "35" },
+  { o: "Chlordiazepoxide", k: "chlord", d: "long-acting benzodiazepine for alcohol withdrawal", g: "med", w: "'chlor' also shows chlorpromazine, chloroquine." },
+  { o: "Varenicline", k: "varen", d: "smoking-cessation pill", g: "med", w: "With smoking counseling (the one you keep missing)." },
+  { o: "Bupropion", k: "bupro", d: "antidepressant also used to stop smoking", g: "med", w: "'bupre' = buprenorphine." },
+  { o: "Buprenorphine", k: "bupre", d: "opioid-use-disorder maintenance drug", g: "med", w: "'bupro' = bupropion." },
+  { o: "Methadone", k: "metha", d: "long-acting opioid for maintenance", g: "med", w: "'meth' also shows methotrexate, methylpred, methimazole." },
+  { o: "Hydroxychloroquine", k: "hydroxyc", d: "the lupus / RA antimalarial", g: "med", w: "'hydroxyu' = hydroxyurea. 'hydroxyz' = hydroxyzine. Eye exam yearly." },
+  { o: "Hydroxyurea", k: "hydroxyu", d: "sickle-cell crisis-prevention drug", g: "med", w: "Case 25 lives here." },
+  { o: "Hydroxyzine", k: "hydroxyz", d: "sedating antihistamine for itch / anxiety", g: "med", w: "" },
+  { o: "Hydrochlorothiazide", k: "hydrochl", d: "thiazide diuretic for hypertension", g: "med", w: "'hydroc' = hydrocortisone. Type 8 letters." },
+  { o: "Spironolactone", k: "spiron", d: "potassium-sparing diuretic — heart failure, cirrhosis", g: "med", w: "'spiro' also shows spirometry." },
+  { o: "Carvedilol", k: "carve", d: "beta blocker for heart failure", g: "med", w: "" },
+  { o: "Amlodipine", k: "amlo", d: "calcium-channel blocker for hypertension", g: "med", w: "" },
+  { o: "Nitroprusside", k: "nitrop", d: "IV drip for hypertensive emergency", g: "med", w: "'nitrog' = nitroglycerin." },
+  { o: "Nicardipine", k: "nicar", d: "IV calcium-channel blocker — hypertensive emergency, SAH", g: "med", w: "'nico' = nicotine patch." },
+  { o: "Esmolol", k: "esmo", d: "short-acting IV beta blocker — dissection, thyroid storm", g: "med", w: "" },
+  { o: "Diltiazem", k: "dilt", d: "rate-control calcium-channel blocker for atrial fibrillation", g: "med", w: "AF rate control. 'dila' = dilation." },
+  { o: "Verapamil", k: "verap", d: "calcium-channel blocker for SVT / rate control", g: "med", w: "Not in WPW." },
+  { o: "Digoxin", k: "digo", d: "the old heart-failure / AF glycoside", g: "med", w: "Level: 'digoxin l'. Toxicity antidote: digoxin immune Fab." },
+  { o: "Digoxin immune Fab", k: "digoxin i", s: "digoxin immune fab", d: "antidote antibody for digoxin poisoning", g: "med", w: "Hyperkalemia + bradycardia on digoxin." },
+  { o: "Dobutamine", k: "dobu", d: "inotrope drip for cardiogenic shock", g: "med", w: "'dopa' = dopamine." },
+  { o: "Dopamine", k: "dopa", d: "pressor / inotrope drip", g: "med", w: "" },
+  { o: "Vasopressin", k: "vasop", d: "second pressor in septic shock", g: "med", w: "After norepinephrine." },
+  { o: "Phenylephrine", k: "phenyle", d: "pure alpha pressor", g: "med", w: "'phenyt' = phenytoin. 'phenob' = phenobarbital." },
+  { o: "Milrinone", k: "milr", d: "inodilator drip for cardiogenic shock", g: "med", w: "" },
+  { o: "Apixaban", k: "apix", d: "direct oral anticoagulant", g: "med", w: "Rivaroxaban: 'rivar'. AF, DVT, PE at discharge." },
+  { o: "Dabigatran", k: "dabig", d: "direct thrombin inhibitor anticoagulant", g: "med", w: "Reversal: idarucizumab." },
+  { o: "Idarucizumab", k: "idaru", d: "reversal antibody for dabigatran", g: "med", w: "" },
+  { o: "Protamine", k: "prota", d: "heparin reversal", g: "med", w: "Heparin bleed." },
+  { o: "Phytonadione (vitamin K)", k: "vitamin k", s: "phytonadione", d: "warfarin reversal vitamin", g: "med", w: "Plus FFP / PCC if bleeding." },
+  { o: "Prothrombin complex concentrate (PCC)", k: "prothrombin c", s: "prothrombin complex concentrate", d: "fast warfarin reversal — intracranial bleed", g: "med", w: "Or 'kcentra'." },
+  { o: "Tranexamic acid", k: "trane", d: "antifibrinolytic for heavy bleeding / trauma", g: "med", w: "'trans' = transfusion." },
+  { o: "Desmopressin (DDAVP)", k: "desmo", d: "the von Willebrand / diabetes insipidus hormone", g: "med", w: "" },
+  { o: "Ticagrelor", k: "ticag", d: "P2Y12 antiplatelet for ACS", g: "med", w: "Or clopidogrel." },
+  { o: "Ketamine", k: "ketam", d: "dissociative anesthetic for intubation / procedural sedation", g: "med", w: "'ketor' = ketorolac. 'keto' = ketones." },
+  { o: "Propofol", k: "propo", d: "sedation drip after intubation", g: "med", w: "'propr' = propranolol." },
+  { o: "Succinylcholine", k: "succin", d: "paralytic for rapid-sequence intubation", g: "med", w: "'succi' = succimer. Not in burns, hyperkalemia." },
+  { o: "Rocuronium", k: "rocu", d: "non-depolarizing paralytic for intubation", g: "med", w: "" },
+  { o: "Pyridostigmine", k: "pyridos", d: "myasthenia gravis daily drug", g: "med", w: "'pyridox' = pyridoxine (B6). Case 7 lives here." },
+  { o: "Neostigmine", k: "neost", d: "reversal of paralytics; Ogilvie syndrome", g: "med", w: "" },
+  { o: "Dantrolene", k: "dantr", d: "malignant hyperthermia / NMS antidote", g: "med", w: "" },
+  { o: "Cyproheptadine", k: "cypro", d: "serotonin syndrome antidote", g: "med", w: "'cyclo' = cyclophosphamide / cyclosporine." },
+  { o: "Benztropine", k: "benzt", d: "acute dystonia antidote", g: "med", w: "Or diphenhydramine." },
+  { o: "Bromocriptine", k: "bromo", d: "dopamine agonist — NMS, prolactinoma", g: "med", w: "Or cabergoline." },
+  { o: "Olanzapine", k: "olanz", d: "antipsychotic for agitation / psychosis", g: "med", w: "Quetiapine: 'quet'. Risperidone: 'risp'." },
+  { o: "Lithium", k: "lithi", d: "the bipolar mood stabilizer", g: "med", w: "'litho' = lithotripsy. Level: 'lithium l'." },
+  { o: "Valproate (valproic acid)", k: "valpr", s: "valproate", d: "anti-seizure / bipolar drug", g: "med", w: "Status epilepticus 2nd line. Not in pregnancy." },
+  { o: "Carbamazepine", k: "carbam", d: "anti-seizure drug — trigeminal neuralgia", g: "med", w: "'carbi' = carbidopa. HLA-B*1502 in Asians." },
+  { o: "Lamotrigine", k: "lamot", d: "anti-seizure drug with the rash risk", g: "med", w: "" },
+  { o: "Topiramate", k: "topir", d: "anti-seizure / migraine-prevention drug", g: "med", w: "Kidney stones." },
+  { o: "Gabapentin", k: "gabap", d: "neuropathic pain drug", g: "med", w: "" },
+  { o: "Lacosamide", k: "lacos", d: "newer anti-seizure drug", g: "med", w: "'lact' = lactated Ringer / lactate." },
+  { o: "Phenobarbital", k: "phenob", d: "barbiturate anti-seizure drug — neonates, status", g: "med", w: "'phenyt' = phenytoin." },
+  { o: "Sumatriptan", k: "sumat", d: "migraine abortive", g: "med", w: "Not with CAD / pregnancy." },
+  { o: "Prochlorperazine", k: "prochl", d: "antiemetic used for migraine in the ED", g: "med", w: "'promet' = promethazine." },
+  { o: "Nimodipine", k: "nimo", d: "vasospasm prevention after subarachnoid hemorrhage", g: "med", w: "'nife' = nifedipine." },
+  { o: "Pyridoxine (vitamin B6)", k: "pyridox", s: "pyridoxine", d: "vitamin B6 — isoniazid, newborn seizures", g: "med", w: "'pyridos' = pyridostigmine." },
+  { o: "Hydroxocobalamin", k: "hydroxoc", d: "cyanide antidote (smoke inhalation)", g: "med", w: "House fire + coma + lactate." },
+  { o: "Deferoxamine", k: "defer", d: "iron overdose chelator", g: "med", w: "Deferasirox for transfusion iron overload." },
+  { o: "Succimer", k: "succi", d: "oral lead chelator for children", g: "med", w: "'succin' = succinylcholine." },
+  { o: "Dimercaprol", k: "dimer", d: "injectable chelator — severe lead, arsenic, mercury", g: "med", w: "" },
+  { o: "Pralidoxime", k: "prali", d: "organophosphate antidote (with atropine)", g: "med", w: "" },
+  { o: "Methylene blue", k: "methylene", s: "methylene blue", d: "methemoglobinemia antidote", g: "med", w: "" },
+  { o: "Leucovorin", k: "leuco", d: "methotrexate rescue", g: "med", w: "" },
+  { o: "Filgrastim (G-CSF)", k: "filg", d: "white-cell growth factor", g: "med", w: "Neutropenic fever prevention." },
+  { o: "Epoetin alfa", k: "epoe", d: "the anemia-of-CKD hormone", g: "med", w: "'epin' = epinephrine." },
+  { o: "Allopurinol", k: "allop", d: "gout prevention (not during the flare)", g: "med", w: "" },
+  { o: "Rasburicase", k: "rasb", d: "tumor-lysis uric-acid drug", g: "med", w: "Not in G6PD deficiency." },
+  { o: "Alendronate", k: "alend", d: "oral bisphosphonate for osteoporosis", g: "med", w: "Zoledronic acid: 'zoled' (IV; hypercalcemia)." },
+  { o: "Calcitonin", k: "calcit", d: "fast-acting hypercalcemia hormone", g: "med", w: "'calci' alone also shows calcitriol, calcium." },
+  { o: "Fludrocortisone", k: "fludr", d: "mineralocorticoid for Addison disease", g: "med", w: "" },
+  { o: "Methimazole", k: "methim", d: "antithyroid drug", g: "med", w: "'methot' = methotrexate. PTU in the first trimester / storm." },
+  { o: "Propylthiouracil (PTU)", k: "propyl", s: "propylthiouracil", d: "antithyroid drug for thyroid storm / first trimester", g: "med", w: "'propr' = propranolol." },
+  { o: "Lactulose", k: "lactu", d: "laxative that treats hepatic encephalopathy", g: "med", w: "'lacta' = lactated Ringer. 'lacti' = lactate. Three words, three letters." },
+  { o: "Rifaximin", k: "rifax", d: "gut antibiotic added to lactulose", g: "med", w: "'rifam' = rifampin." },
+  { o: "Rifampin", k: "rifam", d: "TB drug (orange urine)", g: "med", w: "RIPE: rifampin, isoniazid, pyrazinamide, ethambutol." },
+  { o: "Isoniazid", k: "isoni", d: "TB drug — give with B6", g: "med", w: "" },
+  { o: "Pyrazinamide", k: "pyraz", d: "TB drug", g: "med", w: "'pyrid' = pyridoxine / pyridostigmine." },
+  { o: "Ethambutol", k: "etham", d: "TB drug — eye exams", g: "med", w: "'etha' alone = ethanol level." },
+  { o: "Fluconazole", k: "fluc", d: "azole antifungal — candida, cryptococcus maintenance", g: "med", w: "'fluox' = fluoxetine. 'flum' = flumazenil." },
+  { o: "Amphotericin B", k: "amph", s: "amphotericin", d: "IV antifungal — cryptococcal meningitis, mucormycosis", g: "med", w: "" },
+  { o: "Voriconazole", k: "voric", d: "the antifungal for invasive aspergillosis", g: "med", w: "Aspergillosis — your two UWorld misses." },
+  { o: "Valacyclovir", k: "valac", d: "oral antiviral for shingles / HSV", g: "med", w: "'valpr' = valproate." },
+  { o: "Ganciclovir", k: "ganc", d: "CMV antiviral", g: "med", w: "" },
+  { o: "Ivermectin", k: "iverm", d: "antiparasitic — strongyloides, scabies", g: "med", w: "" },
+  { o: "Permethrin", k: "perme", d: "scabies / lice cream", g: "med", w: "" },
+  { o: "Albendazole", k: "alben", d: "antiworm drug", g: "med", w: "'albu' = albuterol." },
+  { o: "Ursodiol", k: "urso", d: "bile-acid pill for primary biliary cholangitis", g: "med", w: "" },
+  { o: "Cholestyramine", k: "cholest", d: "bile-acid binder — itching in cholestasis", g: "med", w: "'cholec' = cholecystectomy." },
+  { o: "Misoprostol", k: "misop", d: "prostaglandin — postpartum hemorrhage, NSAID-ulcer prevention", g: "med", w: "" },
+  { o: "Terbutaline", k: "terbu", d: "tocolytic / asthma beta-agonist injection", g: "med", w: "" },
+  { o: "Methylergonovine", k: "methyle", d: "uterotonic for postpartum hemorrhage", g: "med", w: "Not in hypertension. 'methylp' = methylprednisolone." },
+  { o: "Carboprost", k: "carbop", d: "prostaglandin uterotonic", g: "med", w: "Not in asthma." },
+  { o: "Medroxyprogesterone", k: "medro", d: "the progestin injection / contraceptive", g: "med", w: "" },
+  { o: "Tamsulosin", k: "tams", d: "alpha blocker for BPH / stone passage", g: "med", w: "'tamo' = tamoxifen." },
+  { o: "Finasteride", k: "finas", d: "5-alpha-reductase inhibitor for BPH", g: "med", w: "" },
+  { o: "Tamoxifen", k: "tamox", d: "estrogen-receptor drug for breast cancer", g: "med", w: "" },
+  { o: "Acetazolamide", k: "acetaz", d: "carbonic anhydrase inhibitor — glaucoma, altitude, pseudotumor", g: "med", w: "'acetam' = acetaminophen. 'acetylc' = N-acetylcysteine." },
+  { o: "Montelukast", k: "mont", d: "leukotriene pill for asthma", g: "med", w: "" },
+  { o: "Fluticasone (inhaled)", k: "flutic", s: "fluticasone", d: "inhaled steroid for asthma control", g: "med", w: "Budesonide: 'budes'." },
+  { o: "Tiotropium", k: "tiot", d: "long-acting inhaled anticholinergic for COPD", g: "med", w: "" },
+  { o: "Theophylline", k: "theop", d: "old asthma / COPD pill with a narrow level", g: "med", w: "Level: 'theophylline l'." },
+  { o: "Tetanus immune globulin", k: "tetanus i", s: "tetanus immune globulin", d: "antibody shot for a dirty wound with no vaccine history", g: "med", w: "Plus Tdap, separate site." },
+  { o: "Rabies immune globulin (+ vaccine)", k: "rabi", s: "rabies immune globulin", d: "post-exposure shots after an animal bite", g: "med", w: "Case 176 'Animal bite'." },
+  { o: "Hepatitis B immune globulin", k: "hepatitis b i", s: "hepatitis b immune globulin", d: "antibody shot after hepatitis B exposure / newborn of a carrier", g: "med", w: "Plus the vaccine." },
+  { o: "Antivenom (CroFab)", k: "antiven", s: "antivenom", d: "the snakebite antibody", g: "med", w: "" },
+  { o: "Hypertonic saline (3%)", k: "hypert", s: "hypertonic saline", d: "concentrated salt drip — seizing hyponatremia, herniation", g: "med", w: "'hyper' alone shows many labs. Type 6 letters." },
+  { o: "Sodium polystyrene sulfonate", k: "polyst", s: "sodium polystyrene sulfonate", d: "potassium-binding resin", g: "med", w: "'polyso' = polysomnography." },
+  { o: "Insulin glargine", k: "insulin g", s: "insulin glargine", d: "long-acting basal insulin", g: "med", w: "DKA = regular insulin IV, not this." },
+  { o: "Metformin", k: "metf", d: "first-line diabetes pill", g: "med", w: "Hold before contrast; not with eGFR < 30." },
+  { o: "Cyclophosphamide", k: "cyclop", d: "chemotherapy / lupus-nephritis immunosuppressant", g: "med", w: "'cyclos' = cyclosporine." },
+  { o: "Azathioprine", k: "azath", d: "steroid-sparing immunosuppressant", g: "med", w: "'azit' = azithromycin." },
+  { o: "Mycophenolate", k: "mycop", d: "transplant / lupus immunosuppressant", g: "med", w: "" },
+  { o: "Tacrolimus", k: "tacr", d: "transplant immunosuppressant", g: "med", w: "" },
+  { o: "Rituximab", k: "ritux", d: "anti-CD20 antibody — lymphoma, ITP, vasculitis", g: "med", w: "" },
+  { o: "Infliximab", k: "infli", d: "anti-TNF antibody for Crohn / RA", g: "med", w: "TB test first." },
+  { o: "Sulfasalazine", k: "sulfas", d: "ulcerative colitis / RA pill", g: "med", w: "'sulfam' = sulfamethoxazole." },
+  { o: "Mesalamine", k: "mesal", d: "5-ASA for ulcerative colitis", g: "med", w: "" },
+  { o: "Prednisolone", k: "prednis", d: "the children's oral steroid", g: "med", w: "'predn' alone also shows prednisone." },
+  { o: "Indomethacin", k: "indom", d: "NSAID — gout, PDA closure, preterm labor", g: "med", w: "" },
+  { o: "Naproxen", k: "napr", d: "NSAID", g: "med", w: "" },
+  { o: "Hydromorphone", k: "hydrom", d: "strong IV opioid", g: "med", w: "'hydroc' = hydrocortisone." },
+  { o: "Fentanyl", k: "fent", d: "fast IV opioid", g: "med", w: "" },
+  { o: "Oxycodone", k: "oxyc", d: "oral opioid", g: "med", w: "'oxyg' = oxygen. 'oxyt' = oxytocin. Three cousins." },
+  { o: "Amitriptyline", k: "amit", d: "tricyclic for neuropathic pain / migraine prevention", g: "med", w: "'amio' = amiodarone. Case 22 overdose." },
+  { o: "Duloxetine", k: "dulox", d: "SNRI for depression + neuropathic pain", g: "med", w: "" },
+  { o: "Venlafaxine", k: "venla", d: "SNRI antidepressant", g: "med", w: "'vanc' = vancomycin." },
+  { o: "Mirtazapine", k: "mirt", d: "antidepressant that helps sleep and appetite", g: "med", w: "" },
+  { o: "Trazodone", k: "traz", d: "sedating antidepressant for sleep", g: "med", w: "'tram' = tramadol." },
+  { o: "Buspirone", k: "busp", d: "non-benzo anxiety pill", g: "med", w: "'bupr' = bupropion / buprenorphine." },
+  { o: "Clonidine", k: "cloni", d: "central alpha-2 agonist — hypertension, opioid withdrawal", g: "med", w: "'clonaz' = clonazepam." },
+  { o: "Clonazepam", k: "clonaz", d: "long-acting benzodiazepine", g: "med", w: "'cloni' = clonidine." },
+  { o: "Donepezil", k: "done", d: "Alzheimer cholinesterase inhibitor", g: "med", w: "Case 73 'Memory loss'." },
+  { o: "Memantine", k: "mema", d: "NMDA blocker for moderate-severe Alzheimer", g: "med", w: "" },
+  { o: "Carbidopa-levodopa", k: "carbid", s: "carbidopa levodopa", d: "the Parkinson pill", g: "med", w: "'carbam' = carbamazepine." },
+  { o: "Baclofen", k: "bacl", d: "muscle relaxant for spasticity", g: "med", w: "" },
+  { o: "Botulinum toxin", k: "botul", s: "botulinum toxin", d: "injected paralytic — dystonia, spasticity, migraine", g: "med", w: "" },
+  { o: "Promethazine", k: "promet", d: "antiemetic antihistamine", g: "med", w: "" },
+  { o: "Dexmedetomidine", k: "dexm", d: "ICU sedation drip", g: "med", w: "'dexa' = dexamethasone. 'dext' = dextrose." },
+
   /* ---- close: consults, counseling, vaccines ---- */
-  { o: "Consult (type the specialty)", k: "cons", g: "close", w: "'cons' shows the whole list: cardiology, surgery, GI, OB/GYN, psychiatry, neurology, ID, nephrology, IR, social work, nutrition, poison control…" },
-  { o: "Counseling (type 'coun' for the list)", k: "coun", g: "close", w: "Smoking, alcohol, diet, exercise, safe sex, seat belt, medication compliance, disease education, no contact sports (mono)." },
+  { o: "Consult (type the specialty)", k: "cons", g: "close", w: "'cons' shows the whole list: cardiology, surgery, GI, OB/GYN, psychiatry, neurology, ID, nephrology, IR, social work, nutrition, poison control…", m: "93,39,13" },
+  { o: "Counseling (type 'coun' for the list)", k: "coun", g: "close", w: "Smoking, alcohol, diet, exercise, safe sex, seat belt, medication compliance, disease education, no contact sports (mono).", m: "6,13,15,35,55,93" },
   { o: "Vaccine (type 'vacc' for the list)", k: "vacc", g: "close", w: "Or 'immun'. Influenza, pneumococcal, Tdap, hepatitis B, HPV, zoster, meningococcal." },
-  { o: "Smoking cessation counseling", k: "smok", g: "close", w: "" },
-  { o: "Alcohol cessation counseling", k: "alcoh", g: "close", w: "" },
-  { o: "Medication compliance / side effects", k: "medic", g: "close", w: "Pick 'counsel' lines." },
-  { o: "Pap smear", k: "pap", g: "close", w: "21–65 y." },
+  { o: "Smoking cessation counseling", k: "smok", g: "close", w: "", m: "35,13" },
+  { o: "Alcohol cessation counseling", k: "alcoh", g: "close", w: "", m: "13" },
+  { o: "Medication compliance / side effects", k: "medic", g: "close", w: "Pick 'counsel' lines.", m: "35,55" },
+  { o: "Papanicolaou smear (Pap)", k: "pap", s: "papanicolaou smear", d: "cervical cancer screening", g: "close", w: "21–65 y.", m: "5,9" },
   { o: "Colonoscopy (screening)", k: "colon", g: "close", w: "45+ y." },
-  { o: "Social work / case management", k: "social", g: "close", w: "Abuse, homelessness, elderly living alone." },
+  { o: "Social work / case management", k: "social", g: "close", w: "Abuse, homelessness, elderly living alone.", m: "93" },
   { o: "Physical therapy / rehab", k: "physical", g: "close", w: "Stroke, fractures, RA." },
   { o: "Dietitian / nutrition consult", k: "nutri", g: "close", w: "Diabetes, CF, celiac, malnutrition." },
   { o: "Discontinue (cancel) an order", k: "—", g: "close", w: "Click the order on the order sheet → confirm. Stop IV fluids, monitor, O2, home NSAID, OCP, metformin before contrast." },
-  { o: "Follow-up appointment", k: "—", g: "close", w: "Not typed. Change Location → Office → schedule appointment (or clock 'On/In'). Before the warning." }
+  { o: "Follow-up appointment", k: "—", g: "close", w: "Not typed. Change Location → Office → schedule appointment (or clock 'On/In'). Before the warning." },
+
+  /* ---- close, spelled the ccscases way (added Oct 27, 2026: the lines you missed Oct 13–26) ---- */
+  { o: "Consult, surgery, general", k: "consult s", s: "consult surgery general", d: "the surgeons", g: "close", w: "Type 'cons' then pick. Abscess, cholangitis, perforation, necrotizing infection. Missed in 93, 39 (critical).", m: "93,39" },
+  { o: "Consult, gastroenterology", k: "consult g", s: "consult gastroenterology", d: "the GI service — the ERCP people", g: "close", w: "Missed in 39.", m: "39" },
+  { o: "Consult, infectious disease", k: "consult i", s: "consult infectious disease", d: "the ID service", g: "close", w: "Missed in 93.", m: "93" },
+  { o: "Consult, social services", k: "consult so", s: "consult social services", d: "social work — drugs, homelessness, abuse, elderly alone", g: "close", w: "Missed in 93 (critical).", m: "93" },
+  { o: "Consult, surgery, orthopedic", k: "consult o", s: "consult surgery orthopedic", d: "the bone surgeons", g: "close", w: "Missed in 13.", m: "13" },
+  { o: "Advise patient, no aspirin", k: "advi", s: "advise patient no aspirin", d: "counsel: no aspirin for a child with a viral illness (Reye)", g: "close", w: "Type 'advi' and read the whole list. Missed in 6 (critical).", m: "6" },
+  { o: "Advise patient, no NSAIDs", k: "advi", s: "advise patient no nsaids", d: "counsel: no ibuprofen-type drugs (gastritis, ulcer, kidney)", g: "close", w: "Missed in 13 (critical).", m: "13" },
+  { o: "Advise patient, no alcohol", k: "advi", s: "advise patient no alcohol", d: "counsel: stop drinking", g: "close", w: "Missed in 13.", m: "13" },
+  { o: "Advise patient, no illegal drug use", k: "advi", s: "advise patient no illegal drug use", d: "counsel: stop the drugs", g: "close", w: "Missed in 93 (critical).", m: "93" },
+  { o: "Advise patient, medication compliance", k: "advi", s: "advise patient medication compliance", d: "counsel: take the pills every day", g: "close", w: "Missed in 35 (critical).", m: "35" },
+  { o: "Advise patient, side effects of medication", k: "advi", s: "advise patient side effects of medication", d: "counsel: what the new drug can do to you", g: "close", w: "Every new anticoagulant / steroid / antiepileptic. Missed in 55 twice (critical).", m: "55" },
+  { o: "Advise patient, rest at home", k: "advi", s: "advise patient rest at home", d: "counsel: rest", g: "close", w: "Pericarditis, mono. Missed in 15 (critical).", m: "15" },
+  { o: "Advise patient, exercise program", k: "advi", s: "advise patient exercise program", d: "counsel: exercise", g: "close", w: "Missed in 55.", m: "55" },
+  { o: "Instruct patient, smoking cessation", k: "instr", s: "instruct patient smoking cessation", d: "counsel: stop smoking", g: "close", w: "'smok' also works. Missed in 35 and 13 (critical).", m: "35,13" },
+  { o: "Vaccine, diphtheria / tetanus / pertussis (Tdap)", k: "vaccine d", s: "vaccine diphtheria tetanus pertussis", d: "the adult tetanus booster", g: "close", w: "Every 10 years; every wound. Missed in 35, 13 (and 5 last year).", m: "35,13" },
+  { o: "Vaccine, pneumococcal", k: "vaccine p", s: "vaccine pneumococcal", d: "pneumonia shot — 65+, COPD, splenectomy", g: "close", w: "P-MIST." },
+  { o: "Vaccine, influenza", k: "vaccine i", s: "vaccine influenza", d: "the flu shot — every adult, every year", g: "close", w: "P-MIST." },
+  { o: "Vaccine, zoster (shingles)", k: "vaccine z", s: "vaccine zoster", d: "shingles shot — 50+", g: "close", w: "P-MIST." },
+  { o: "Vaccine, meningococcal", k: "vaccine m", s: "vaccine meningococcal", d: "meningitis shot — teens, asplenia, dorms", g: "close", w: "P-MIST." },
+  { o: "Vaccine, hepatitis B", k: "vaccine h", s: "vaccine hepatitis b", d: "hepatitis B series", g: "close", w: "" },
+  { o: "Vaccine, human papillomavirus (HPV)", k: "vaccine hu", s: "vaccine human papillomavirus", d: "cervical-cancer prevention shot — 9–26 y", g: "close", w: "" },
 ];
 /* What to do in each phase, shown under the clock. Unstable and stable patients get different first orders. */
 function protoLines(ph, patient) {
@@ -899,44 +1160,102 @@ const norm = s => String(s || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").repla
 function renderKeyList() {
   const q = norm($("keyQ").value), box = $("keyList");
   if (!q) { box.innerHTML = '<div><span>Type 3 letters to look up an order.</span><span class="k">' + ORDERS.length + '</span><small>Keys are the letters you type in Primum before you pick from the list.</small></div>'; return; }
-  const rows = ORDERS.filter(o => (norm(o.o) + " " + norm(o.k) + " " + norm(o.w)).includes(q)).slice(0, 30);
-  box.innerHTML = rows.length ? rows.map(o => "<div><span>" + P.esc(o.o) + '</span><span class="k">' + P.esc(o.k) + "</span>" + (o.w ? "<small>" + P.esc(o.w) + "</small>" : "") + "</div>").join("") : "<div><span>Nothing. Try another name (x-ray / radiograph, ECG / EKG).</span></div>";
+  const rows = ORDERS.filter(o => (norm(o.o) + " " + norm(o.k) + " " + norm(o.w) + " " + norm(o.d)).includes(q)).slice(0, 30);
+  box.innerHTML = rows.length ? rows.map(o => "<div><span>" + P.esc(o.o) + '</span><span class="k">' + P.esc(o.k) + "</span>" + (o.w ? "<small>" + P.esc(o.w) + "</small>" : "") + (o.m ? '<span class="m">missed in case ' + P.esc(o.m.replace(/,/g, ", ")) + "</span>" : "") + "</div>").join("") : "<div><span>Nothing. Try another name (x-ray / radiograph, ECG / EKG).</span></div>";
 }
-let D = { items: [], i: 0, right: 0, answered: false };
-function drillable() { return ORDERS.filter(o => o.k !== "—" && o.g !== "close"); }
+/* The drill. Sets: all / a group / the orders missed in his own cases (o.m). Modes: keys (type the letters you would
+   type in Primum) or spelling (the order is spoken and shown as a shape; type the whole name). */
+let D = { items: [], i: 0, right: 0, answered: false, mode: "keys", set: "missed", n: 10, misses: [] };
+const GROUP_LABEL = { stab: "stabilize / monitor", lab: "lab", img: "imaging", proc: "procedure", med: "drug", close: "close: consult / counseling / vaccine" };
+function spellTarget(o) {
+  if (o.s) return o.s;
+  return o.o.replace(/\(.*?\)/g, "").split(/ \/ | — | · | ×/)[0].replace(/\s+/g, " ").trim();
+}
+function spellable(o) { const t = norm(spellTarget(o)); return o.k !== "—" && t.length >= 4 && !/\d/.test(t); }
+function drillPool(set, mode) {
+  let pool = ORDERS.filter(o => o.k !== "—");
+  if (set === "missed") pool = pool.filter(o => o.m);
+  else if (set !== "all") pool = pool.filter(o => o.g === set);
+  if (mode === "spell") pool = pool.filter(spellable);
+  else pool = pool.filter(o => !(set === "all" && o.g === "close"));
+  return pool;
+}
+function drillKey() { return D.set + "|" + D.mode + "|" + D.n; }
+function bestFor(key) { try { const d = P.readJSON(LS_D, {}) || {}; if (d.bests && d.bests[key] != null) return d.bests[key]; if (key === "all|keys|10" && d.best != null) return d.best; } catch (e) {} return null; }
+function shape(t) { return t.split(" ").map(w => w.length <= 2 ? w : w[0] + "·".repeat(w.length - 1)).join("   ") + "  (" + t.replace(/ /g, "").length + " letters)"; }
+function say(text) {
+  try {
+    if (!("speechSynthesis" in window)) return false;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; u.rate = 0.8;
+    speechSynthesis.speak(u); return true;
+  } catch (e) { return false; }
+}
 function startDrill() {
-  const pool = drillable().slice();
+  D.set = $("drillSet").value; D.mode = $("drillMode").value; D.n = +$("drillN").value || 10;
+  const pool = drillPool(D.set, D.mode);
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-  D = { items: pool.slice(0, 10), i: 0, right: 0, answered: false };
+  D.items = pool.slice(0, Math.min(D.n, pool.length)); D.i = 0; D.right = 0; D.answered = false; D.misses = [];
   $("drillIn").disabled = false; $("btnDrillCheck").disabled = false; $("btnDrill").textContent = "Restart";
-  $("drillFb").textContent = ""; $("drillFb").className = "fb";
+  $("drillFb").textContent = ""; $("drillFb").className = "fb"; $("drillMissList").hidden = true;
+  $("btnSay").hidden = D.mode !== "spell";
+  $("drillIn").setAttribute("aria-label", D.mode === "spell" ? "Type the whole order name" : "Letters you would type");
   showDrill();
 }
 function showDrill() {
   if (D.i >= D.items.length) {
-    const best = (() => { try { const d = P.readJSON(LS_D, {}); return d && d.best || 0; } catch (e) { return 0; } })();
-    const b = Math.max(best, D.right); try { P.writeJSON(LS_D, { best: b, last: D.right, at: Date.now() }); } catch (e) {}
-    $("drillPrompt").textContent = D.right + " / 10" + (D.right === 10 ? " — clean." : D.right >= 8 ? " — good. The misses are tomorrow's first three." : " — write the misses on the wall sheet.");
-    $("drillScore").textContent = "best " + b + " / 10";
+    const key = drillKey(), prev = bestFor(key), b = Math.max(prev == null ? 0 : prev, D.right), n = D.items.length;
+    try { const d = P.readJSON(LS_D, {}) || {}; d.bests = d.bests || {}; d.bests[key] = b; d.last = { key, right: D.right, n, at: Date.now() }; if (key === "all|keys|10") d.best = b; P.writeJSON(LS_D, d); } catch (e) {}
+    $("drillPrompt").textContent = D.right + " / " + n + (D.right === n ? " — clean." : D.right >= n * 0.8 ? " — good. The misses are tomorrow's first few." : " — the misses are below. Tomorrow: this set again.");
+    $("drillScore").textContent = "best " + b + " / " + n;
+    $("drillHint").hidden = true; $("btnSay").hidden = true;
     $("drillIn").disabled = true; $("btnDrillCheck").disabled = true; $("btnDrill").textContent = "Start drill";
+    if (D.misses.length) { $("drillMissList").hidden = false; $("drillMissList").innerHTML = "<b>Missed:</b> " + D.misses.map(P.esc).join(" · "); }
     return;
   }
   const o = D.items[D.i];
-  $("drillPrompt").textContent = (D.i + 1) + ". " + o.o.replace(/\s*\(.*?\)\s*/g, " ").trim();
-  $("drillScore").textContent = D.right + " right · " + D.i + " done";
+  if (D.mode === "spell") {
+    const t = spellTarget(o);
+    $("drillPrompt").textContent = (D.i + 1) + ". 🔊 Type what you hear.";
+    $("drillHint").hidden = false;
+    $("drillHint").innerHTML = "<b>" + P.esc(shape(t)) + "</b>" + (o.d ? " — " + P.esc(o.d) : "") + " · " + P.esc(GROUP_LABEL[o.g] || o.g) + (o.m ? " · missed in case " + P.esc(o.m.replace(/,/g, ", ")) : "");
+    if (!say(t)) $("drillHint").innerHTML += " · (no speech on this device — use the shape)";
+  } else {
+    $("drillPrompt").textContent = (D.i + 1) + ". " + o.o.replace(/\s*\(.*?\)\s*/g, " ").trim();
+    $("drillHint").hidden = !o.m; if (o.m) $("drillHint").textContent = "missed in case " + o.m.replace(/,/g, ", ");
+  }
+  $("drillScore").textContent = D.right + " right · " + D.i + " done · " + D.items.length + " total";
   $("drillIn").value = ""; $("drillFb").textContent = ""; $("drillFb").className = "fb"; D.answered = false;
+  $("btnDrillCheck").textContent = "Check";
   $("drillIn").focus();
+}
+function lev(a, b) {
+  const m = a.length, n = b.length, d = []; for (let i = 0; i <= m; i++) { d[i] = [i]; } for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
 }
 function checkDrill() {
   if (D.i >= D.items.length) return;
   const o = D.items[D.i], typed = norm($("drillIn").value), key = norm(o.k), name = norm(o.o);
   if (D.answered) { D.i += 1; showDrill(); return; }
   if (!typed) return;
-  const ok = typed.length >= key.length && (typed.startsWith(key) || name.startsWith(typed));
   D.answered = true;
-  if (ok) { D.right += 1; P.sfx("tick"); $("drillFb").className = "fb ok"; $("drillFb").textContent = "✓ " + o.k + (o.w ? " — " + o.w : ""); }
-  else { P.sfx("behind"); $("drillFb").className = "fb bad"; $("drillFb").textContent = "✗ type " + o.k + (typed.length < key.length && name.startsWith(typed) ? " — too short, the list would show look-alikes." : "") + (o.w ? " — " + o.w : ""); }
-  $("drillScore").textContent = D.right + " right · " + (D.i + 1) + " done";
+  if (D.mode === "spell") {
+    const t = norm(spellTarget(o)), alt = norm(o.o.replace(/\(.*?\)/g, "").split(/ \/ | — | · | ×/)[0]);
+    const ok = typed === t || typed === alt;
+    if (ok) { D.right += 1; P.sfx("tick"); $("drillFb").className = "fb ok"; $("drillFb").textContent = "✓ " + spellTarget(o) + (o.w ? " — " + o.w : ""); }
+    else {
+      const close = lev(typed, t) <= 2;
+      D.misses.push(spellTarget(o));
+      P.sfx("behind"); $("drillFb").className = "fb bad";
+      $("drillFb").textContent = (close ? "✗ almost — " : "✗ it is spelled ") + spellTarget(o) + " (you typed " + $("drillIn").value.trim() + ")" + (o.w ? " — " + o.w : "");
+    }
+  } else {
+    const ok = typed.length >= key.length && (typed.startsWith(key) || name.startsWith(typed));
+    if (ok) { D.right += 1; P.sfx("tick"); $("drillFb").className = "fb ok"; $("drillFb").textContent = "✓ " + o.k + (o.w ? " — " + o.w : ""); }
+    else { D.misses.push(o.o.replace(/\s*\(.*?\)\s*/g, " ").trim() + " → " + o.k); P.sfx("behind"); $("drillFb").className = "fb bad"; $("drillFb").textContent = "✗ type " + o.k + (typed.length < key.length && name.startsWith(typed) ? " — too short, the list would show look-alikes." : "") + (o.w ? " — " + o.w : ""); }
+  }
+  $("drillScore").textContent = D.right + " right · " + (D.i + 1) + " done · " + D.items.length + " total";
   $("btnDrillCheck").textContent = "Next";
   setTimeout(() => { $("btnDrillCheck").textContent = "Check"; }, 1400);
 }
@@ -952,8 +1271,14 @@ function init() {
   $("keyQ").addEventListener("input", renderKeyList); renderKeyList();
   $("btnDrill").addEventListener("click", startDrill);
   $("btnDrillCheck").addEventListener("click", checkDrill);
+  $("btnSay").addEventListener("click", () => { if (D.i < D.items.length) say(spellTarget(D.items[D.i])); $("drillIn").focus(); });
   $("drillIn").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); checkDrill(); } });
-  (() => { try { const d = P.readJSON(LS_D, null); if (d && d.best != null) $("drillScore").textContent = "best " + d.best + " / 10"; } catch (e) {} })();
+  const showBest = () => {
+    const key = $("drillSet").value + "|" + $("drillMode").value + "|" + $("drillN").value, b = bestFor(key), pool = drillPool($("drillSet").value, $("drillMode").value).length;
+    $("drillScore").textContent = (b != null ? "best " + b + " / " + $("drillN").value + " · " : "") + pool + " orders in this set";
+  };
+  ["drillSet", "drillMode", "drillN"].forEach(id => $(id).addEventListener("change", () => { if (D.i >= D.items.length || !D.items.length) showBest(); }));
+  showBest();
   $("fFinal").value = fmt(S.finalSec); $("fRevShort").value = fmt(S.revShortSec); $("fRevLong").value = fmt(S.revLongSec); $("fTheme").value = P.getTheme();
   document.querySelectorAll("#presets button").forEach(b => b.addEventListener("click", () => { chosenLen = +b.dataset.len; renderSetup(); }));
   $("btnStart").addEventListener("click", () => { R.limitSec = chosenLen; startCase(); buildStrip(); render(); });

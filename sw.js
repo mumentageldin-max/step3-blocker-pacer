@@ -1,7 +1,7 @@
 /* Step 3 Pacer — service worker.
    Caches the app shell on install so the pacers open offline, then refreshes it in the background.
    Bump VERSION whenever a page changes so installed copies pick up the update. */
-const VERSION = "pacer-v6";
+const VERSION = "pacer-v7";
 const FONT_CACHE = "pacer-fonts";
 const SHELL = [
   "./",
@@ -9,6 +9,7 @@ const SHELL = [
   "./review.html",
   "./stats.html",
   "./ccs.html",
+  "./template.html",
   "./shared.css",
   "./shared.js",
   "./manifest.webmanifest",
