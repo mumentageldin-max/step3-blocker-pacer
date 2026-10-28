@@ -66,6 +66,11 @@
 .sessions li[data-type="ccs"] .kind{background:var(--t);color:#fff}
 .sessions .what{min-width:0;overflow-wrap:anywhere}
 .sessions .what b{font-family:var(--font-num)}
+.sessions .acts{display:flex;gap:6px}
+.sessions li{grid-template-rows:auto;}
+.sessions .editbox{grid-column:1/-1;display:grid;gap:10px;border-top:1px solid var(--line2);padding-top:10px}
+.sessions .editbox .form{grid-template-columns:1fr 1fr}
+@media (max-width:520px){.sessions .editbox .form{grid-template-columns:1fr}}
 .sessions button{min-height:32px;padding:4px 10px;font-size:13px}
 .synccard .status{font-size:14px;color:var(--muted);margin:0}
 .synccard .status.ok{color:var(--good)} .synccard .status.bad{color:var(--crit)}
@@ -553,12 +558,65 @@ function renderSessions() {
     if (s.type === "ccs") what = esc(P.fmtDate(s.date, true)) + " · " + esc(s.label || s.category || "case") + (s.score != null ? " · <b>" + s.score + "%</b>" : "") + " · " + fmt(s.timeUsedSec || 0) + "/" + fmt(s.limitSec || 750) + ((s.missedChecks || []).length ? " · skipped " + esc(s.missedChecks.join(", ")) : "");
     else if (s.type === "block") what = esc(P.fmtDate(s.date, true)) + (s.label ? " · " + esc(s.label) : "") + (s.correct != null ? " · <b>" + s.correct + "/" + s.nQ + "</b>" : "") + " · " + (s.checkpoints || []).map(c => "Q" + c.q + " " + P.fmtSigned(Math.round(c.delta))).join(" ") + " · " + (s.flagged || 0) + " flagged";
     else { const t = s.tags || {}; what = esc(P.fmtDate(s.date, true)) + (s.label ? " · " + esc(s.label) : "") + (s.correct != null ? " · <b>" + s.correct + "/" + s.nQ + "</b>" : "") + " · K" + (t.K || 0) + " M" + (t.M || 0) + " T" + (t.T || 0) + " G" + (t.G || 0) + " · " + fmt(s.timeUsedSec || 0) + (s.mode === "eo" ? " · EO only" : ""); }
-    return '<li data-type="' + s.type + '"><span class="kind">' + s.type + '</span><span class="what">' + what + '</span><button type="button" data-del="' + esc(s.id) + '">Delete</button></li>';
+    return '<li data-type="' + s.type + '" data-id="' + esc(s.id) + '"><span class="kind">' + s.type + '</span><span class="what">' + what + '</span><span class="acts"><button type="button" data-edit="' + esc(s.id) + '">Edit</button><button type="button" data-del="' + esc(s.id) + '">Delete</button></span></li>';
   }).join("");
   ul.querySelectorAll("button[data-del]").forEach(b => b.addEventListener("click", () => {
     if (b.dataset.armed) { P.deleteSession(b.dataset.del); refresh(); P.syncQuietly(); return; }
     b.dataset.armed = "1"; b.textContent = "Sure?"; setTimeout(() => { b.dataset.armed = ""; b.textContent = "Delete"; }, 3000);
   }));
+  ul.querySelectorAll("button[data-edit]").forEach(b => b.addEventListener("click", () => openEdit(b.dataset.edit)));
+}
+/* Inline editor for a saved block, review or CCS case. Only the fields a human types; the timings the pacer measured stay. */
+const LENS = [[750, "12:30 · short (1.25×)"], [1500, "25:00 · long (1.25×)"], [600, "10:00 · short (1×)"], [1200, "20:00 · long (1×)"]];
+function openEdit(id) {
+  const s = ALL.find(x => x.id === id); if (!s) return;
+  const li = $("sessions").querySelector('li[data-id="' + CSS.escape(id) + '"]'); if (!li) return;
+  const old = li.querySelector(".editbox"); if (old) { old.remove(); return; }
+  const f = n => '<label>' + n[0] + '<input type="' + (n[2] || "text") + '" data-f="' + n[1] + '" value="' + esc(n[3] == null ? "" : n[3]) + '"' + (n[2] === "number" ? ' inputmode="numeric" min="0"' : ' autocomplete="off"') + '></label>';
+  const sel = (label, key, opts, cur) => '<label>' + label + '<select data-f="' + key + '">' + opts.map(o => '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(cur) ? " selected" : "") + ">" + esc(o[1]) + "</option>").join("") + "</select></label>";
+  let html = "";
+  if (s.type === "ccs") {
+    const lens = LENS.some(l => l[0] === s.limitSec) ? LENS : LENS.concat([[s.limitSec, fmt(s.limitSec)]]);
+    html = f(["Case (name or number)", "label", "text", s.label]) + sel("Category", "category", ["Internal Medicine", "Emergency Medicine", "Pediatrics", "OB/GYN", "Neurology", "Psychiatry", "Surgery", "Other"].map(c => [c, c]), s.category) +
+      sel("Attempt", "attempt", [["first", "First attempt"], ["repeat", "Repeat"]], s.attempt) + f(["Score (%)", "score", "number", s.score]) +
+      sel("Case length", "limitSec", lens, s.limitSec) + f(["Time used (mm:ss)", "timeUsedSec", "text", fmt(s.timeUsedSec || 0)]) +
+      f(["The one order you missed", "missedOrder", "text", s.missedOrder]) + f(["Misspelled words (comma-separated)", "misspelled", "text", (s.misspelled || []).join(", ")]) + f(["Note", "note", "text", s.note]);
+  } else if (s.type === "block") {
+    html = f(["Block name", "label", "text", s.label]) + f(["Correct (of " + (s.nQ || 20) + ")", "correct", "number", s.correct]);
+  } else {
+    html = f(["Block name", "label", "text", s.label]) + f(["Correct (of " + (s.nQ || 20) + ")", "correct", "number", s.correct]) +
+      ["K", "M", "T", "G"].map(l => f([l + " (" + ({ K: "didn't know", M: "misread", T: "wrong form", G: "rushed" })[l] + ")", "tag" + l, "number", (s.tags || {})[l] || 0])).join("");
+  }
+  const box = document.createElement("div"); box.className = "editbox";
+  box.innerHTML = '<div class="form">' + html + '</div><div class="row2"><button type="button" class="primary" data-save>Save changes</button><button type="button" data-cancel>Cancel</button></div><p class="note">Date and the pacer\'s own timings stay as recorded.</p>';
+  li.appendChild(box);
+  box.querySelector("[data-cancel]").addEventListener("click", () => box.remove());
+  box.querySelector("[data-save]").addEventListener("click", () => {
+    const get = k => { const el = box.querySelector('[data-f="' + k + '"]'); return el ? el.value : undefined; };
+    const num = v => { v = String(v == null ? "" : v).trim(); if (v === "") return null; const n = parseInt(v, 10); return isNaN(n) ? null : n; };
+    if (s.type === "ccs") {
+      s.label = get("label").trim(); s.category = get("category"); s.attempt = get("attempt");
+      const sc = num(get("score")); s.score = sc == null ? null : Math.max(0, Math.min(100, sc));
+      const lim = parseInt(get("limitSec"), 10); if (lim > 0) s.limitSec = lim;
+      const used = P.parseMS(get("timeUsedSec")); if (used != null) s.timeUsedSec = Math.min(used, s.limitSec);
+      s.endedBy = s.caseTimed === false ? "none" : (s.timeUsedSec >= s.limitSec ? "clock" : "me");
+      s.missedOrder = get("missedOrder").trim(); s.note = get("note").trim();
+      s.misspelled = get("misspelled").split(/[,;\n]/).map(w => w.trim()).filter(Boolean);
+      s.misspelled.forEach(w => addWord(w, s.label || s.category || "case"));
+    } else {
+      s.label = get("label").trim();
+      const c = num(get("correct")); s.correct = c == null ? null : Math.max(0, Math.min(s.nQ || 20, c));
+      if (s.type === "review") { s.tags = s.tags || {}; ["K", "M", "T", "G"].forEach(l => { const n = num(get("tag" + l)); s.tags[l] = n == null ? 0 : Math.max(0, n); }); }
+    }
+    P.saveSession(s); refresh(); P.syncQuietly();
+  });
+}
+/* A misspelled word from a case edit joins the drill's word list (one record per word, synced like a session). */
+function addWord(word, from) {
+  const w = String(word || "").trim(); if (!w) return;
+  const key = w.toLowerCase().replace(/[^a-z0-9 -]/g, "");
+  if (P.loadSessions().some(x => x.type === "word" && String(x.word || "").toLowerCase() === w.toLowerCase())) return;
+  P.saveSession({ id: "word-" + key.replace(/[^a-z0-9]/g, "-") + "-" + Date.now().toString(36), type: "word", date: new Date().toISOString(), word: w, note: "", from: from || "" });
 }
 function renderSync() {
   const cfg = P.getSync();
@@ -569,7 +627,7 @@ function renderSync() {
   st.textContent = cfg.lastError ? "Last sync failed: " + cfg.lastError : (cfg.lastSync ? "Last synced " + P.fmtDate(new Date(cfg.lastSync).toISOString(), true) + "." : "Token saved. Press Sync now.");
 }
 function refresh() {
-  ALL = P.loadSessions();
+  ALL = P.loadSessions().filter(s => s.type !== "word");
   const list = sessionsIn(range);
   const prevList = range ? ALL.filter(s => { const t = new Date(s.date).getTime(); return t < Date.now() - range * 86400000 && t >= Date.now() - 2 * range * 86400000; }) : [];
   document.querySelectorAll("#filters button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.range === +range)));

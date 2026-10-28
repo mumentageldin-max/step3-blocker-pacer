@@ -118,6 +118,20 @@
 .drill .hint{margin:0;font-size:15px;letter-spacing:.06em;color:var(--muted);overflow-wrap:anywhere}
 .drill .hint b{color:var(--fg);letter-spacing:.12em}
 .keylist div .m{grid-column:1/-1;font-size:12px;color:var(--crit);font-weight:700}
+.lenswitch{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;width:100%}
+.lenswitch .lbl{font-size:12px;color:var(--muted);font-weight:700}
+.lenswitch button{min-height:34px;padding:4px 10px;font-size:13px;font-family:var(--font-num)}
+.lenswitch button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.mywords{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.mywords .row{display:flex;gap:8px;flex-wrap:wrap}
+.mywords input{font:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);flex:1 1 140px;min-width:0}
+.mywords input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.wordlist{list-style:none;margin:0;padding:0;display:grid;gap:4px;max-height:260px;overflow:auto}
+.wordlist li{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--bg)}
+.wordlist li b{font-family:var(--font-num)}
+.wordlist li small{display:block;color:var(--muted);font-size:12px}
+.wordlist li button{min-height:32px;padding:4px 10px;font-size:13px}
+.wordlist li.empty{color:var(--muted);border-style:dashed}
 @media (min-width:820px) and (min-height:520px){
   .clockcard{padding:22px 20px 18px}
 }
@@ -187,8 +201,9 @@
           <div class="rowhead"><h2>Drill</h2><span class="score" id="drillScore"></span></div>
           <div class="form drillopts">
             <label>Set<select id="drillSet">
-              <option value="missed">Missed in my cases · Oct 13–26</option>
-              <option value="all">All orders</option>
+              <option value="missed">Missed in my cases + my words</option>
+              <option value="mine">My misspelled words only</option>
+              <option value="all">All orders + my words</option>
               <option value="proc">Procedures &amp; surgeries</option>
               <option value="med">Drugs</option>
               <option value="lab">Labs</option>
@@ -214,6 +229,16 @@
           <div class="fb" id="drillFb"></div>
           <p class="note" id="drillMissList" hidden></p>
         </div>
+        <div class="mywords" id="mywords">
+          <div class="rowhead"><h2>My misspelled words</h2><span class="score" id="wordsMeta"></span></div>
+          <p class="note">The ccscases feedback doesn't show what you mistyped — write it here while you remember. Spell it correctly; the drill will say it and make you type it. They sync with your cases.</p>
+          <div class="row">
+            <input type="text" id="wordIn" placeholder="word, spelled right" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Word, spelled correctly">
+            <input type="text" id="wordNote" placeholder="what it is (optional)" autocomplete="off" aria-label="What it is">
+            <button type="button" class="small" id="btnWordAdd">Add</button>
+          </div>
+          <ul class="wordlist" id="wordList"></ul>
+        </div>
       </div>
     </details>
   </section>
@@ -236,6 +261,11 @@
       <div class="statetoggle" id="statetoggle">
         <button type="button" data-state="unstable" aria-pressed="false">Unstable · ED</button>
         <button type="button" data-state="stable" aria-pressed="false">Stable · office / ward</button>
+      </div>
+      <div class="lenswitch" id="lenswitch" aria-label="Case length">
+        <span class="lbl">Wrong length? Switch:</span>
+        <button type="button" data-len="750">12:30</button><button type="button" data-len="1500">25:00</button>
+        <button type="button" data-len="600">10:00</button><button type="button" data-len="1200">20:00</button>
       </div>
       <div class="subactions">
         <button id="btnUndo" type="button" disabled>Undo</button>
@@ -305,7 +335,10 @@
     <div class="form">
       <label>Score from the feedback (%)<input type="number" id="dScore" class="scoreinput" min="0" max="100" inputmode="numeric" placeholder="78"></label>
       <label>Case (name or number)<input type="text" id="dLabel" autocomplete="off"></label>
+      <label>Case length (fix it here if it was wrong)<select id="dLen"><option value="750">12:30 · short</option><option value="1500">25:00 · long</option><option value="600">10:00 · 1× short</option><option value="1200">20:00 · 1× long</option></select></label>
+      <label>Time used (mm:ss)<input type="text" id="dUsed" inputmode="numeric" autocomplete="off"></label>
       <label class="wide">The one order you missed<input type="text" id="dMissed" placeholder="e.g. repeat ECG after treatment" autocomplete="off" maxlength="120"></label>
+      <label class="wide">Words you misspelled in this case (comma-separated — they go into the drill)<input type="text" id="dWords" placeholder="e.g. colchicine, ampicillin sulbactam" autocomplete="off" maxlength="300"></label>
       <label class="wide">Note (optional)<input type="text" id="dNote" autocomplete="off" maxlength="200"></label>
     </div>
     <p class="note">One line for the notebook:</p>
@@ -929,6 +962,25 @@ function resumeCase() { // exited by mistake; real time never stopped
   R.phase = "run"; R.endEl = 0; R.endedBy = ""; R.rev = { startAt: 0, limitSec: 0, endAt: 0, warned: false, rang: false };
   P.keepAwake(); persist(); render();
 }
+function setLimit(sec) { // the case turned out to be the other length: keep the elapsed time, re-cut the phases
+  sec = +sec; if (!(sec > 0) || sec === R.limitSec) return;
+  if (R.phase === "run") {
+    const el = elapsed();
+    R.limitSec = sec; S.lastLen = sec; saveSettings();
+    const b = phaseBounds(); b.forEach(ph => { if (ph.start > el) delete R.phaseChimed[ph.k]; });
+    if (sec - el > S.finalSec) R.finalFired = false;
+    buildStrip();
+    if (el >= sec) { finish("clock"); return; }
+    P.sfx("tick"); persist(); render(); return;
+  }
+  if (R.phase === "done") {
+    R.limitSec = sec; S.lastLen = sec; saveSettings();
+    if (R.endEl > sec) R.endEl = sec;
+    if (R.caseTimed !== false) R.endedBy = R.endEl >= sec ? "clock" : "me";
+    if (R.rev.startAt && !R.rev.endAt) R.rev.limitSec = revLimit();
+    persist(); doneRendered = false; markDirty(); render();
+  }
+}
 function revLimit() { return R.limitSec > 750 ? S.revLongSec : S.revShortSec; }
 function startReviewOnly() { // a case run without the pacer: log + feedback timer, no case clock
   R = fresh();
@@ -976,12 +1028,14 @@ function saveCase() {
     id: R.id, type: "ccs", date: R.date, label: R.label, category: R.category, attempt: R.attempt, source: R.source,
     limitSec: R.limitSec, timeUsedSec: Math.round(R.endEl), endedBy: R.endedBy, patient: R.patient,
     score: isNaN(score) ? null : score, missedOrder: $("dMissed").value.trim(), note: $("dNote").value.trim(),
+    misspelled: $("dWords").value.split(/[,;\n]/).map(w => w.trim()).filter(Boolean),
     checks: checks, firstAdvanceSec: checks.adv.state === "done" ? checks.adv.at : null, counselSec: checks.counsel.state === "done" ? checks.counsel.at : null,
     caseTimed: R.caseTimed !== false,
     missedChecks: R.caseTimed === false ? [] : CHECKS.filter(c => !checks[c.k].state).map(c => c.k), endedIn: R.caseTimed === false ? null : phaseAt(Math.max(0, R.endEl - 0.001)).k,
     reviewSec: R.rev.startAt ? Math.round(revElapsed()) : null, reviewLimitSec: R.rev.startAt ? R.rev.limitSec : null
   };
-  P.saveSession(s); P.syncQuietly();
+  s.misspelled.forEach(w => addWord(w, "", R.label || R.category || "case", true));
+  P.saveSession(s); P.syncQuietly(); renderWords();
   R.saved = true; persist();
   $("savedMsg").hidden = false; $("savedMsg").textContent = "Saved to Stats. Change anything above and press Update to re-save.";
   $("btnSave").textContent = "Saved"; $("btnSave").disabled = true;
@@ -1053,6 +1107,7 @@ function render() {
     const card = $("clockcard");
     card.dataset.tone = R.pausedAt ? "paused" : rem <= S.finalSec ? "crit" : ph.k === "close" ? "warn" : "normal";
     $("metaCase").textContent = (R.label ? R.label + " · " : "") + R.category + " · " + (R.attempt === "repeat" ? "repeat" : "first attempt") + " · " + fmt(R.limitSec);
+    document.querySelectorAll("#lenswitch button").forEach(b => { b.setAttribute("aria-pressed", String(+b.dataset.len === R.limitSec)); b.disabled = !!R.pausedAt; });
     $("pill").textContent = R.pausedAt ? "Paused" : ph.name; $("pill").dataset.kind = R.pausedAt ? "idle" : ph.k === "final" ? "crit" : ph.k === "close" ? "warn" : "accent";
     $("phaseText").textContent = R.pausedAt ? "Paused. The real exam has no pause — practice only." : ph.text;
     renderProto(ph);
@@ -1103,7 +1158,7 @@ function renderReview() {
     $("revText").textContent = left <= 60 ? "One minute. Write the one order you missed and the score." : left <= 180 ? "Last three minutes: stop reading, start writing — the one order, the score." : "Reading the feedback: missed orders first, then timing, then the sequence. Not the case again.";
   }
 }
-let doneRendered = false;
+let doneRendered = false, doneFormFor = "";
 function noteLine(score) {
   const d = new Date(R.date), day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const missed = CHECKS.filter(c => !R.checks[c.k]).map(c => c.label.split(" ")[0].toLowerCase());
@@ -1115,7 +1170,8 @@ function renderDone() {
   if (R.caseTimed === false) {
     $("doneStats").innerHTML = "<li>Case run outside the pacer — no case clock or checklist for this one.</li>";
     $("doneChecks").innerHTML = "";
-    $("dLabel").value = R.label; $("dScore").value = ""; $("dMissed").value = ""; $("dNote").value = "";
+    if (doneFormFor !== R.id) { doneFormFor = R.id; $("dLabel").value = R.label; $("dScore").value = ""; $("dMissed").value = ""; $("dNote").value = ""; $("dWords").value = ""; }
+    $("dLen").value = String(R.limitSec); $("dUsed").value = fmt(R.endEl);
     $("btnSave").textContent = "Save case"; $("btnSave").disabled = false; $("savedMsg").hidden = true; $("btnResume").hidden = true;
     $("noteLine").textContent = noteLine(null);
     return;
@@ -1127,7 +1183,8 @@ function renderDone() {
     "<li>First clock advance at <b>" + (adv != null ? fmt(adv) : "—") + "</b> (target before " + fmt(phaseBounds()[1].end) + ")</li>" +
     "<li>Counseling and follow-up at <b>" + (cons != null ? fmt(cons) : "—") + "</b>" + (cons != null && cons > R.limitSec - S.finalSec ? " — inside the final-orders window; earlier next time" : "") + "</li>";
   $("doneChecks").innerHTML = CHECKS.map(c => { const v = R.checks[c.k]; return '<span class="' + (v ? "ok" : "") + '">' + (v ? (v.state === "done" ? "✓ " : "— ") : "✗ ") + P.esc(c.label) + "</span>"; }).join("");
-  $("dLabel").value = R.label; $("dScore").value = ""; $("dMissed").value = ""; $("dNote").value = "";
+  if (doneFormFor !== R.id) { doneFormFor = R.id; $("dLabel").value = R.label; $("dScore").value = ""; $("dMissed").value = ""; $("dNote").value = ""; $("dWords").value = ""; }
+  $("dLen").value = String(R.limitSec); $("dUsed").value = fmt(R.endEl);
   $("btnSave").textContent = "Save case"; $("btnSave").disabled = false; $("savedMsg").hidden = true;
   $("btnResume").hidden = !(R.endedBy !== "clock" && !R.saved && (Date.now() - R.startAt - R.pausedTotal) / 1000 < R.limitSec);
   $("noteLine").textContent = noteLine(null);
@@ -1171,11 +1228,36 @@ function spellTarget(o) {
   if (o.s) return o.s;
   return o.o.replace(/\(.*?\)/g, "").split(/ \/ | — | · | ×/)[0].replace(/\s+/g, " ").trim();
 }
-function spellable(o) { const t = norm(spellTarget(o)); return o.k !== "—" && t.length >= 4 && !/\d/.test(t); }
+function spellable(o) { const t = norm(spellTarget(o)); return o.k !== "—" && t.length >= (o.mine ? 3 : 4) && !/\d/.test(t); }
+/* My misspelled words: one record per word, saved like a session so they sync with the cases. */
+function myWords() { return P.loadSessions().filter(x => x.type === "word" && x.word).sort((a, b) => new Date(b.date) - new Date(a.date)); }
+function addWord(word, note, from, quiet) {
+  const w = String(word || "").trim().replace(/\s+/g, " "); if (!w) return false;
+  if (myWords().some(x => x.word.toLowerCase() === w.toLowerCase())) { if (!quiet) $("wordsMeta").textContent = "already in the list"; return false; }
+  P.saveSession({ id: "word-" + w.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now().toString(36), type: "word", date: new Date().toISOString(), word: w, note: String(note || "").trim(), from: String(from || "").trim() });
+  if (!quiet) { P.syncQuietly(); renderWords(); P.sfx("tick"); }
+  return true;
+}
+function deleteWord(id) { P.deleteSession(id); P.syncQuietly(); renderWords(); }
+function wordAsOrder(x) {
+  const w = x.word.toLowerCase();
+  return { o: x.word, k: w.replace(/[^a-z0-9 ]/g, "").slice(0, Math.min(5, w.length)), s: x.word, d: x.note || (x.from ? "misspelled in " + x.from : "from my list"), g: "mine", w: "", m: "", mine: true };
+}
+function renderWords() {
+  const ul = $("wordList"); if (!ul) return;
+  const ws = myWords();
+  $("wordsMeta").textContent = ws.length + (ws.length === 1 ? " word" : " words") + " in the drill";
+  ul.innerHTML = ws.length ? ws.map(x => "<li><span><b>" + P.esc(x.word) + "</b>" + (x.note || x.from ? "<small>" + P.esc(x.note || "") + (x.note && x.from ? " · " : "") + (x.from ? "case " + P.esc(x.from) : "") + "</small>" : "") + '</span><button type="button" data-w="' + P.esc(x.id) + '">Remove</button></li>').join("") : '<li class="empty">Nothing yet. Add a word, or type them into "Words you misspelled" when you log a case.</li>';
+  ul.querySelectorAll("button[data-w]").forEach(b => b.addEventListener("click", () => deleteWord(b.dataset.w)));
+  const sel = $("drillSet"); if (sel && (D.i >= D.items.length || !D.items.length)) sel.dispatchEvent(new Event("change"));
+}
 function drillPool(set, mode) {
+  const mine = myWords().map(wordAsOrder);
+  if (set === "mine") return mine.filter(o => mode !== "spell" || spellable(o));
   let pool = ORDERS.filter(o => o.k !== "—");
-  if (set === "missed") pool = pool.filter(o => o.m);
-  else if (set !== "all") pool = pool.filter(o => o.g === set);
+  if (set === "missed") pool = pool.filter(o => o.m).concat(mine);
+  else if (set === "all") pool = pool.concat(mine);
+  else pool = pool.filter(o => o.g === set);
   if (mode === "spell") pool = pool.filter(spellable);
   else pool = pool.filter(o => !(set === "all" && o.g === "close"));
   return pool;
@@ -1218,11 +1300,11 @@ function showDrill() {
     const t = spellTarget(o);
     $("drillPrompt").textContent = (D.i + 1) + ". 🔊 Type what you hear.";
     $("drillHint").hidden = false;
-    $("drillHint").innerHTML = "<b>" + P.esc(shape(t)) + "</b>" + (o.d ? " — " + P.esc(o.d) : "") + " · " + P.esc(GROUP_LABEL[o.g] || o.g) + (o.m ? " · missed in case " + P.esc(o.m.replace(/,/g, ", ")) : "");
+    $("drillHint").innerHTML = "<b>" + P.esc(shape(t)) + "</b>" + (o.d ? " — " + P.esc(o.d) : "") + (o.mine ? " · my list" : " · " + P.esc(GROUP_LABEL[o.g] || o.g)) + (o.m ? " · missed in case " + P.esc(o.m.replace(/,/g, ", ")) : "");
     if (!say(t)) $("drillHint").innerHTML += " · (no speech on this device — use the shape)";
   } else {
     $("drillPrompt").textContent = (D.i + 1) + ". " + o.o.replace(/\s*\(.*?\)\s*/g, " ").trim();
-    $("drillHint").hidden = !o.m; if (o.m) $("drillHint").textContent = "missed in case " + o.m.replace(/,/g, ", ");
+    $("drillHint").hidden = !(o.m || o.mine); if (o.m) $("drillHint").textContent = "missed in case " + o.m.replace(/,/g, ", "); else if (o.mine) $("drillHint").textContent = "from my list" + (o.d ? " — " + o.d : "");
   }
   $("drillScore").textContent = D.right + " right · " + D.i + " done · " + D.items.length + " total";
   $("drillIn").value = ""; $("drillFb").textContent = ""; $("drillFb").className = "fb"; D.answered = false;
@@ -1294,7 +1376,14 @@ function init() {
   $("btnResume").addEventListener("click", resumeCase);
   $("btnRevStart").addEventListener("click", startReview);
   $("btnReviewOnly").addEventListener("click", startReviewOnly);
-  ["dScore", "dLabel", "dMissed", "dNote"].forEach(id => $(id).addEventListener("input", markDirty));
+  ["dScore", "dLabel", "dMissed", "dNote", "dWords"].forEach(id => $(id).addEventListener("input", markDirty));
+  $("dLen").addEventListener("change", () => setLimit($("dLen").value));
+  $("dUsed").addEventListener("change", () => { const v = P.parseMS($("dUsed").value); if (v == null || R.phase !== "done") { $("dUsed").value = fmt(R.endEl); return; } R.endEl = Math.min(v, R.limitSec); if (R.caseTimed !== false) R.endedBy = R.endEl >= R.limitSec ? "clock" : "me"; persist(); doneRendered = false; markDirty(); render(); });
+  document.querySelectorAll("#lenswitch button").forEach(b => b.addEventListener("click", () => setLimit(b.dataset.len)));
+  $("btnWordAdd").addEventListener("click", () => { addWord($("wordIn").value, $("wordNote").value, "", false); $("wordIn").value = ""; $("wordNote").value = ""; $("wordIn").focus(); });
+  $("wordIn").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("btnWordAdd").click(); } });
+  $("wordNote").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("btnWordAdd").click(); } });
+  renderWords();
   $("dScore").addEventListener("input", () => { const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v); });
   $("dLabel").addEventListener("input", () => { R.label = $("dLabel").value.trim(); const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v); });
   $("btnCopyLine").addEventListener("click", async e => { const b = e.currentTarget; try { await navigator.clipboard.writeText($("noteLine").textContent); b.textContent = "Copied"; } catch (err) { b.textContent = "Select the line and copy"; } setTimeout(() => { b.textContent = "Copy the line"; }, 2500); });
