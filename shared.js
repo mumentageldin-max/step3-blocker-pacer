@@ -390,7 +390,12 @@ window.Pacer = (() => {
     }
   }
   let notifTimers = [];
-  async function swReg() { try { if (!("serviceWorker" in navigator)) return null; return await navigator.serviceWorker.ready; } catch (e) { return null; } }
+  async function swReg() { // the registration, or null after 1.5 s (no worker registered yet, e.g. a plain Safari tab)
+    try {
+      if (!("serviceWorker" in navigator)) return null;
+      return await Promise.race([navigator.serviceWorker.ready, new Promise(res => setTimeout(() => res(null), 1500))]);
+    } catch (e) { return null; }
+  }
   async function showNotif(ev) {
     const opts = { body: ev.body || "", tag: ev.tag || ev.title, renotify: true, icon: "./icons/icon-192.png", badge: "./icons/icon-192.png",
       vibrate: ev.important ? [300, 120, 300, 120, 600] : [150, 80, 150], requireInteraction: !!ev.important, silent: false, data: { url: location.href } };
