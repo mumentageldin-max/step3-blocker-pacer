@@ -42,27 +42,36 @@
 .mode{display:grid;gap:5px;justify-items:center}
 .modeText{max-width:42ch}
 
-.qcard{display:grid;gap:12px}
+.qcard{display:grid;gap:12px;container-type:inline-size}
 .qrow{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .qnum{display:flex;align-items:baseline;gap:8px;flex:0 0 auto}
 .qlabel{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
 .qbig{font-family:var(--font-num);font-weight:700;font-size:40px;line-height:1;font-variant-numeric:tabular-nums}
 .qof{font-family:var(--font-num);color:var(--muted);font-size:15px}
-.qcue{flex:1 1 auto;min-width:0;font-size:14px;color:var(--muted);line-height:1.3}
+.qcue{min-width:0;font-size:14px;color:var(--muted);line-height:1.3;margin:0}
 .qcue.over{color:var(--crit);font-weight:700}
-.qtimer{position:relative;width:62px;height:62px;flex:0 0 auto}
-.qtimer svg{width:100%;height:100%;transform:rotate(-90deg)}
-.qtimer .track{fill:none;stroke:var(--line);stroke-width:6}
-.qtimer .arc{fill:none;stroke:var(--accent);stroke-width:6;stroke-linecap:round;stroke-dasharray:163.36;stroke-dashoffset:163.36}
-.qtimer .qsec{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--font-num);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
-.qtimer[data-over="1"] .arc{stroke:var(--crit)} .qtimer[data-over="1"] .qsec{color:var(--crit)}
-.qtimer[data-over="0"].near .arc{stroke:var(--warn)}
+/* time on this question: big, m:ss, one color + one word per stage so the color is never the only signal */
+.qtimer{display:grid;justify-items:end;gap:4px;flex:1 1 auto;min-width:0;user-select:none;-webkit-user-select:none}
+.qtime{font-family:var(--font-num);font-weight:700;font-size:clamp(44px,19cqi,112px);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--fg)}
+.qstage{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:2px solid var(--line);color:var(--muted);white-space:nowrap}
+.qtimer[data-stage="idle"] .qtime{color:var(--muted)}
+.qtimer[data-stage="warn1"] .qtime{color:var(--warn)} .qtimer[data-stage="warn1"] .qstage{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
+.qtimer[data-stage="warn2"] .qtime{color:var(--g)} .qtimer[data-stage="warn2"] .qstage{border-color:var(--g);color:var(--g)}
+.qtimer[data-stage="flag"] .qtime{color:var(--t)} .qtimer[data-stage="flag"] .qstage{background:var(--t);border-color:var(--t);color:#fff}
+.qtimer[data-stage="over"] .qtime{color:var(--crit)} .qtimer[data-stage="over"] .qstage{background:var(--crit);border-color:var(--crit);color:var(--on-crit)}
+@media (prefers-reduced-motion: no-preference){
+  .qtimer[data-stage="over"] .qtime{animation:qpulse 1s ease-in-out infinite alternate}
+  @keyframes qpulse{from{opacity:1}to{opacity:.6}}
+}
+.qbar{width:100%;height:8px;border-radius:4px;background:var(--line);position:relative;overflow:hidden}
+.qbar i{position:absolute;inset:0 auto 0 0;width:0;background:var(--accent);border-radius:4px}
+.qtimer[data-stage="warn1"] .qbar i{background:var(--warn)} .qtimer[data-stage="warn2"] .qbar i{background:var(--g)}
+.qtimer[data-stage="flag"] .qbar i{background:var(--t)} .qtimer[data-stage="over"] .qbar i{background:var(--crit)}
 .summary .form{margin-top:4px}
 @media (min-width:820px) and (min-height:520px){
   .clockcard{padding:22px 20px 18px}
   .rail li{padding:10px 8px 9px}
   .qbig{font-size:52px}
-  .qtimer{width:72px;height:72px}
 }
 </style>
 </head>
@@ -110,12 +119,14 @@
           <span class="qbig" id="qnum">1</span>
           <span class="qof" id="qof">/ 20</span>
         </div>
-        <div class="qcue" id="qcue">Easy ones first. Tap when you submit each question.</div>
-        <div class="qtimer" id="qtimer" data-over="0" aria-label="Seconds on this question">
-          <svg viewBox="0 0 60 60" aria-hidden="true"><circle class="track" cx="30" cy="30" r="26"/><circle class="arc" id="arc" cx="30" cy="30" r="26"/></svg>
-          <span class="qsec" id="qsec">0</span>
+        <div class="qtimer" id="qtimer" data-stage="idle" aria-label="Time on this question" aria-live="off">
+          <div class="qtime" id="qtime">0:00</div>
+          <div class="qstage" id="qstage">on this question</div>
+          <div class="qbar" aria-hidden="true"><i id="qbarFill"></i></div>
         </div>
       </div>
+      <p class="qcue" id="qcue">Easy ones first. Tap when you submit each question.</p>
+      <p class="livestatus" id="liveStatus"></p>
       <div class="actions">
         <button class="primary" id="btnDone" type="button" disabled>Q1 answered</button>
         <button class="secondary" id="btnFlag" type="button" disabled>Q1 flagged</button>
@@ -126,6 +137,7 @@
         <button id="btnReset" type="button" disabled>Reset</button>
         <button id="btnSound" type="button" aria-pressed="true">Sound on</button>
       </div>
+      <div class="formrow" id="pipRow" hidden><button id="btnPip" type="button" class="small">Float the timer</button><span class="note">A small clock that stays on top of UWorld.</span></div>
     </section>
 
     <section class="summary" id="summary" hidden>
@@ -160,7 +172,8 @@
           <li><b>2:00 left</b> → fill every blank with a guess. Never leave a blank.</li>
           <li>The block ends by itself at 0:00, or when you tap the last question (with flags: when the last flag is resolved). Tapped by mistake? Undo, or "back into the block" on the summary.</li>
         </ol>
-        <p class="note">Keep this app visible beside UWorld (split screen) so the chimes can fire; a hidden app is paused by the phone. Keys when a keyboard is attached: <kbd>Space</kbd> answered · <kbd>F</kbd> flagged · <kbd>P</kbd> pause/resume · <kbd>Z</kbd> undo.</p>
+        <p class="note">The time on this question is shown in minutes: amber at 1:00, orange at 1:30, red at 1:52 (the 37:30 ÷ 20 budget) with its own soft sound once per question; violet "flag &amp; move" at 0:50 after a behind checkpoint.</p>
+        <p class="note">Hidden app: iPad — open the pacer from the Home Screen icon and allow notifications, otherwise keep it in split screen (a hidden web app on iPad cannot play sound). Android — notifications plus "Keep running in the background" in Settings. Mac — notifications. Whatever happens while it is hidden is caught up the moment you come back. Keys when a keyboard is attached: <kbd>Space</kbd> answered · <kbd>F</kbd> flagged · <kbd>P</kbd> pause/resume · <kbd>Z</kbd> undo.</p>
       </div>
     </details>
 
@@ -190,6 +203,8 @@
             <span class="note" id="settingsMsg"></span>
           </div>
         </fieldset>
+        <div class="rowhead"><h2>Background &amp; sound</h2><span class="meta">Shared by all pacer pages</span></div>
+        <div id="bgSettings"></div>
         <p class="note" id="settingsLock" hidden>Settings unlock when the block is reset or finished.</p>
         <p class="note" id="installNote" hidden>To install: iPad Safari → Share → Add to Home Screen. Galaxy Fold → browser menu → Install app. Mac → Safari File → Add to Dock, or Chrome's install button.</p>
       </div>
@@ -220,9 +235,18 @@ let resetArmed = 0, summaryRenderedFor = "";
 
 function freshRun() {
   return { phase: "idle", sid: "", startAt: 0, pausedAt: 0, pausedTotal: 0, q: 1, qStartEl: 0, taps: [], cps: {},
-    mode: "first", flagged: 0, reviewLeft: 0, fillFired: false, chimed: false, endEl: 0, verdict: null, label: "", correct: null, endedBy: "" };
+    mode: "first", flagged: 0, reviewLeft: 0, fillFired: false, chimed: false, budgetChimed: false, endQuiet: false, endEl: 0, verdict: null, label: "", correct: null, endedBy: "", updatedAt: 0 };
 }
 function qs() { return checkpointQs(S.nQ, S.every); }
+function budgetSec() { return Math.floor(S.blockSec / S.nQ); }   // 37:30 ÷ 20 = 112.5 s → 1:52 per question
+function stageOf(qEl) {                              // [stage, label] for the time on this question
+  const b = budgetSec(), w1 = Math.min(60, b * 0.55), w2 = Math.min(90, b * 0.8);
+  if (qEl >= b) return ["over", fmt(b) + " · over budget · move"];
+  if (R.mode === "flag50" && qEl >= S.flagSec) return ["flag", "flag & move"];
+  if (qEl >= w2) return ["warn2", fmt(w2) + " · commit"];
+  if (qEl >= w1) return ["warn1", fmt(w1) + " · decide"];
+  return ["calm", "on this question"];
+}
 
 /* ---------- storage ---------- */
 function loadSettings() {
@@ -232,7 +256,7 @@ function loadSettings() {
   P.setSound(S.sound);
 }
 function saveSettings() { P.writeJSON(LS_S, S); }
-function persistRun() { P.writeJSON(LS_R, R); }
+function persistRun() { R.updatedAt = Date.now(); P.writeJSON(LS_R, R); P.live.touch(); }
 function loadRun() {
   const p = P.readJSON(LS_R, null);
   if (!p || (p.phase !== "running" && p.phase !== "paused" && p.phase !== "done")) return;
@@ -253,10 +277,10 @@ function elapsedMs(now) {
 function startPause() {
   if (R.phase === "idle") {
     R = freshRun(); R.phase = "running"; R.startAt = Date.now(); R.sid = P.newId();
-    P.audioInit(); P.sfx("start"); P.keepAwake();
+    P.audioInit(); P.sfx("start"); P.keepAwake(); P.bg.runStart("block running");
     $("rulesFold").open = false;
   } else if (R.phase === "paused") {
-    R.pausedTotal += Date.now() - R.pausedAt; R.pausedAt = 0; R.phase = "running"; P.keepAwake();
+    R.pausedTotal += Date.now() - R.pausedAt; R.pausedAt = 0; R.phase = "running"; P.keepAwake(); P.bg.runStart("block running");
   } else if (R.phase === "running") {
     R.phase = "paused"; R.pausedAt = Date.now();
   } else if (R.phase === "done") {
@@ -284,7 +308,7 @@ function tap(flagged) {
     if (q >= S.nQ) { R.mode = "review"; R.reviewLeft = R.flagged; P.sfx(rem > 0 ? "ahead" : "behind"); }
     else { R.mode = v.delta < 0 ? "flag50" : "first"; P.sfx(v.kind); P.vibrate(v.kind === "behind" ? [150, 80, 150, 80, 150] : [80]); }
   }
-  R.chimed = false;
+  R.chimed = false; R.budgetChimed = false;
   if (q < S.nQ) { R.q = q + 1; R.qStartEl = el; } else { R.q = S.nQ + 1; }
   if (q >= S.nQ && (R.flagged === 0 || S.endAtLast)) { finishBlock(el, "last"); return; }
   persistRun(); render();
@@ -300,13 +324,14 @@ function undo() {
   R.qStartEl = R.taps.length ? R.taps[R.taps.length - 1].el : 0;
   let mode = "first";
   for (const cq of qs()) if (cq < t.q && R.cps[cq]) mode = R.cps[cq].delta < 0 ? "flag50" : "first";
-  R.mode = mode; R.reviewLeft = 0; R.verdict = null; R.chimed = false;
+  R.mode = mode; R.reviewLeft = 0; R.verdict = null; R.chimed = false; R.budgetChimed = false;
   persistRun(); render();
 }
 function finishBlock(endEl, by) {
   R.endEl = endEl; R.phase = "done"; R.verdict = null; R.endedBy = by || "me";
-  P.sfx("end"); P.releaseWake();
-  saveBlockSession(); persistRun(); render();
+  if (!R.endQuiet) P.sfx("end"); R.endQuiet = false;
+  P.releaseWake(); P.bg.runEnd();
+  saveBlockSession(); persistRun(); P.live.clear(); render();
 }
 function endBlock() { if (R.phase === "idle" || R.phase === "done") return; finishBlock(elapsedMs(), "me"); }
 function reopenBlock() { // the block ended on a tap you didn't mean; the clock never stopped
@@ -318,7 +343,7 @@ function reopenBlock() { // the block ended on a tap you didn't mean; the clock 
   P.keepAwake(); persistRun(); render();
 }
 function reset() {
-  if (resetArmed && Date.now() - resetArmed < 3500) { resetArmed = 0; R = freshRun(); P.releaseWake(); persistRun(); render(); return; }
+  if (resetArmed && Date.now() - resetArmed < 3500) { resetArmed = 0; R = freshRun(); P.releaseWake(); P.bg.runEnd(); persistRun(); render(); return; }
   resetArmed = Date.now(); render();
   setTimeout(() => { if (resetArmed && Date.now() - resetArmed >= 3500) { resetArmed = 0; render(); } }, 3600);
 }
@@ -349,9 +374,27 @@ function tick() {
       if (R.mode === "flag50" || S.chimeEvery) { P.sfx("flag"); P.vibrate([120, 60, 120]); }
       persistRun();
     }
+    if (R.mode !== "review" && !R.budgetChimed && (el - R.qStartEl) / 1000 >= budgetSec()) {
+      R.budgetChimed = true; P.sfx("budget"); P.vibrate([90, 60, 90]); persistRun();   // 1:52: once per question, soft
+    }
     if (rem <= 0) { P.vibrate([600]); finishBlock(S.blockSec * 1000, "clock"); return; }
   }
   render();
+}
+/* Every time-based event of the running block, in block seconds. Used for the catch-up after the page was hidden
+   and for the notifications scheduled while it is hidden. mark() = "already chimed", so tick() stays quiet. */
+function events() {
+  if (R.phase !== "running") return [];
+  const out = [], budget = budgetSec();
+  if (R.mode !== "review") {
+    const q = Math.min(R.q, S.nQ);
+    if (R.mode === "flag50" || S.chimeEvery) out.push({ el: R.qStartEl / 1000 + S.flagSec, tag: "flag" + q, title: "Q" + q + ": " + S.flagSec + " s — flag & move", sfx: "flag", fired: () => R.chimed, mark: () => { R.chimed = true; } });
+    out.push({ el: R.qStartEl / 1000 + budget, tag: "budget" + q, title: "Q" + q + ": " + fmt(budget) + " budget passed", body: "Best answer, move on.", sfx: "budget", fired: () => R.budgetChimed, mark: () => { R.budgetChimed = true; } });
+    qs().forEach((cq, i) => { if (cq >= R.q && cq < S.nQ) out.push({ el: S.blockSec - (S.targets[i] || 0), tag: "cp" + cq, title: "Q" + cq + " target passed (clock " + fmt(S.targets[i] || 0) + ")", body: "Tap the checkpoint when Q" + cq + " is in." }); });
+  }
+  out.push({ el: S.blockSec - S.fillSec, tag: "fill", title: fmt(S.fillSec) + " left — fill every blank", body: "Never leave a blank.", sfx: "fill", important: true, fired: () => R.fillFired, mark: () => { R.fillFired = true; } });
+  out.push({ el: S.blockSec, tag: "end", title: "Block over — 0:00", body: "Come back to the pacer for the summary.", sfx: "end", important: true, mark: () => { R.endQuiet = true; } });
+  return out.sort((a, b) => a.el - b.el);
 }
 
 /* ---------- render ---------- */
@@ -427,20 +470,22 @@ function render() {
     else { cd.textContent = ""; if (live && !inReview && q === nextCp) li.classList.add("current"); }
   });
 
-  const qnum = $("qnum"), qcue = $("qcue"), qt = $("qtimer"), qsec = $("qsec"), arc = $("arc"), C = 163.36;
+  const qnum = $("qnum"), qcue = $("qcue"), qt = $("qtimer"), qtime = $("qtime"), qstage = $("qstage"), qbar = $("qbarFill");
   if (inReview || R.phase === "done") {
     qnum.textContent = inReview && R.phase !== "done" ? "✓" : String(Math.min(S.nQ, R.taps.length));
-    arc.style.strokeDashoffset = C; qsec.textContent = "—"; qt.dataset.over = "0"; qt.classList.remove("near");
+    qtime.textContent = R.phase === "done" ? "—" : fmt(rem); qstage.textContent = R.phase === "done" ? "finished" : "for the flags"; qt.dataset.stage = "idle"; qbar.style.width = "0%";
     qcue.className = "qcue"; qcue.textContent = R.phase === "done" ? "Block finished." : "Each tap = one flagged question resolved.";
   } else {
     qnum.textContent = String(R.q);
-    const qEl = live ? Math.max(0, (el - R.qStartEl) / 1000) : 0, frac = Math.min(1, qEl / S.flagSec);
-    arc.style.strokeDashoffset = C * (1 - frac);
-    qsec.textContent = qEl < 100 ? String(Math.floor(qEl)) : fmt(qEl);
-    const over = qEl >= S.flagSec;
-    qt.dataset.over = over ? "1" : "0"; qt.classList.toggle("near", !over && qEl >= S.flagSec * 0.7);
-    qcue.className = "qcue" + (over ? " over" : "");
-    if (!live) qcue.textContent = "Easy ones first. Tap when you submit each question.";
+    const qEl = live ? Math.max(0, (el - R.qStartEl) / 1000) : 0, budget = budgetSec();
+    const st = live ? stageOf(qEl) : ["idle", "on this question"];
+    qtime.textContent = fmt(Math.floor(qEl));
+    qstage.textContent = st[1]; qt.dataset.stage = R.phase === "paused" ? "idle" : st[0];
+    qbar.style.width = Math.min(100, qEl / budget * 100) + "%";
+    const over = qEl >= S.flagSec && (R.mode === "flag50" || S.chimeEvery);
+    qcue.className = "qcue" + (st[0] === "over" || st[0] === "flag" ? " over" : "");
+    if (!live) qcue.textContent = "Easy ones first. Tap when you submit each question. Budget " + fmt(budget) + " per question.";
+    else if (st[0] === "over") qcue.textContent = "Over " + fmt(budget) + ". Best answer, move. Flags get the banked time after Q" + S.nQ + ".";
     else if (over) qcue.textContent = R.mode === "flag50" ? S.flagSec + " s — flag, best answer, move." : S.flagSec + " s. No big picture? Flag, best guess, move.";
     else qcue.textContent = R.mode === "flag50" ? "Skim mode. Flag at " + S.flagSec + " s, no exceptions." : "Tap when you submit this question.";
   }
@@ -547,7 +592,35 @@ function init() {
     else if (e.key === "p" || e.key === "P") startPause();
     else if (e.key === "z" || e.key === "Z") undo();
   });
+  /* background layers: catch-up on return, notifications while hidden, keep-alive, floating timer */
+  P.bg.bind({
+    type: "block", running: () => R.phase === "running", events: events,
+    elapsedAt: ts => elapsedMs(ts) / 1000, epochOf: el => R.startAt + R.pausedTotal + el * 1000,
+    label: () => "Block · Q" + Math.min(R.q, S.nQ) + " of " + S.nQ,
+    after: () => { persistRun(); render(); }
+  });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { if (R.phase === "running") P.keepAwake(); tick(); } });
+  P.renderBgSettings($("bgSettings"));
+  if (P.pipSupported()) {
+    $("pipRow").hidden = false;
+    $("btnPip").addEventListener("click", async () => {
+      if (P.pipActive()) { await P.pipStop(); $("btnPip").textContent = "Float the timer"; return; }
+      const ok = await P.pipStart(() => {
+        const now = Date.now(), el = elapsedMs(now), rem = Math.max(0, S.blockSec - el / 1000);
+        const qEl = R.phase === "running" || R.phase === "paused" ? Math.max(0, (el - R.qStartEl) / 1000) : 0, st = R.phase === "running" ? stageOf(qEl) : ["idle", ""];
+        const col = { warn1: "#E0A000", warn2: "#D07E35", flag: "#9D6FE0", over: "#FF6B70" }[st[0]];
+        return { clock: R.phase === "idle" ? fmt(S.blockSec) : R.mode === "review" ? fmt(Math.ceil(rem)) : fmt(Math.floor(qEl)), label: R.phase === "idle" ? "Block pacer" : R.mode === "review" ? "flags · " + fmt(Math.ceil(rem)) + " left" : "Q" + Math.min(R.q, S.nQ) + " · " + st[1] + " · " + fmt(Math.ceil(rem)) + " left", color: col };
+      });
+      $("btnPip").textContent = ok ? "Stop floating" : "Float the timer";
+    });
+  }
+  /* live sync: pick up a block started on another device */
+  P.live.bind({
+    type: "block", noun: "block", statusEl: $("liveStatus"), get: () => R, idOf: s => s && s.sid,
+    active: () => R.phase === "running" || R.phase === "paused",
+    apply: state => { R = Object.assign(freshRun(), state); resetArmed = 0; summaryRenderedFor = ""; P.writeJSON(LS_R, R); if (R.phase === "running") { P.keepAwake(); P.bg.runStart("block running"); } render(); }
+  });
+  if (R.phase === "running") P.bg.runStart("block running");
   $("installNote").hidden = P.standalone();
   setInterval(tick, 250);
   render();

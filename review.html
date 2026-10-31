@@ -156,6 +156,7 @@
       <button id="btnEnd" type="button">End review</button>
       <button id="btnSound" type="button" aria-pressed="true">Sound on</button>
     </div>
+    <div class="row" style="justify-content:space-between"><p class="livestatus" id="liveStatus"></p><button id="btnPip" type="button" class="small" hidden>Float the timer</button></div>
   </section>
 
   <div class="colL" id="colL" hidden>
@@ -222,6 +223,7 @@
           <li><b>Pressed the wrong button?</b> "Change choice" sends the running question back to the chooser; the clock on that question keeps counting. "Undo last question" reopens the one you just closed.</li>
           <li><b>Not allowed:</b> UWorld library, a new sheet, YouTube, a podcast, a "quick" lookup, Claude per question. Parking lot instead.</li>
         </ol>
+        <p class="note">Hidden app: iPad — open the pacer from the Home Screen icon and allow notifications, otherwise keep it in split screen beside UWorld (a hidden web app on iPad cannot play sound). Android — notifications plus "Keep running in the background" in Settings. Mac — notifications. A chunk that ended while the app was hidden is caught up when you come back: Timer A stops at the chunk end, not when you return.</p>
         <p class="note">Keys: <kbd>W</kbd> wrong · <kbd>C</kbd> correct · <kbd>L</kbd> lucky · <kbd>K</kbd> <kbd>M</kbd> <kbd>T</kbd> <kbd>G</kbd> tag · <kbd>E</kbd> +3:00 · <kbd>N</kbd> next · <kbd>B</kbd> change choice · <kbd>Z</kbd> undo last · <kbd>P</kbd> pause.</p>
       </div>
     </details>
@@ -246,6 +248,8 @@
           </div>
         </fieldset>
         <p class="note" id="settingsLock" hidden>Settings unlock when the review is finished.</p>
+        <div class="rowhead"><h2>Background &amp; sound</h2><span class="meta">Shared by all pacer pages</span></div>
+        <div id="bgSettings"></div>
       </div>
     </details>
   </div>
@@ -291,13 +295,13 @@ function fresh() {
   return { phase: "setup", id: "", date: "", label: "", nQ: 20, correct: null, wrongTotal: null, mode: "full", blockId: null,
     startAt: 0, pausedAt: 0, pausedTotal: 0, pauseKind: "", standStartAt: 0, standChimed: false, standsDone: 0, manualStands: 0,
     q: null, items: [], tags: { K: 0, M: 0, T: 0, G: 0 }, wrongDone: 0, correctDone: 0, lucky: 0, swept: 0,
-    stopped: false, sweepStartAt: 0, endEl: 0, pendingStartEl: null };
+    stopped: false, sweepStartAt: 0, endEl: 0, pendingStartEl: null, quietStand: false, quietStop: false, updatedAt: 0 };
 }
 
 /* ---------- storage ---------- */
 function loadSettings() { const p = P.readJSON(LS_S, null); if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p); P.setSound(S.sound); }
 function saveSettings() { P.writeJSON(LS_S, S); }
-function persist() { P.writeJSON(LS_R, R); }
+function persist() { R.updatedAt = Date.now(); P.writeJSON(LS_R, R); P.live.touch(); }
 function loadRun() {
   const p = P.readJSON(LS_R, null);
   if (!p || (p.phase !== "run" && p.phase !== "sweep")) return;
@@ -340,7 +344,7 @@ function startReview() {
   R.blockId = pickedBlock || null;
   R.startAt = Date.now();
   if (R.mode === "eo") startItem("eo");
-  P.audioInit(); P.sfx("start"); P.keepAwake();
+  P.audioInit(); P.sfx("start"); P.keepAwake(); P.bg.runStart("review running");
   $("rulesFold").open = false;
   persist(); render();
 }
@@ -433,9 +437,9 @@ function nextSweep() {
   R.q = { kind: "sweep", startEl: 0, startAt: Date.now(), ext: false, rang: false, hardRang: false };
   persist(); render();
 }
-function pause(kind) {
+function pause(kind, at) { // at: the moment the pause really began (a chunk end reached while the page was hidden)
   if (R.phase !== "run" || R.pauseKind) return;
-  R.pauseKind = kind; R.pausedAt = Date.now();
+  R.pauseKind = kind; R.pausedAt = at || Date.now();
   if (kind === "stand") {
     R.standStartAt = R.pausedAt; R.standChimed = false;
     if (!R.auto) {
@@ -450,7 +454,7 @@ function pause(kind) {
 function resume() {
   if (R.phase !== "run" || !R.pauseKind) return;
   R.pausedTotal += Date.now() - R.pausedAt; R.pausedAt = 0; R.pauseKind = ""; R.standStartAt = 0;
-  P.keepAwake(); persist(); render();
+  P.keepAwake(); P.bg.runStart("review running"); persist(); render();
 }
 function hardStop() {
   const now = Date.now();
@@ -458,7 +462,7 @@ function hardStop() {
   // an open correct item just closes; an open wrong item is closed as a sweep item (EO only from here on)
   if (R.q && (R.q.kind === "wrong" || R.q.kind === "lucky")) { R.q.kind = "sweep"; R.q.startAt = now; }
   else closeCurrent(now, null);
-  P.sfx("stop"); P.vibrate([400, 120, 400]);
+  if (!R.quietStop) P.sfx("stop"); R.quietStop = false; P.vibrate([400, 120, 400]);
   const left = remainingAll();
   if (S.atStop === "end") { R.phase = "done"; }
   else if (left == null || left > 0) { R.phase = "sweep"; R.pauseKind = ""; if (!R.q) R.q = { kind: "sweep", startEl: 0, startAt: now, ext: false, rang: false, hardRang: false }; }
@@ -471,9 +475,9 @@ function finish() {
   if (R.q && (R.q.kind === "wrong" || R.q.kind === "lucky")) { R.q.kind = "sweep"; R.q.startAt = R.q.startAt || now; }
   closeCurrent(now, null);
   R.phase = "done";
-  P.sfx("end"); P.releaseWake();
+  P.sfx("end"); P.releaseWake(); P.bg.runEnd();
   saveReview();
-  persist(); render();
+  persist(); P.live.clear(); render();
 }
 function endReview() {
   if (R.phase !== "run" && R.phase !== "sweep") return;
@@ -509,8 +513,9 @@ function tick() {
     if (!R.pauseKind) {
       // chunk ends → automatic stand (first two chunk ends only)
       if (R.standsDone < 2 && el >= S.chunkSec * (R.standsDone + 1) && el < S.limitSec) {
-        R.standsDone++; R.auto = true; P.sfx("stand"); P.vibrate([200, 100, 200]);
-        pause("stand"); return;
+        const over = el - S.chunkSec * (R.standsDone + 1);   // reached while the page was hidden: the stand began at the chunk end
+        R.standsDone++; R.auto = true; if (!R.quietStand) P.sfx("stand"); R.quietStand = false; P.vibrate([200, 100, 200]);
+        pause("stand", over > 3 ? now - over * 1000 : now); return;
       }
       if (el >= S.limitSec) { hardStop(); return; }
       // Timer B
@@ -533,6 +538,30 @@ function tick() {
     if (rem <= 0 && !R.q.rang) { R.q.rang = true; P.sfx("tick"); persist(); }
   }
   render();
+}
+/* Time-based events of the running review, on whichever clock is running: Timer A (review seconds), the stand
+   (stand seconds) or the sweep item. The catch-up after the page was hidden and the notifications while it is
+   hidden read this list; mark() = "already chimed", so tick() stays quiet. */
+function bgMode() { if (R.phase === "run" && !R.pauseKind) return "A"; if (R.phase === "run" && R.pauseKind === "stand") return "stand"; if (R.phase === "sweep" && R.q) return "sweep"; return ""; }
+function bgRunning() { const m = bgMode(); return m === "A" || (m === "stand" && !R.standChimed) || m === "sweep"; }
+function bgElapsedAt(ts) { const m = bgMode(); if (m === "A") return Math.max(0, (ts - R.startAt - R.pausedTotal) / 1000); if (m === "stand") return (ts - R.standStartAt) / 1000; if (m === "sweep") return (ts - R.q.startAt) / 1000; return 0; }
+function bgEpochOf(el) { const m = bgMode(); return (m === "A" ? R.startAt + R.pausedTotal : m === "stand" ? R.standStartAt : R.q ? R.q.startAt : Date.now()) + el * 1000; }
+function events() {
+  const m = bgMode(), out = [];
+  if (m === "A") {
+    if (R.standsDone < 2) { const b = S.chunkSec * (R.standsDone + 1); if (b < S.limitSec) out.push({ el: b, tag: "chunk" + (R.standsDone + 1), title: "Chunk " + (R.standsDone + 1) + " over — stand", body: "Timer A stopped at the chunk end. Walk, water, no phone.", sfx: "stand", important: true, mark: () => { R.quietStand = true; } }); }
+    out.push({ el: S.limitSec, tag: "stop", title: fmt(S.limitSec) + " hard stop", body: S.atStop === "end" ? "The review is over." : "Educational Objective only from here, 30 s each.", sfx: "stop", important: true, mark: () => { R.quietStop = true; } });
+    if (R.q) {
+      const k = R.q.kind, quick = k === "correct" || k === "eo";
+      out.push({ el: R.q.startEl / 1000 + qBudget(), tag: "timerB", title: quick ? S.eoSec + " s are up — next" : R.q.ext ? fmt(S.bSec + S.extSec) + " — move. Tag it and go" : "Timer B rang — tag it and move, or +" + fmt(S.extSec) + " once",
+        sfx: quick ? "tick" : R.q.ext ? "hardmove" : "move", fired: () => !!(R.q && R.q.rang), mark: () => { if (R.q) { R.q.rang = true; if (R.q.ext) R.q.hardRang = true; } } });
+    }
+  } else if (m === "stand") {
+    out.push({ el: S.standSec, tag: "standover", title: "Stand over — sit back down", body: "Press Resume at the desk.", sfx: "resume", important: true, fired: () => R.standChimed, mark: () => { R.standChimed = true; } });
+  } else if (m === "sweep") {
+    out.push({ el: S.eoSec, tag: "sweep", title: S.eoSec + " s — next (K)", sfx: "tick", fired: () => !!(R.q && R.q.rang), mark: () => { if (R.q) R.q.rang = true; } });
+  }
+  return out.sort((a, b) => a.el - b.el);
 }
 
 /* ---------- render ---------- */
@@ -806,7 +835,38 @@ function init() {
     else if (k === "n" || e.code === "Space") { e.preventDefault(); next(); }
     else if (k === "p") pause("pause");
   });
+  /* background layers: catch-up on return, notifications while hidden, keep-alive, floating timer */
+  P.bg.bind({
+    type: "review", running: bgRunning, events: events, elapsedAt: bgElapsedAt, epochOf: bgEpochOf,
+    label: () => "Review" + (R.label ? " · " + R.label : "") + " · " + (R.wrongDone + R.correctDone) + " of " + R.nQ,
+    after: () => { persist(); render(); }
+  });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { if (R.phase === "run" && !R.pauseKind) P.keepAwake(); tick(); } });
+  P.renderBgSettings($("bgSettings"));
+  if (P.pipSupported()) {
+    $("btnPip").hidden = false;
+    $("btnPip").addEventListener("click", async () => {
+      if (P.pipActive()) { await P.pipStop(); $("btnPip").textContent = "Float the timer"; return; }
+      const ok = await P.pipStart(() => {
+        const now = Date.now();
+        if (R.phase === "setup" || R.phase === "done") return { clock: "—", label: "Review pacer" };
+        const remA = Math.max(0, S.limitSec - elA(now) / 1000);
+        if (R.pauseKind === "stand") { const left = S.standSec - (now - R.standStartAt) / 1000; return { clock: left >= 0 ? fmt(Math.ceil(left)) : "+" + fmt(-left), label: "stand · then resume", color: left < 0 ? "#FF6B70" : "#4FCF8E" }; }
+        if (R.pauseKind) return { clock: fmt(Math.ceil(remA)), label: "paused" };
+        if (!R.q) return { clock: fmt(Math.ceil(remA)), label: "Timer A · pick the next question" };
+        const rem = qBudget() - qElapsedSec(now), over = rem < 0;
+        return { clock: over ? "+" + fmt(-rem) : fmt(Math.ceil(rem)), label: (R.q.kind === "correct" || R.q.kind === "eo" ? "correct · EO only" : R.q.kind === "sweep" ? "sweep · K" : "wrong · tag it") + " · A " + fmt(Math.ceil(remA)), color: over ? "#FF6B70" : rem <= 60 ? "#F2B13F" : undefined };
+      });
+      $("btnPip").textContent = ok ? "Stop floating" : "Float the timer";
+    });
+  }
+  /* live sync: pick up a review started on another device */
+  P.live.bind({
+    type: "review", noun: "review", statusEl: $("liveStatus"), get: () => R, idOf: s => s && s.id,
+    active: () => R.phase === "run" || R.phase === "sweep",
+    apply: state => { R = Object.assign(fresh(), state); endArmed = 0; doneRenderedFor = ""; P.writeJSON(LS_R, R); if (R.phase === "run" && !R.pauseKind) { P.keepAwake(); P.bg.runStart("review running"); } renderPicks(); render(); }
+  });
+  if (R.phase === "run" && !R.pauseKind) P.bg.runStart("review running");
   setInterval(tick, 250);
   render();
 }
