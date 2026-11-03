@@ -42,17 +42,20 @@
 .mode{display:grid;gap:5px;justify-items:center}
 .modeText{max-width:42ch}
 
-.qcard{display:grid;gap:12px;container-type:inline-size}
-.qrow{display:flex;justify-content:space-between;align-items:center;gap:12px}
+/* The question card: the same shape as the clock card (big number → bar → pill → one line), so the eye
+   reads both the same way. Q number top-left, time on this question centered and big. */
+.qcard{display:grid;gap:12px;container-type:inline-size;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px 14px}
+.qrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .qnum{display:flex;align-items:baseline;gap:8px;flex:0 0 auto}
 .qlabel{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
 .qbig{font-family:var(--font-num);font-weight:700;font-size:40px;line-height:1;font-variant-numeric:tabular-nums}
 .qof{font-family:var(--font-num);color:var(--muted);font-size:15px}
-.qcue{min-width:0;font-size:14px;color:var(--muted);line-height:1.3;margin:0}
+.qhint{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;white-space:nowrap}
+.qcue{min-width:0;font-size:15px;color:var(--muted);line-height:1.3;margin:0;text-align:center;text-wrap:balance}
 .qcue.over{color:var(--crit);font-weight:700}
 /* time on this question: big, m:ss, one color + one word per stage so the color is never the only signal */
-.qtimer{display:grid;justify-items:end;gap:4px;flex:1 1 auto;min-width:0;user-select:none;-webkit-user-select:none}
-.qtime{font-family:var(--font-num);font-weight:700;font-size:clamp(44px,19cqi,112px);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--fg)}
+.qtimer{display:grid;justify-items:center;gap:8px;min-width:0;user-select:none;-webkit-user-select:none}
+.qtime{font-family:var(--font-num);font-weight:700;font-size:clamp(56px,22cqi,132px);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--fg)}
 .qstage{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:2px solid var(--line);color:var(--muted);white-space:nowrap}
 .qtimer[data-stage="idle"] .qtime{color:var(--muted)}
 .qtimer[data-stage="warn1"] .qtime{color:var(--warn)} .qtimer[data-stage="warn1"] .qstage{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
@@ -63,14 +66,21 @@
   .qtimer[data-stage="over"] .qtime{animation:qpulse 1s ease-in-out infinite alternate}
   @keyframes qpulse{from{opacity:1}to{opacity:.6}}
 }
-.qbar{width:100%;height:8px;border-radius:4px;background:var(--line);position:relative;overflow:hidden}
-.qbar i{position:absolute;inset:0 auto 0 0;width:0;background:var(--accent);border-radius:4px}
+.qbar{width:100%;height:10px;border-radius:5px;background:var(--line);position:relative;overflow:hidden;margin-top:4px}
+.qbar i{position:absolute;inset:0 auto 0 0;width:0;background:var(--accent);border-radius:5px}
 .qtimer[data-stage="warn1"] .qbar i{background:var(--warn)} .qtimer[data-stage="warn2"] .qbar i{background:var(--g)}
 .qtimer[data-stage="flag"] .qbar i{background:var(--t)} .qtimer[data-stage="over"] .qbar i{background:var(--crit)}
 .summary .form{margin-top:4px}
+/* Wide screens: the question card (what you tap and watch) top-left under the shortcuts, the block clock and
+   checkpoints to its right. Rows 1–3 are the title, the page switcher and the shortcuts. */
 @media (min-width:820px) and (min-height:520px){
+  .colR{grid-column:1;grid-row:4}
+  .colL{grid-column:2;grid-row:4}
+  .rail{grid-template-columns:repeat(auto-fit,minmax(112px,1fr))}
   .clockcard{padding:22px 20px 18px}
+  .clock{font-size:clamp(48px,19cqi,124px)}
   .rail li{padding:10px 8px 9px}
+  .qcard{padding:18px 20px 18px}
   .qbig{font-size:52px}
 }
 </style>
@@ -119,11 +129,12 @@
           <span class="qbig" id="qnum">1</span>
           <span class="qof" id="qof">/ 20</span>
         </div>
-        <div class="qtimer" id="qtimer" data-stage="idle" aria-label="Time on this question" aria-live="off">
-          <div class="qtime" id="qtime">0:00</div>
-          <div class="qstage" id="qstage">on this question</div>
-          <div class="qbar" aria-hidden="true"><i id="qbarFill"></i></div>
-        </div>
+        <span class="qhint" id="qhint">budget 1:52 each</span>
+      </div>
+      <div class="qtimer" id="qtimer" data-stage="idle" aria-label="Time on this question" aria-live="off">
+        <div class="qtime" id="qtime">0:00</div>
+        <div class="qbar" aria-hidden="true"><i id="qbarFill"></i></div>
+        <div class="qstage" id="qstage">on this question</div>
       </div>
       <p class="qcue" id="qcue">Easy ones first. Tap when you submit each question.</p>
       <p class="livestatus" id="liveStatus"></p>
@@ -412,6 +423,7 @@ function buildRail() {
   $("tagline").textContent = S.nQ + " Q in " + fmt(S.blockSec) + " — by checkpoint, not per question";
   $("scratch").textContent = list.map((q, i) => "Q" + q + " → " + fmt(S.targets[i] || 0)).join("    ");
   $("qof").textContent = "/ " + S.nQ;
+  $("qhint").textContent = "budget " + fmt(budgetSec()) + " each";
   $("fBlock").value = fmt(S.blockSec); $("fN").value = S.nQ; $("fEvery").value = S.every;
   $("fFlag").value = S.flagSec; $("fFill").value = fmt(S.fillSec);
   $("fTargets").value = S.targets.map(fmt).join(", ");
@@ -484,7 +496,7 @@ function render() {
     qbar.style.width = Math.min(100, qEl / budget * 100) + "%";
     const over = qEl >= S.flagSec && (R.mode === "flag50" || S.chimeEvery);
     qcue.className = "qcue" + (st[0] === "over" || st[0] === "flag" ? " over" : "");
-    if (!live) qcue.textContent = "Easy ones first. Tap when you submit each question. Budget " + fmt(budget) + " per question.";
+    if (!live) qcue.textContent = "Easy ones first. Tap when you submit each question.";
     else if (st[0] === "over") qcue.textContent = "Over " + fmt(budget) + ". Best answer, move. Flags get the banked time after Q" + S.nQ + ".";
     else if (over) qcue.textContent = R.mode === "flag50" ? S.flagSec + " s — flag, best answer, move." : S.flagSec + " s. No big picture? Flag, best guess, move.";
     else qcue.textContent = R.mode === "flag50" ? "Skim mode. Flag at " + S.flagSec + " s, no exceptions." : "Tap when you submit this question.";

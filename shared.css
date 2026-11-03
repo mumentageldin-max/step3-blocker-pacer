@@ -150,7 +150,7 @@ table.t td.ahead,table.t td.good{color:var(--good)} table.t td.behind,table.t td
 /* wide screens: iPad Pro 13", the Fold opened, iMac / Mac mini windows. Split view stays one column. */
 @media (min-width:820px) and (min-height:520px){
   .wrap{max-width:1200px;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);column-gap:22px;align-items:start}
-  .top,.pnav,.full{grid-column:1/-1}
+  .top,.pnav,.quicklinks,.full{grid-column:1/-1}
   .colL,.colR{display:grid;gap:14px;min-width:0}
   button.primary,button.secondary{min-height:96px}
   .subactions button{min-height:52px;font-size:15px}
