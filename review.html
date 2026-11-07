@@ -51,6 +51,7 @@
 .qcard[data-tone="good"] .ring i{background:var(--good)}
 .starts{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
 .starts .lucky{grid-column:1/-1;min-height:48px;font-size:15px;border-color:var(--warn);color:var(--warn)}
+.starts button.solo{grid-column:1/-1}
 .tagbtns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%}
 .tagbtns button{min-height:84px;display:grid;gap:2px;align-content:center;padding:8px 4px;line-height:1.15}
 .tagbtns button b{font-family:var(--font-num);font-size:28px}
@@ -118,6 +119,7 @@
     <a href="https://claude.ai/artifact/SgX4q6UhdN1No9sJKWvh4a" target="_blank" rel="noopener">Daily sequence</a>
     <a href="https://claude.ai/artifact/1UrfVMa6zbxTSL6HjHd7sL" target="_blank" rel="noopener">Biostats cheat sheet</a>
   </div>
+  <div id="breakBand" hidden></div>
 
   <!-- SETUP -->
   <section class="card setup full" id="setup">
@@ -127,7 +129,8 @@
       <label>Block label or system<input type="text" id="sLabel" placeholder="Cardio · Random · Ethics…" autocomplete="off"></label>
       <label>Questions in the block<input type="number" id="sN" min="1" max="60" value="20" inputmode="numeric"></label>
       <label>Correct (from the results page)<input type="number" id="sCorrect" min="0" max="60" placeholder="13" inputmode="numeric"></label>
-      <label>Mode<select id="sMode"><option value="full">Full review · 90:00 hard stop</option><option value="eo">EO only · 30 s per question</option></select></label>
+      <label>Mode<select id="sMode"><option value="full">Full review · 90:00 hard stop</option><option value="eo">EO only · 60 s per question</option></select></label>
+      <label class="wide">Order<select id="sOrder"><option value="wrongFirst">Wrong questions first, then the right ones with the time that is left</option><option value="any">Any order — I pick wrong or right as I go</option></select></label>
     </div>
     <p class="note" id="sDerived">Enter the score and the app knows how many wrong questions get Timer B.</p>
     <button class="primary" id="btnStart" type="button">Start review</button>
@@ -168,10 +171,10 @@
       </div>
       <div class="clockB" id="clockB">5:00</div>
       <div class="ring"><i id="ringFill"></i></div>
-      <p class="ruleline" id="textB">Which one is next? Wrong gets 5:00 — EO, the correct-answer paragraph, your choice. Correct gets 30 s — Educational Objective only.</p>
+      <p class="ruleline" id="textB">Which one is next? Wrong gets 5:00 — EO, the correct-answer paragraph, your choice. Right gets 60 s — Educational Objective only.</p>
       <div class="starts" id="starts">
         <button class="primary" id="btnWrong" type="button">Wrong · 5:00</button>
-        <button class="primary good" id="btnCorrect" type="button">Correct · 30 s</button>
+        <button class="primary good" id="btnCorrect" type="button">Right · 60 s</button>
         <button class="lucky" id="btnLucky" type="button">Lucky guess → treat as wrong</button>
       </div>
       <div class="extrow" id="extrow" hidden>
@@ -214,12 +217,14 @@
       <summary>Rules for this review</summary>
       <div class="body">
         <ol class="rules">
-          <li><b>Two timers.</b> Timer A: 30-min chunks, 3 chunks = 90 min per block, hard stop; stand 3–5 min between chunks. Timer B: 5 min per wrong question, +3 if you need it = 8 max. Rings → you move.</li>
-          <li><b>Correct questions:</b> no Timer B. Educational Objective, 30 seconds. A lucky guess counts as wrong.</li>
+          <li><b>Two timers.</b> Timer A: 30-min chunks, 3 chunks = 90 min per block, hard stop; <b>stand 10 min</b> between chunks (the break after a chunk). Timer B: 5 min per wrong question, +3 if you need it = 8 max. Rings → you move.</li>
+          <li><b>Order:</b> wrong questions first (UWorld Results → Show: Incorrect), then the right ones with whatever time is left. The app walks you through it in that order; "Any order" in the setup if you want to mix.</li>
+          <li><b>Right questions:</b> no Timer B. Educational Objective, <b>60 seconds</b> each. A lucky guess counts as wrong.</li>
           <li><b>Don't re-read the stem.</b> Educational Objective → correct-answer paragraph → the paragraph for the choice you picked. Skip the other wrong-choice paragraphs.</li>
           <li><b>Calculation question</b> → draw the 2×2 and redo it yourself before reading their math.</li>
           <li>Write one line: <b>"Rule: ___"</b> in your own words. Ten words max. Tag the miss with one letter.</li>
-          <li><b>Chunk 3 ends with questions left</b> → Educational Objective only, 30 s each, tagged K. The app switches to that by itself (or ends the review, if you set that in Settings).</li>
+          <li><b>Chunk 3 ends with questions left</b> → Educational Objective only, 60 s each, tagged K. The app switches to that by itself (or ends the review, if you set that in Settings).</li>
+          <li><b>When the review ends, the 20-minute break starts</b> by itself and shows on every pacer page until the next block, review or case starts.</li>
           <li><b>Pressed the wrong button?</b> "Change choice" sends the running question back to the chooser; the clock on that question keeps counting. "Undo last question" reopens the one you just closed.</li>
           <li><b>Not allowed:</b> UWorld library, a new sheet, YouTube, a podcast, a "quick" lookup, Claude per question. Parking lot instead.</li>
         </ol>
@@ -235,11 +240,12 @@
           <div class="form">
             <label>Timer A total (mm:ss)<input type="text" id="fLimit" value="90:00" inputmode="numeric"></label>
             <label>Chunk length (mm:ss)<input type="text" id="fChunk" value="30:00" inputmode="numeric"></label>
-            <label>Stand between chunks (mm:ss)<input type="text" id="fStand" value="4:00" inputmode="numeric"></label>
+            <label>Break after a 30-min chunk — stand (mm:ss)<input type="text" id="fStand" value="10:00" inputmode="numeric"></label>
             <label>Timer B per wrong (mm:ss)<input type="text" id="fB" value="5:00" inputmode="numeric"></label>
             <label>Extension, once (mm:ss)<input type="text" id="fExt" value="3:00" inputmode="numeric"></label>
-            <label>Correct question (seconds)<input type="number" id="fEo" value="30" min="10" max="300" inputmode="numeric"></label>
-            <label>At the hard stop<select id="fStop"><option value="sweep">EO sweep, 30 s each, tagged K</option><option value="end">End the review</option></select></label>
+            <label>Right question (seconds)<input type="number" id="fEo" value="60" min="10" max="300" inputmode="numeric"></label>
+            <label>At the hard stop<select id="fStop"><option value="sweep">EO sweep, tagged K</option><option value="end">End the review</option></select></label>
+            <label>Default order<select id="fOrder"><option value="wrongFirst">Wrong first, then right</option><option value="any">Any order</option></select></label>
             <label>Theme<select id="fTheme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
           </div>
           <div class="formrow">
@@ -248,6 +254,8 @@
           </div>
         </fieldset>
         <p class="note" id="settingsLock" hidden>Settings unlock when the review is finished.</p>
+        <div class="rowhead"><h2>Breaks</h2><span class="meta">Shared by all pacer pages</span></div>
+        <div id="brkSettings"></div>
         <div class="rowhead"><h2>Background &amp; sound</h2><span class="meta">Shared by all pacer pages</span></div>
         <div id="bgSettings"></div>
       </div>
@@ -280,7 +288,9 @@
 (() => {
 const P = window.Pacer, $ = id => document.getElementById(id), fmt = P.fmt;
 const LS_S = "step3pacer.review.settings.v1", LS_R = "step3pacer.review.run.v1";
-const DEFAULTS = { limitSec: 5400, chunkSec: 1800, standSec: 240, bSec: 300, extSec: 180, eoSec: 30, sound: true, atStop: "sweep" };
+/* Nov 7 defaults: a right question gets 60 s (was 30), the stand after a 30-minute chunk is 10:00 (was 4:00), and the
+   review runs wrong questions first, then the right ones with the time that is left ("wrongFirst"; "any" = the old chooser). */
+const DEFAULTS = { limitSec: 5400, chunkSec: 1800, standSec: 600, bSec: 300, extSec: 180, eoSec: 60, sound: true, atStop: "sweep", order: "wrongFirst", v: 2 };
 const FIX = {
   K: "Mostly K — knowledge gap. Normal. The \"Rule:\" lines are the fix; nothing extra.",
   M: "Mostly M — misread. Read the last line first; highlight D / T / MC / MT / GA while reading.",
@@ -292,14 +302,27 @@ let R = fresh();
 let endArmed = 0, parkTimer = null;
 
 function fresh() {
-  return { phase: "setup", id: "", date: "", label: "", nQ: 20, correct: null, wrongTotal: null, mode: "full", blockId: null,
+  return { phase: "setup", id: "", date: "", label: "", nQ: 20, correct: null, wrongTotal: null, mode: "full", order: "wrongFirst", blockId: null,
     startAt: 0, pausedAt: 0, pausedTotal: 0, pauseKind: "", standStartAt: 0, standChimed: false, standsDone: 0, manualStands: 0,
     q: null, items: [], tags: { K: 0, M: 0, T: 0, G: 0 }, wrongDone: 0, correctDone: 0, lucky: 0, swept: 0,
     stopped: false, sweepStartAt: 0, endEl: 0, pendingStartEl: null, quietStand: false, quietStop: false, updatedAt: 0 };
 }
 
 /* ---------- storage ---------- */
-function loadSettings() { const p = P.readJSON(LS_S, null); if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p); P.setSound(S.sound); }
+function loadSettings() {
+  const p = P.readJSON(LS_S, null);
+  if (p && typeof p === "object") {
+    S = Object.assign({}, DEFAULTS, p);
+    if (!p.v || p.v < 2) {            // settings saved before Nov 7: move the two old defaults to the new ones, once
+      if (p.eoSec === 30 || p.eoSec == null) S.eoSec = 60;
+      if (p.standSec === 240 || p.standSec == null) S.standSec = 600;
+      if (!p.order) S.order = "wrongFirst";
+      S.v = 2; saveSettings();
+    }
+    if (S.order !== "any") S.order = "wrongFirst";
+  }
+  P.setSound(S.sound);
+}
 function saveSettings() { P.writeJSON(LS_S, S); }
 function persist() { R.updatedAt = Date.now(); P.writeJSON(LS_R, R); P.live.touch(); }
 function loadRun() {
@@ -341,12 +364,21 @@ function startReview() {
   R.phase = "run"; R.id = P.newId(); R.date = new Date().toISOString();
   R.label = label; R.nQ = nQ; R.correct = correct; R.wrongTotal = correct == null ? null : nQ - correct;
   R.mode = $("sMode").value === "eo" ? "eo" : "full";
+  R.order = $("sOrder").value === "any" ? "any" : "wrongFirst";
   R.blockId = pickedBlock || null;
   R.startAt = Date.now();
   if (R.mode === "eo") startItem("eo");
-  P.audioInit(); P.sfx("start"); P.keepAwake(); P.bg.runStart("review running");
+  P.audioInit(); P.sfx("start"); P.keepAwake(); P.bg.runStart("review running"); P.breakStop();
   $("rulesFold").open = false;
   persist(); render();
+}
+/* wrong-first order: which kind the chooser offers now. null = the plain chooser (any order, or no score entered) */
+function orderedKind() {
+  if (R.mode !== "full" || R.order !== "wrongFirst" || R.wrongTotal == null) return null;
+  const w = remainingWrong(), c = remainingCorrect();
+  if (w > 0) return "wrong";
+  if (c > 0) return "correct";
+  return null;
 }
 function startItem(kind) {
   const now = Date.now();
@@ -477,7 +509,9 @@ function finish() {
   R.phase = "done";
   P.sfx("end"); P.releaseWake(); P.bg.runEnd();
   saveReview();
-  persist(); P.live.clear(); render();
+  persist(); P.live.clear();
+  P.breakStart(P.getBreaks().taskSec, "Break after the review" + (R.label ? " · " + R.label : ""), "review");   // 20:00 by default, shown on every page
+  render();
 }
 function endReview() {
   if (R.phase !== "run" && R.phase !== "sweep") return;
@@ -550,7 +584,7 @@ function events() {
   const m = bgMode(), out = [];
   if (m === "A") {
     if (R.standsDone < 2) { const b = S.chunkSec * (R.standsDone + 1); if (b < S.limitSec) out.push({ el: b, tag: "chunk" + (R.standsDone + 1), title: "Chunk " + (R.standsDone + 1) + " over — stand", body: "Timer A stopped at the chunk end. Walk, water, no phone.", sfx: "stand", important: true, mark: () => { R.quietStand = true; } }); }
-    out.push({ el: S.limitSec, tag: "stop", title: fmt(S.limitSec) + " hard stop", body: S.atStop === "end" ? "The review is over." : "Educational Objective only from here, 30 s each.", sfx: "stop", important: true, mark: () => { R.quietStop = true; } });
+    out.push({ el: S.limitSec, tag: "stop", title: fmt(S.limitSec) + " hard stop", body: S.atStop === "end" ? "The review is over." : "Educational Objective only from here, " + S.eoSec + " s each.", sfx: "stop", important: true, mark: () => { R.quietStop = true; } });
     if (R.q) {
       const k = R.q.kind, quick = k === "correct" || k === "eo";
       out.push({ el: R.q.startEl / 1000 + qBudget(), tag: "timerB", title: quick ? S.eoSec + " s are up — next" : R.q.ext ? fmt(S.bSec + S.extSec) + " — move. Tag it and go" : "Timer B rang — tag it and move, or +" + fmt(S.extSec) + " once",
@@ -621,7 +655,7 @@ function render() {
   const standbox = $("standbox");
   if (R.phase === "sweep") {
     band.dataset.tone = "crit"; $("pillA").dataset.kind = "crit"; $("pillA").textContent = "Hard stop";
-    $("textA").textContent = "90 minutes are over. Educational Objective only, 30 s each, tagged K. Then done.";
+    $("textA").textContent = Math.round(S.limitSec / 60) + " minutes are over. Educational Objective only, " + S.eoSec + " s each, tagged K. Then done.";
     standbox.hidden = true;
   } else if (R.pauseKind === "stand") {
     band.dataset.tone = "stand"; $("pillA").dataset.kind = "good"; $("pillA").textContent = "Stand · chunk " + chunkIdx + " done";
@@ -660,11 +694,30 @@ function render() {
     $("ringFill").style.width = "0%"; $("textB").textContent = "Timer B waits with you.";
     starts.hidden = true; extrow.hidden = true; tagbtns.hidden = true; nextrow.hidden = true;
   } else if (!R.q) {
-    qc.dataset.tone = "idle"; $("pillB").dataset.kind = "idle"; $("pillB").textContent = "Next question";
-    $("clockB").textContent = fmt(S.bSec); $("ringFill").style.width = "0%";
-    $("textB").textContent = "Which one is next? Wrong gets " + fmt(S.bSec) + " — EO, the correct-answer paragraph, your choice. Correct gets " + S.eoSec + " s — Educational Objective only.";
+    const kind = orderedKind(), bw = $("btnWrong"), bc = $("btnCorrect"), bl = $("btnLucky");
     starts.hidden = false; extrow.hidden = true; tagbtns.hidden = true; nextrow.hidden = true;
-    $("btnWrong").textContent = "Wrong · " + fmt(S.bSec); $("btnCorrect").textContent = "Correct · " + S.eoSec + " s";
+    $("ringFill").style.width = "0%";
+    if (kind === "wrong") {        // wrong first: one button, the count, Timer B
+      const w = remainingWrong();
+      qc.dataset.tone = "idle"; $("pillB").dataset.kind = "warn"; $("pillB").textContent = "Wrong first · " + w + " left";
+      $("clockB").textContent = fmt(S.bSec);
+      $("textB").textContent = "UWorld → Show: Incorrect. " + w + " wrong to go, " + fmt(S.bSec) + " each (+" + fmt(S.extSec) + " once). Educational Objective → correct-answer paragraph → your choice → Rule line. The right ones get what is left.";
+      bw.hidden = false; bc.hidden = true; bl.hidden = true; bw.classList.add("solo");
+      bw.textContent = "Next wrong · " + fmt(S.bSec);
+    } else if (kind === "correct") { // then the right ones with the time that is left
+      const c = remainingCorrect(), per = c > 0 ? remA / c : 0;
+      qc.dataset.tone = "idle"; $("pillB").dataset.kind = "good"; $("pillB").textContent = "Right ones · " + c + " left";
+      $("clockB").textContent = fmt(S.eoSec);
+      $("textB").textContent = "Wrong ones done. UWorld → Show: Correct. " + c + " to go · " + fmt(remA) + " left on Timer A" + (c > 0 ? " → about " + fmt(per) + " each if you use it all" : "") + "; the " + S.eoSec + "-s budget keeps you moving. Educational Objective only. Lucky guess → tap it, it becomes a wrong question.";
+      bw.hidden = true; bc.hidden = false; bl.hidden = false; bc.classList.add("solo"); bw.classList.remove("solo");
+      bc.textContent = "Next right · " + S.eoSec + " s";
+    } else {                        // any order (or no score entered): the plain chooser
+      qc.dataset.tone = "idle"; $("pillB").dataset.kind = "idle"; $("pillB").textContent = "Next question";
+      $("clockB").textContent = fmt(S.bSec);
+      $("textB").textContent = "Which one is next? Wrong gets " + fmt(S.bSec) + " — EO, the correct-answer paragraph, your choice. Right gets " + S.eoSec + " s — Educational Objective only.";
+      bw.hidden = false; bc.hidden = false; bl.hidden = false; bw.classList.remove("solo"); bc.classList.remove("solo");
+      bw.textContent = "Wrong · " + fmt(S.bSec); bc.textContent = "Right · " + S.eoSec + " s";
+    }
   } else {
     const budget = qBudget(), qel = qElapsedSec(now), rem = budget - qel, over = rem < 0;
     const k = R.q.kind;
@@ -680,16 +733,20 @@ function render() {
       extrow.hidden = R.q.ext; $("btnExtend").disabled = R.q.ext; $("btnExtend").textContent = "+" + fmt(S.extSec) + " (once)";
     } else if (k === "correct" || k === "eo") {
       qc.dataset.tone = over ? "crit" : "good";
-      $("pillB").dataset.kind = over ? "crit" : "good"; $("pillB").textContent = k === "eo" ? "EO only" : "Correct";
-      $("textB").textContent = over ? "30 seconds are up. Educational Objective only — next." : "Educational Objective only. Lucky guess? Tap it, it becomes a wrong question.";
+      $("pillB").dataset.kind = over ? "crit" : "good"; $("pillB").textContent = k === "eo" ? "EO only" : "Right";
+      $("textB").textContent = over ? S.eoSec + " seconds are up. Educational Objective only — next." : "Educational Objective only. Lucky guess? Tap it, it becomes a wrong question.";
       starts.hidden = k === "eo"; extrow.hidden = true; tagbtns.hidden = true;
       nextrow.hidden = false; $("btnNext").textContent = k === "eo" ? "Next · " + (R.correctDone + 1) + "/" + R.nQ : "Done with this one";
-      $("btnCorrect").textContent = "Correct · " + S.eoSec + " s"; $("btnWrong").textContent = "Wrong · " + fmt(S.bSec);
+      $("btnCorrect").textContent = "Right · " + S.eoSec + " s"; $("btnWrong").textContent = "Wrong · " + fmt(S.bSec);
+      const onlyRight = orderedKind() === "correct";   // wrong-first order, wrong ones done: Right and Lucky only
+      $("btnCorrect").hidden = false; $("btnWrong").hidden = onlyRight; $("btnLucky").hidden = false;
+      $("btnWrong").classList.remove("solo"); $("btnCorrect").classList.toggle("solo", onlyRight);
+      if (onlyRight) $("btnCorrect").textContent = "Next right · " + S.eoSec + " s";
     } else { // sweep
       qc.dataset.tone = over ? "crit" : "warn";
       $("pillB").dataset.kind = "crit"; $("pillB").textContent = "EO sweep · tagged K";
       const left = remainingAll();
-      $("textB").textContent = "Educational Objective only, 30 s, tag K, next." + (left != null ? " " + left + " left." : "");
+      $("textB").textContent = "Educational Objective only, " + S.eoSec + " s, tag K, next." + (left != null ? " " + left + " left." : "");
       starts.hidden = true; extrow.hidden = true; tagbtns.hidden = true;
       nextrow.hidden = false; $("btnNext").textContent = "Next (K)";
     }
@@ -774,13 +831,17 @@ function applySettings() {
   const limit = P.parseMS($("fLimit").value), chunk = P.parseMS($("fChunk").value), stand = P.parseMS($("fStand").value);
   const b = P.parseMS($("fB").value), ext = P.parseMS($("fExt").value), eo = parseInt($("fEo").value, 10);
   if (!limit || !chunk || stand == null || !b || ext == null || !eo || chunk > limit || eo < 10) { $("settingsMsg").textContent = "Check the values: times as mm:ss."; return; }
-  S = Object.assign({}, S, { limitSec: limit, chunkSec: chunk, standSec: stand, bSec: b, extSec: ext, eoSec: eo, atStop: $("fStop").value === "end" ? "end" : "sweep" });
+  S = Object.assign({}, S, { limitSec: limit, chunkSec: chunk, standSec: stand, bSec: b, extSec: ext, eoSec: eo, atStop: $("fStop").value === "end" ? "end" : "sweep", order: $("fOrder").value === "any" ? "any" : "wrongFirst", v: 2 });
   saveSettings(); fillSettings(); renderDerived(); render(); $("settingsMsg").textContent = "Saved.";
 }
 function fillSettings() {
   $("fLimit").value = fmt(S.limitSec); $("fChunk").value = fmt(S.chunkSec); $("fStand").value = fmt(S.standSec);
   $("fB").value = fmt(S.bSec); $("fExt").value = fmt(S.extSec); $("fEo").value = S.eoSec; $("fTheme").value = P.getTheme(); $("fStop").value = S.atStop === "end" ? "end" : "sweep";
-  $("tagline").textContent = fmt(S.limitSec) + " hard stop · " + Math.round(S.bSec / 60) + "+" + Math.round(S.extSec / 60) + " per wrong · " + S.eoSec + " s per correct";
+  $("fOrder").value = S.order === "any" ? "any" : "wrongFirst";
+  if (R.phase === "setup") $("sOrder").value = S.order === "any" ? "any" : "wrongFirst";
+  $("sMode").options[1].text = "EO only · " + S.eoSec + " s per question";
+  $("fStop").options[0].text = "EO sweep, " + S.eoSec + " s each, tagged K";
+  $("tagline").textContent = fmt(S.limitSec) + " hard stop · " + Math.round(S.bSec / 60) + "+" + Math.round(S.extSec / 60) + " per wrong · " + S.eoSec + " s per right · wrong first";
   $("textA").textContent = "Stand " + Math.round(S.standSec / 60) + " minutes at the end of each chunk. " + Math.round(S.limitSec / 60) + " minutes of review, hard stop.";
 }
 
@@ -843,6 +904,8 @@ function init() {
   });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { if (R.phase === "run" && !R.pauseKind) P.keepAwake(); tick(); } });
   P.renderBgSettings($("bgSettings"));
+  P.renderBreakSettings($("brkSettings"));
+  P.renderBreak($("breakBand"), { running: bgRunning });
   if (P.pipSupported()) {
     $("btnPip").hidden = false;
     $("btnPip").addEventListener("click", async () => {

@@ -585,11 +585,93 @@ window.Pacer = (() => {
   function loadParking() { const a = readJSON(KEYS.parking, []); return Array.isArray(a) ? a : []; }
   function saveParking(a) { writeJSON(KEYS.parking, a); }
 
+  /* ---------- breaks (shared across pages) ----------
+     The day's rule: 20 minutes after a task (a block, a review, a CCS case with its feedback), 10 minutes after
+     a 30-minute review chunk (that one lives in the Review page's stand timer). A task break starts by itself
+     when the task ends, is shown as a band on every pacer page, chimes once when it is over (and notifies when
+     the page is hidden), and ends by itself when the next block, review or case starts. */
+  KEYS.breaks = "step3pacer.breaks.v1";
+  KEYS.brk = "step3pacer.break.v1";
+  const BREAK_DEFAULTS = { taskSec: 1200 };
+  function getBreaks() { const b = readJSON(KEYS.breaks, {}); return Object.assign({}, BREAK_DEFAULTS, (b && typeof b === "object") ? b : {}); }
+  function setBreaks(patch) { writeJSON(KEYS.breaks, Object.assign({}, getBreaks(), patch || {})); }
+  function breakGet() {
+    const b = readJSON(KEYS.brk, null);
+    if (!b || typeof b !== "object" || !b.endAt) return null;
+    if (Date.now() - b.endAt > 3 * 3600 * 1000) { writeJSON(KEYS.brk, null); return null; }   // an old break nobody closed
+    return b;
+  }
+  function breakStart(sec, label, from) {
+    sec = sec > 0 ? sec : getBreaks().taskSec;
+    const now = Date.now();
+    const b = { startAt: now, endAt: now + sec * 1000, sec: sec, label: label || "Break", from: from || "", chimed: false };
+    writeJSON(KEYS.brk, b);
+    breakRender();
+    return b;
+  }
+  function breakStop() { if (breakGet()) { writeJSON(KEYS.brk, null); breakRender(); } }
+  function breakExtend(sec) { const b = breakGet(); if (!b) return; b.endAt += sec * 1000; b.sec += sec; b.chimed = false; writeJSON(KEYS.brk, b); breakRender(); }
+  function breakLeft(b, now) { b = b || breakGet(); if (!b) return 0; return (b.endAt - (now || Date.now())) / 1000; }
+  let breakBox = null, breakIv = 0, breakArmed = false;
+  function breakRender() {
+    if (!breakBox) return;
+    const b = breakGet();
+    if (!b) { breakBox.hidden = true; breakBox.innerHTML = ""; return; }
+    const left = breakLeft(b), over = left <= 0;
+    if (over && !b.chimed) { b.chimed = true; writeJSON(KEYS.brk, b); sfx("resume"); vibrate([150, 80, 150, 80, 300]); }
+    breakBox.hidden = false;
+    breakBox.dataset.tone = over ? "over" : "on";
+    breakBox.innerHTML =
+      '<div class="brkrow"><span class="pill" data-kind="' + (over ? "crit" : "good") + '">' + (over ? "Break over" : "Break") + "</span>" +
+      '<span class="brkclock">' + (over ? "+" + fmt(-left) : fmt(Math.ceil(left))) + "</span></div>" +
+      '<p class="brktext">' + esc(over ? "Next step. Press Start on it and this line goes away." : (b.label || "Break") + " · back at " + fmtClock(b.endAt) + " · out of the chair, no screen.") + "</p>" +
+      '<div class="brkbtns"><button type="button" class="small" data-brk="ext">+5:00</button><button type="button" class="small" data-brk="stop">' + (over ? "Dismiss" : "Skip the rest") + "</button></div>";
+    breakBox.querySelector('[data-brk="ext"]').addEventListener("click", () => breakExtend(300));
+    breakBox.querySelector('[data-brk="stop"]').addEventListener("click", breakStop);
+  }
+  function breakTick() { // once a second: refresh the clock in place without rebuilding the buttons
+    if (!breakBox || breakBox.hidden) { if (breakGet()) breakRender(); return; }
+    const b = breakGet();
+    if (!b) { breakRender(); return; }
+    const left = breakLeft(b), over = left <= 0;
+    if (over && (!b.chimed || breakBox.dataset.tone !== "over")) { breakRender(); return; }
+    const c = breakBox.querySelector(".brkclock"); if (c) c.textContent = over ? "+" + fmt(-left) : fmt(Math.ceil(left));
+  }
+  function renderBreak(container, opts) { // call once per page; the band lives in `container`
+    if (!container) return;
+    breakBox = container; breakBox.className = "brkband"; breakBox.hidden = true;
+    breakRender();
+    clearInterval(breakIv); breakIv = setInterval(breakTick, 1000);
+    const running = (opts && opts.running) || (() => false);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") { if (breakArmed) { notifDisarm(); breakArmed = false; } breakRender(); return; }
+      const b = breakGet();                          // hidden during a break (and no run active): a notification at its end
+      if (!b || b.chimed || running() || breakLeft(b) <= 0) return;
+      notifArm([{ at: b.endAt, tag: "break", title: "Break over — next step", body: b.label || "", important: true }]); breakArmed = true;
+    });
+  }
+  function renderBreakSettings(container) {
+    if (!container) return;
+    const cfg = getBreaks();
+    container.innerHTML =
+      '<div class="bgset">' +
+      '<label>Break after a task — a block, a review, a CCS case with its feedback (mm:ss)<input type="text" id="brkTask" inputmode="numeric" value="' + fmt(cfg.taskSec) + '" style="font-family:var(--font-num);font-size:15px;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);max-width:140px"></label>' +
+      '<p class="note">The break starts by itself when the task ends and shows on every pacer page; it ends when the next block, review or case starts. The 10-minute stand after a 30-minute review chunk is in the Review page settings.</p>' +
+      '<div class="formrow"><button type="button" class="small" id="brkSave">Save break</button><span class="note" id="brkMsg"></span></div>' +
+      "</div>";
+    container.querySelector("#brkSave").addEventListener("click", () => {
+      const v = parseMS(container.querySelector("#brkTask").value);
+      if (v == null || v < 60 || v > 3600) { container.querySelector("#brkMsg").textContent = "1:00 to 60:00."; return; }
+      setBreaks({ taskSec: v }); container.querySelector("#brkMsg").textContent = "Saved: " + fmt(v) + " after a task.";
+    });
+  }
+
   const api = { KEYS, fmt, fmtSigned, parseMS, todayKey, fmtDate, fmtDay, fmtClock, newId, esc, readJSON, writeJSON,
     loadSessions, saveSessions, saveSession, deleteSession, mergeSessions,
     getTheme, setTheme, applyTheme, setSound, getVolume, setVolume, audioInit, sfx, sfxLater, vibrate, keepAwake, releaseWake,
     renderNav, notice, getSync, setSync, syncNow, syncQuietly, loadParking, saveParking, standalone,
     device, setDeviceName, isIOS, isAndroid, live, bg, getBg, setBg, notifSupported, notifStatus, notifRequest, notifArm, notifDisarm,
-    keepAliveStart, keepAliveStop, keepAliveActive, pipSupported, pipStart, pipStop, pipActive, renderBgSettings };
+    keepAliveStart, keepAliveStop, keepAliveActive, pipSupported, pipStart, pipStop, pipActive, renderBgSettings,
+    getBreaks, setBreaks, breakGet, breakStart, breakStop, breakExtend, breakLeft, renderBreak, renderBreakSettings };
   return api;
 })();

@@ -159,6 +159,7 @@
     <p class="tag" id="tagline">12:30 or 25:00 of real time · 1.25×</p>
   </header>
   <nav id="pnav" aria-label="Pages"></nav>
+  <div id="breakBand" hidden></div>
 
   <!-- SETUP -->
   <section class="card setup full" id="setup">
@@ -343,6 +344,9 @@
           <div class="formrow"><button type="button" id="btnApply">Save settings</button><span class="note" id="settingsMsg"></span></div>
         </fieldset>
         <p class="note" id="settingsLock" hidden>Settings unlock when the case is over.</p>
+        <div class="rowhead"><h2>Breaks</h2><span class="meta">Shared by all pacer pages</span></div>
+        <div id="brkSettings"></div>
+        <p class="note">After a case: the break starts when the feedback review timer ends (or when you save the case, if you did not run that timer).</p>
         <div class="rowhead"><h2>Background &amp; sound</h2><span class="meta">Shared by all pacer pages</span></div>
         <div id="bgSettings"></div>
       </div>
@@ -950,9 +954,14 @@ function startCase() {
   R.label = $("sLabel").value.trim(); R.category = $("sCat").value; R.attempt = $("sAttempt").value; R.source = $("sSource").value;
   R.limitSec = chosenLen; R.startAt = Date.now();
   S.lastLen = chosenLen; saveSettings();
-  P.audioInit(); P.sfx("start"); P.keepAwake(); P.bg.runStart("CCS case running");
+  P.audioInit(); P.sfx("start"); P.keepAwake(); P.bg.runStart("CCS case running"); P.breakStop();
   $("rulesFold").open = false;
   persist(); render();
+}
+function startTaskBreak() { // once per case: when the feedback review ends, or on save if the review timer was not used
+  if (R.breakStarted) return;
+  R.breakStarted = true;
+  P.breakStart(P.getBreaks().taskSec, "Break after the case" + (R.label ? " · " + R.label : ""), "ccs");
 }
 function pauseResume() {
   if (R.phase !== "run") return;
@@ -1064,7 +1073,9 @@ function saveCase() { // the log keeps only what ccscases.com cannot know; score
   };
   s.misspelled.forEach(w => addWord(w, "", R.label || R.category || "case", true));
   P.saveSession(s); P.syncQuietly(); renderWords();
-  R.saved = true; persist(); P.live.clear();
+  R.saved = true;
+  if (!R.rev.startAt || R.rev.endAt) startTaskBreak();   // the task is over: case + feedback (a running review timer starts it when it ends)
+  persist(); P.live.clear();
   $("savedMsg").hidden = false; $("savedMsg").textContent = "Saved to Stats. Change anything above and press Update to re-save.";
   $("btnSave").textContent = "Saved"; $("btnSave").disabled = true;
   $("btnResume").hidden = true;
@@ -1085,7 +1096,7 @@ function tick() {
   if (R.phase === "done" && R.rev.startAt && !R.rev.endAt) {
     const left = R.rev.limitSec - revElapsed();
     if (left <= 60 && !R.rev.warned) { R.rev.warned = true; P.sfx("move"); P.vibrate([120, 60, 120]); persist(); }
-    if (left <= 0) { R.rev.endAt = Date.now(); R.rev.rang = true; if (!R.rev.quiet) P.sfx("stop"); R.rev.quiet = false; P.vibrate([400, 120, 400]); P.releaseWake(); P.bg.runEnd(); persist(); }
+    if (left <= 0) { R.rev.endAt = Date.now(); R.rev.rang = true; if (!R.rev.quiet) P.sfx("stop"); R.rev.quiet = false; P.vibrate([400, 120, 400]); P.releaseWake(); P.bg.runEnd(); startTaskBreak(); persist(); }
   }
   render();
 }
@@ -1400,6 +1411,8 @@ function init() {
   showBest();
   $("fFinal").value = fmt(S.finalSec); $("fRevShort").value = fmt(S.revShortSec); $("fRevLong").value = fmt(S.revLongSec); $("fTheme").value = P.getTheme(); $("fClock").value = S.countdown ? "down" : "up";
   P.renderBgSettings($("bgSettings"));
+  P.renderBreakSettings($("brkSettings"));
+  P.renderBreak($("breakBand"), { running: bgRunning });
   document.querySelectorAll("#presets button").forEach(b => b.addEventListener("click", () => { chosenLen = +b.dataset.len; renderSetup(); }));
   $("btnStart").addEventListener("click", () => { R.limitSec = chosenLen; startCase(); buildStrip(); render(); });
   $("btnPause").addEventListener("click", pauseResume);

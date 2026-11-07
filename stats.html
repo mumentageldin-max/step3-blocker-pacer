@@ -89,6 +89,7 @@ textarea.imp{font-family:var(--font-num);font-size:12px;min-height:80px;width:10
     <p class="tag" id="tagline">Every block, review and CCS case you finish lands here.</p>
   </header>
   <nav id="pnav" aria-label="Pages"></nav>
+  <div id="breakBand" hidden></div>
 
   <div class="filters" id="filters" role="group" aria-label="Range">
     <span class="note">Range:</span>
@@ -160,6 +161,8 @@ textarea.imp{font-family:var(--font-num);font-size:12px;min-height:80px;width:10
       <a href="https://github.com/settings/tokens/new?scopes=gist&description=Step%203%20Pacer%20sync" target="_blank" rel="noopener" style="align-self:center;font-size:14px">Create a token on GitHub ↗</a>
     </div>
     <p class="status" id="syncStatus"></p>
+    <div class="rowhead"><h2>Breaks</h2><span class="meta">Shared by all pacer pages</span></div>
+    <div id="brkSettings"></div>
     <div class="rowhead"><h2>Background &amp; sound</h2><span class="meta">Shared by all pacer pages</span></div>
     <div id="bgSettings"></div>
   </section>
@@ -367,7 +370,8 @@ function renderInsights(list, tagsInfo) {
     const wrongN = reviews.reduce((a, r) => a + (r.wrongDone || 0), 0), extN = reviews.reduce((a, r) => a + (r.extensions || 0), 0);
     if (wrongN >= 5 && extN / wrongN >= 0.5) add("warn", "Review", "The +3:00 was needed on " + Math.round(extN / wrongN * 100) + "% of wrong questions. Five minutes is: Educational Objective → correct-answer paragraph → the paragraph for your choice. Skip the other wrong-choice paragraphs.");
     const corrAvg = mean(reviews.filter(r => r.avgCorrectSec).map(r => r.avgCorrectSec));
-    if (corrAvg != null && corrAvg > 45) add("warn", "Review", "Correct questions are taking about " + Math.round(corrAvg) + " s each; the budget is 30. Educational Objective only — a lucky guess is the one exception, and it gets Timer B.");
+    const eoBudget = (P.readJSON("step3pacer.review.settings.v1", null) || {}).eoSec || 60;   // the Review page's right-question budget (60 s since Nov 7)
+    if (corrAvg != null && corrAvg > eoBudget * 1.5) add("warn", "Review", "Right questions are taking about " + Math.round(corrAvg) + " s each; the budget is " + eoBudget + ". Educational Objective only — a lucky guess is the one exception, and it gets Timer B.");
     const wrongAvg = mean(reviews.filter(r => r.avgWrongSec).map(r => r.avgWrongSec));
     if (!stopped && wrongN >= 5 && extN / wrongN < 0.25 && wrongAvg != null && wrongAvg <= 300) add("good", "Review", "Review discipline is holding: about " + fmt(wrongAvg) + " per wrong question, " + Math.round(extN / wrongN * 100) + "% extensions, every review inside 90:00.");
   }
@@ -650,6 +654,8 @@ function init() {
   $("btnSyncForget").addEventListener("click", () => { P.setSync({}); renderSync(); });
   $("deviceName").addEventListener("change", () => { P.setDeviceName($("deviceName").value); renderSync(); });
   P.renderBgSettings($("bgSettings"));
+  P.renderBreakSettings($("brkSettings"));
+  P.renderBreak($("breakBand"));
   refresh();
   if (P.getSync().token) P.syncNow().then(() => refresh()).catch(() => {});
 }
