@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Step 3 Day</title>
+<meta name="description" content="The study day as one sequence: every step with its own timer (blocks, breaks, meals, cases, reviews), a tick box per step, one sound for the end of a step, the day's totals and the time you will be done.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F5F8">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E141B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Day">
+<link rel="manifest" href="./manifest-day.webmanifest">
+<link rel="icon" href="./icons/day-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icons/day-apple-touch-icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Martian+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="./shared.css">
+<style>
+/* The day page: one "Now" card that runs the current step's timer, the sequence as a tickable list, totals, the ten-day strip.
+   Colors follow the printed sheet: block blue, review violet, CCS orange, biostats teal, break green, meal grey, arrive/close ink. */
+:root{--kc:var(--fg)}
+[data-kind="block"]{--kc:var(--accent)} [data-kind="review"]{--kc:var(--t)} [data-kind="ccs"]{--kc:var(--g)} [data-kind="bio"]{--kc:var(--m)}
+[data-kind="brk"]{--kc:var(--good)} [data-kind="meal"]{--kc:var(--muted)} [data-kind="close"]{--kc:var(--fg)} [data-kind="exam"]{--kc:var(--crit)} [data-kind="off"]{--kc:var(--good)}
+.tint{background:color-mix(in srgb,var(--kc) 9%,var(--surface))}
+
+/* plan line: the two fixed times of the day and the live projection */
+.plan{display:flex;justify-content:space-between;align-items:center;gap:8px 14px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:10px;border-radius:12px;padding:8px 14px;font-weight:700;font-size:16px;color:#fff;background:var(--fg);white-space:nowrap}
+.badge small{font-weight:700;font-size:11px;opacity:.85;letter-spacing:.08em;text-transform:uppercase}
+.badge.start{background:var(--good);color:var(--on-good)} .badge.end{background:var(--fg);color:var(--bg)}
+.badge .num{font-size:17px}
+.plan .proj{flex:1;min-width:180px;font-size:14px;color:var(--muted);font-weight:700;text-align:center;text-wrap:balance}
+.plan .proj b{color:var(--fg);font-family:var(--font-num)}
+.plan .proj.late b{color:var(--warn)} .plan .proj.done b{color:var(--good)}
+
+/* the Now card */
+.now{background:var(--surface);border:1px solid var(--line);border-top:8px solid var(--kc);border-radius:14px;padding:14px 16px 16px;display:grid;gap:10px;container-type:inline-size;user-select:none;-webkit-user-select:none}
+.now .kicker{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.now .kicker .pill{background:var(--kc);color:#fff}
+.now[data-kind="meal"] .kicker .pill,.now[data-kind="close"] .kicker .pill{color:var(--bg)}
+.now .who{font-size:13px;color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
+.now .title{font-size:21px;font-weight:700;line-height:1.2;margin:0;text-wrap:balance}
+.now .title .n{font-family:var(--font-num);color:var(--kc);margin-right:6px}
+.now .why{margin:0;color:var(--muted);font-size:14.5px;line-height:1.35;text-wrap:pretty}
+.now .big{font-family:var(--font-num);font-weight:700;font-size:clamp(60px,25cqi,170px);line-height:1;text-align:center;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--kc);white-space:nowrap;margin-top:2px}
+.now[data-tone="idle"] .big{color:var(--muted)}
+.now[data-tone="paused"] .big{color:var(--muted)}
+.now[data-tone="warn"] .big{color:var(--warn)}
+.now[data-tone="over"] .big{color:var(--crit)}
+@media (prefers-reduced-motion: no-preference){
+  .now[data-tone="over"] .big{animation:dpulse 1s ease-in-out infinite alternate}
+  @keyframes dpulse{from{opacity:1}to{opacity:.55}}
+}
+.parts{display:flex;gap:4px;width:100%}
+.parts i{position:relative;display:block;height:10px;border-radius:5px;background:var(--line);overflow:hidden;flex:1}
+.parts i b{position:absolute;inset:0 auto 0 0;width:0;background:var(--kc);border-radius:5px}
+.parts i.done b{width:100%}
+.parts i.brk b{background:var(--good)}
+.parts i.cur{box-shadow:inset 0 0 0 2px var(--kc)}
+.now .stage{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--muted);font-weight:700}
+.now .stage b{color:var(--fg);font-family:var(--font-num)}
+.now .stage .over{color:var(--crit)}
+.now .cue{margin:0;text-align:center;font-weight:700;font-size:16px;color:var(--kc);text-wrap:balance}
+.now[data-tone="over"] .cue{color:var(--crit)}
+.now .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.now .btns button{min-height:72px;font-size:18px}
+.now .btns button.go{background:var(--kc);color:#fff;border-color:var(--kc)}
+.now[data-kind="meal"] .btns button.go,.now[data-kind="close"] .btns button.go{color:var(--bg)}
+.now .btns button.solo{grid-column:1/-1}
+.now .btns button.done{border-color:var(--fg)}
+.now[data-tone="over"] .btns button.done{background:var(--crit);color:var(--on-crit);border-color:var(--crit)}
+.now .sub{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.now .sub button{min-height:44px;font-size:14px;padding:8px 4px;white-space:nowrap}
+.now .sub button.armed{border-color:var(--crit);color:var(--crit)}
+.now .links{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.now .links a{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border:1px solid var(--kc);border-radius:999px;color:var(--kc);text-decoration:none;font-weight:700;font-size:14px;min-height:42px;white-space:nowrap}
+.now .links a.plain{border-color:var(--line);color:var(--fg)}
+.now .casenum{display:inline-flex;align-items:center;gap:8px;border:2px dashed var(--kc);border-radius:10px;padding:6px 12px;font-weight:700;color:var(--kc);font-size:15px}
+.now .casenum b{font-family:var(--font-num);font-size:26px;line-height:1}
+.mirror{display:grid;gap:6px;border:1px dashed var(--kc);border-radius:10px;padding:10px 12px;background:var(--bg)}
+.mirror .mrow{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted);font-weight:700}
+.mirror .mrow b{font-family:var(--font-num);color:var(--kc);font-size:22px}
+.strip{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px dashed var(--line);border-radius:10px;padding:8px 12px;font-size:14px;color:var(--muted);font-weight:700}
+.strip b{font-family:var(--font-num);color:var(--fg)}
+.strip a{font-weight:700}
+
+/* totals */
+.tots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tot{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 10px 9px;display:grid;gap:2px;min-width:0;text-align:center}
+.tot .l{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.tot .v{font-family:var(--font-num);font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tot .d{font-size:11.5px;color:var(--muted);line-height:1.2}
+.tot[data-k="study"] .v{color:var(--accent)} .tot[data-k="brk"] .v{color:var(--good)} .tot[data-k="done"] .v{color:var(--fg)} .tot[data-k="day"] .v{color:var(--t)}
+@media (max-width:420px){ .tots{grid-template-columns:repeat(2,minmax(0,1fr))} }
+
+/* the sequence */
+.seqhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.legend{display:flex;gap:8px 12px;flex-wrap:wrap;font-size:12px;font-weight:700;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block;background:var(--kc)}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.st{display:grid;grid-template-columns:36px 26px minmax(0,1fr) auto;align-items:center;gap:8px;border:1px solid var(--line);border-left:8px solid var(--kc);border-radius:12px;padding:8px 10px 8px 6px;min-height:58px;cursor:pointer;position:relative}
+.st.tint{background:color-mix(in srgb,var(--kc) 9%,var(--surface))}
+.st.cur{outline:3px solid var(--kc);outline-offset:-1px}
+.st.run{outline:3px solid var(--kc);outline-offset:-1px}
+.st.done{opacity:.6}
+.st.done .t{text-decoration:line-through;text-decoration-thickness:2px}
+.st:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.st .box{width:30px;height:30px;min-height:30px;padding:0;border:2.5px solid var(--fg);border-radius:8px;background:var(--surface);display:grid;place-items:center;font-size:20px;line-height:1;color:#fff}
+.st.done .box{background:var(--kc);border-color:var(--kc)}
+.st[data-kind="meal"].done .box,.st[data-kind="close"].done .box{color:var(--bg)}
+.st .n{font-family:var(--font-num);font-weight:700;font-size:15px;color:var(--kc);text-align:center}
+.st .txt{min-width:0;display:grid;gap:1px}
+.st .t{font-weight:700;font-size:15px;line-height:1.2;overflow-wrap:anywhere}
+.st .w{font-size:12.5px;color:var(--muted);line-height:1.25}
+.st .d{font-family:var(--font-num);font-weight:700;font-size:13px;color:var(--kc);border:1.5px solid var(--kc);border-radius:999px;padding:4px 9px;white-space:nowrap;background:var(--surface);font-variant-numeric:tabular-nums}
+.st.run .d{background:var(--kc);color:#fff}
+.st[data-kind="meal"].run .d,.st[data-kind="close"].run .d{color:var(--bg)}
+.st.done .d{border-style:dashed;color:var(--muted);border-color:var(--line)}
+.st .at{font-size:11px;color:var(--muted);font-family:var(--font-num);text-align:right;white-space:nowrap}
+.st.exam .box,.st.off .box{border-radius:50%}
+
+/* ten days */
+.ten{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
+.ten div{border:1px solid var(--line);border-radius:8px;padding:6px 2px 5px;display:grid;gap:2px;text-align:center;min-width:0;background:var(--surface)}
+.ten .dl{font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ten .dv{font-family:var(--font-num);font-size:12px;font-weight:700;white-space:nowrap}
+.ten div.today{outline:2px solid var(--accent);outline-offset:-1px}
+.ten div.all{background:var(--good);border-color:var(--good)} .ten div.all .dl,.ten div.all .dv{color:var(--on-good)}
+.ten div.part{background:var(--warn-bg)} .ten div.off{background:var(--bg);border-style:dashed}
+.ten div.future{opacity:.55}
+@media (max-width:420px){ .ten{grid-template-columns:repeat(5,minmax(0,1fr))} }
+
+/* settings */
+.durs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.durs label{display:grid;gap:3px;font-size:12px;color:var(--muted);font-weight:700}
+.durs input{font:inherit;font-family:var(--font-num);font-size:15px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%;min-width:0}
+.durs .ro{font-family:var(--font-num);font-size:15px;padding:8px 10px;border-radius:8px;border:1px dashed var(--line);color:var(--muted)}
+textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:100%;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);padding:8px;line-height:1.4}
+.celebrate{display:grid;gap:8px;justify-items:center;text-align:center;padding:10px 0 4px}
+.celebrate .bigtick{width:72px;height:72px;border-radius:50%;background:var(--good);color:var(--on-good);display:grid;place-items:center;font-size:40px;font-weight:700}
+
+@media (max-width:819px), (max-height:519px){
+  #mirrorStrip{order:1} #now{order:2} #tots{order:3} #seqCard{order:4} #tenCard{order:5} #rulesFold{order:6} #settingsFold{order:7}
+  .plan .proj{order:3;flex-basis:100%;text-align:left}
+}
+@media (min-width:820px) and (min-height:520px){
+  .wrap{grid-auto-flow:row dense}
+  .colL{grid-column:1} .colR{grid-column:2}
+  .now{padding:18px 20px 20px}
+  .now .big{font-size:clamp(60px,20cqi,150px)}
+  .now .btns button{min-height:84px}
+  .st{min-height:62px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Step 3 Day</h1>
+    <p class="tag" id="tagline">One sequence. The only question: what is the next step?</p>
+  </header>
+  <nav id="pnav" aria-label="Pages"></nav>
+
+  <div class="plan full" id="plan">
+    <span class="badge start"><small>Start</small><span class="num" id="planStart">8:00 AM</span></span>
+    <p class="proj" id="proj"></p>
+    <span class="badge end"><small>Done</small><span class="num" id="planEnd">~10:00 PM</span></span>
+  </div>
+
+  <div class="colL">
+    <div class="strip" id="mirrorStrip" hidden></div>
+    <section class="now" id="now" data-kind="close" data-tone="idle" aria-live="polite">
+      <div class="kicker"><span class="pill" id="nowPill">Next</span><span class="who" id="nowWho"></span></div>
+      <h2 class="title" id="nowTitle"><span class="n">0</span>Arrive · sit · phone in the bag</h2>
+      <p class="why" id="nowWhy"></p>
+      <div id="nowCase" hidden></div>
+      <div id="nowMirror" hidden></div>
+      <div class="big" id="nowBig">5:00</div>
+      <div class="parts" id="nowParts" aria-hidden="true"></div>
+      <div class="stage" id="nowStage"></div>
+      <p class="cue" id="nowCue"></p>
+      <div class="btns" id="nowBtns"></div>
+      <div class="sub" id="nowSub"></div>
+      <div class="links" id="nowLinks"></div>
+      <p class="livestatus" id="liveStatus"></p>
+    </section>
+
+    <div class="tots" id="tots"></div>
+
+    <section class="card" id="tenCard">
+      <div class="rowhead"><h2 id="tenTitle">The ten days</h2><span class="meta" id="tenMeta"></span></div>
+      <div class="ten" id="ten"></div>
+    </section>
+
+    <details class="fold" id="rulesFold">
+      <summary>How this page works</summary>
+      <div class="body">
+        <ol class="rules">
+          <li><b>One card, one step.</b> The Now card always shows the next step of the day. <b>Start</b> runs its timer; <b>Done</b> ticks it and moves to the next. A break or a meal starts by itself when the step before it ends on its timer.</li>
+          <li><b>Steps with parts</b> — a CCS case is 12:30 then 10:00 of feedback; a review is 30 · stand 10 · 30 · stand 10 · 30. The stand starts by itself; the next chunk and the feedback wait for your tap.</li>
+          <li><b>The sound.</b> A step's end is a rising four-note melody played twice, with a long vibration where the device allows it (Android; iPad and iPhone do not vibrate from a web app). One minute before the end: two soft notes. If you do not tick within a minute, the melody repeats — once a minute, five times at most (Settings).</li>
+          <li><b>The other pages still work.</b> Run a block in the Block page, a review in the Review page, a case in the CCS page: this card shows it running, and the step ticks itself when it is saved. The 20-minute break after a block, a review or a case is the same break on every page.</li>
+          <li><b>Tick by hand</b> when you did a step without a timer: tap its box. Tap a row to make it the current step. Tap a ticked box to untick.</li>
+          <li><b>Hidden app.</b> Allow notifications (Settings → Background &amp; sound): the end of a step, and the reminders, arrive as notifications when the page is hidden. On iPad, open the pacer from the Home Screen icon. Whatever was missed is caught up the moment you come back.</li>
+          <li>The day rolls over at <b>4:00 AM</b>, so a night that runs past midnight stays one day. Days are kept for the ten-day strip.</li>
+        </ol>
+        <p class="note">Keys: <kbd>Space</kbd> Start or Done · <kbd>N</kbd> next part · <kbd>P</kbd> pause · <kbd>E</kbd> +5:00 · <kbd>D</kbd> done.</p>
+      </div>
+    </details>
+
+    <details class="fold" id="settingsFold">
+      <summary>Settings</summary>
+      <div class="body">
+        <div class="rowhead"><h2>The ten days</h2><span class="meta">Day 1 is the first 8:00 start</span></div>
+        <div class="form">
+          <label>Day 1<input type="date" id="fDayOne"></label>
+          <label>Number of days<input type="number" id="fDays" min="1" max="60" inputmode="numeric"></label>
+          <label>Start badge<input type="text" id="fPlanStart" placeholder="8:00 AM"></label>
+          <label>Done badge<input type="text" id="fPlanEnd" placeholder="~10:00 PM"></label>
+          <label class="wide">Today's sequence<select id="fTpl"><option value="auto">From the calendar below</option><option value="study">Study day · 4 blocks, 2 cases, 4 reviews</option><option value="tonight">Nov 7 tonight · 2 biostats blocks, 2 reviews, 2 cases</option><option value="rehearsal">Rehearsal · 6 blocks in a row, then wrong questions only</option><option value="between">Between exam days · 1 block, 1 review, 3 repeat cases</option><option value="interface">Interface day · official sample blocks and official CCS</option><option value="minimum">Minimum day · 1 block, 1 case, pack</option><option value="exam">Exam day · the morning list</option><option value="off">Day off</option></select></label>
+          <label>Theme<select id="fTheme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+        </div>
+        <label class="check wide"><input type="checkbox" id="fRemind"> Repeat the end sound every minute until I tick the step (five times at most)</label>
+        <div class="rowhead"><h2>Durations</h2><span class="meta">mm:ss · the others come from their own pages</span></div>
+        <div class="durs" id="durs"></div>
+        <div class="rowhead"><h2>Calendar</h2><span class="meta">date | sequence | case numbers | note</span></div>
+        <textarea class="cal" id="fCal" spellcheck="false"></textarea>
+        <p class="note">Case numbers: the first two are case 1 and case 2 of that day, a third is the retry for the 3rd slot. Sequences: study · tonight · rehearsal · between · interface · minimum · exam · off. A date that is not listed gets a study day.</p>
+        <div class="formrow">
+          <button type="button" id="btnApply">Save settings</button>
+          <button type="button" id="btnCalReset">Calendar back to the plan</button>
+          <button type="button" id="btnNewDay">Start today over</button>
+          <span class="note" id="settingsMsg"></span>
+        </div>
+        <div class="rowhead"><h2>Breaks</h2><span class="meta">Shared by all pacer pages</span></div>
+        <div id="brkSettings"></div>
+        <div class="rowhead"><h2>Background &amp; sound</h2><span class="meta">Shared by all pacer pages</span></div>
+        <div id="bgSettings"></div>
+        <p class="note" id="installNote" hidden>To install: iPad Safari → Share → Add to Home Screen (from this page for a Day icon). Galaxy Fold → browser menu → Install app. Mac → Safari File → Add to Dock, or Chrome's install button.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="colR">
+    <section class="card" id="seqCard">
+      <div class="seqhead">
+        <h2 id="seqTitle">The sequence</h2>
+        <span class="meta" id="seqMeta"></span>
+      </div>
+      <div class="legend" id="legend"></div>
+      <ol class="steps" id="steps" aria-label="Today's steps"></ol>
+    </section>
+  </div>
+</div>
+
+<script src="./shared.js"></script>
+<script>
+(() => {
+const P = window.Pacer, $ = id => document.getElementById(id), fmt = P.fmt, parseMS = P.parseMS, esc = P.esc;
+const LS_S = "step3pacer.day.settings.v1", LS_D = "step3pacer.day.v1", LS_H = "step3pacer.days.v1";
+const ROLL_HOUR = 4;              // a study day that runs past midnight is still the same day until 4:00 AM
+const REMIND_MAX = 5;
+
+/* ---------- the plan's calendar (editable in Settings) ---------- */
+const CAL_DEFAULT = [
+  "2026-11-07 | tonight | 94, 34 | 2 Biostatistics blocks + their reviews. Tomorrow's 4 tests created before bed. Tomorrow is the promise.",
+  "2026-11-08 | study | 21, 77, 122 | Block 1 at 8:00 — Day 1 of the clock. Biostats contact: Sensitivity & Specificity.",
+  "2026-11-09 | study | 18, 47, 11 | Biostats contact: Predictive Values.",
+  "2026-11-10 | study | 46, 125, 101 | Biostats contact: Confidence Interval.",
+  "2026-11-11 | study | 10, 8, 113 | Biostats contact: Odds Ratio & Relative Risk.",
+  "2026-11-12 | study | 48, 126, 90 | Biostats contact: Null Hypothesis & P value.",
+  "2026-11-13 | study | 116, 75, 39 | Last new cases. Biostats contact: Measures of Disease Occurrence.",
+  "2026-11-14 | rehearsal | | 6 random blocks in a row from the exam's hour. Then wrong questions only, EO + Rule line. Evening off. Exam Day 1 in miniature.",
+  "2026-11-15 | off | | Notebook photo to Claude. Nothing else. The day off is off.",
+  "2026-11-16 | interface | | 2 official sample blocks and 2 official practice CCS cases — buttons, not content. Afternoon: all UWorld Notes once, 40 min. Early night.",
+  "2026-11-17 | minimum | | Done by noon. Pack permit, ID, snacks, water. CCS cheat sheet from memory. Early lights out.",
+  "2026-11-18 | exam | | EXAM DAY 1 — 6 blocks. Same alarms, breakfast, bag. Checkpoints every block. 2:00 left → fill every blank. No reviewing in breaks.",
+  "2026-11-19 | off | | Day off.",
+  "2026-11-20 | between | 11, 15, 39 | 1 random block at 8:00, then repeats only on a strict 12:30 clock. Done by early afternoon.",
+  "2026-11-21 | between | 32, 6, 9 | Same shape as Friday.",
+  "2026-11-22 | between | 113, 122, 101 | Same shape. Early night.",
+  "2026-11-23 | exam | | EXAM DAY 2 — 6 blocks.",
+  "2026-11-24 | exam | | EXAM DAY 3 — 9 blocks. Nov 14 is what makes this familiar.",
+  "2026-11-25 | exam | | EXAM DAY 4 — CCS. Location → stabilize → orders → advance the clock → reassess → close line."
+].join("\n");
+const TPLS = ["study", "tonight", "rehearsal", "between", "interface", "minimum", "exam", "off"];
+const DEFAULTS = { arriveSec: 300, shortSec: 600, mealSec: 1800, bioSec: 600, caseSec: 750, feedbackSec: 600, closeSec: 600, sampleSec: 3600, notesSec: 2400, packSec: 900,
+  remind: true, sound: true, dayOne: "2026-11-08", nDays: 10, planStart: "8:00 AM", planEnd: "~10:00 PM", tpl: "auto", cal: CAL_DEFAULT, v: 1 };
+
+let S = Object.assign({}, DEFAULTS);
+let D = null;                      // today's state
+let STEPS = [];                    // today's steps, built from the template and the durations
+let builtFor = "";                 // STEPS signature, so the list is rebuilt only when it changes
+let newDayArmed = 0, skipArmed = 0, lastAbsorb = 0, lastRebuild = 0, tenSig = "";
+
+/* ---------- dates ---------- */
+function pad(n) { return String(n).padStart(2, "0"); }
+function keyOf(ts) { const d = new Date(ts - ROLL_HOUR * 3600000); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+function parseKey(k) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(k || ""); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+function dayStart(k) { const d = parseKey(k); return d ? new Date(d.getFullYear(), d.getMonth(), d.getDate(), ROLL_HOUR).getTime() : 0; }
+function addDays(k, n) { const d = parseKey(k); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+function dayLabel(k, long) { const d = parseKey(k); return d ? d.toLocaleDateString(undefined, long ? { weekday: "long", month: "long", day: "numeric" } : { weekday: "short", month: "short", day: "numeric" }) : k; }
+function dayNumber(k) { const n = Math.round((dayStart(k) - dayStart(S.dayOne)) / 86400000) + 1; return n; }
+function clockOf(ts) { return P.fmtClock(ts); }
+function fmtH(sec) { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h ? h + "h " + pad(m) + "m" : m + "m"; }
+
+/* ---------- calendar ---------- */
+function calendar() { // { key: { tpl, cases: [], note } }
+  const out = {};
+  String(S.cal || "").split(/\n+/).forEach(line => {
+    const parts = line.split("|").map(s => s.trim());
+    if (!parseKey(parts[0])) return;
+    const tpl = TPLS.includes((parts[1] || "").toLowerCase()) ? parts[1].toLowerCase() : "study";
+    const cases = (parts[2] || "").split(/[^0-9]+/).filter(Boolean);
+    out[parts[0]] = { tpl: tpl, cases: cases, note: parts.slice(3).join(" | ") };
+  });
+  return out;
+}
+function calFor(k) { return calendar()[k] || { tpl: "study", cases: [], note: "" }; }
+function tplFor(k) { return S.tpl !== "auto" ? S.tpl : calFor(k).tpl; }
+
+/* ---------- durations that live on the other pages ---------- */
+function blockSec() { const p = P.readJSON("step3pacer.settings.v1", null); return (p && p.blockSec > 0) ? p.blockSec : 2250; }
+function reviewCfg() { const p = P.readJSON("step3pacer.review.settings.v1", null) || {}; return { chunk: p.chunkSec > 0 ? p.chunkSec : 1800, stand: p.standSec > 0 ? p.standSec : 600, limit: p.limitSec > 0 ? p.limitSec : 5400 }; }
+function breakSec() { return P.getBreaks().taskSec; }
+
+/* ---------- the templates ---------- */
+function buildSteps(k, tpl) {
+  const cal = calFor(k), c1 = cal.cases[0] || "", c2 = cal.cases[1] || "", c3 = cal.cases[2] || "";
+  const rv = reviewCfg(), bs = blockSec(), br = breakSec();
+  const d = parseKey(k), wd = d ? d.getDay() : 0, bioDay = wd === 1 || wd === 3 || wd === 5;
+  const num = n => n ? " · № " + n : "";
+  const B = (id, t, w) => ({ id, kind: "block", t, w, tool: "block", parts: [{ l: "Block", sec: bs }] });
+  const BR = (id, t, w, sec) => ({ id, kind: "brk", t, w, parts: [{ l: "Break", sec: sec || br, brk: true }] });
+  const ML = (id, t, w, sec) => ({ id, kind: "meal", t, w, parts: [{ l: t, sec: sec || S.mealSec, brk: true }] });
+  const RV = (id, t, w) => ({ id, kind: "review", t, w, tool: "review", parts: [{ l: "Chunk 1", sec: rv.chunk }, { l: "Stand", sec: rv.stand, auto: true, brk: true }, { l: "Chunk 2", sec: rv.chunk }, { l: "Stand", sec: rv.stand, auto: true, brk: true }, { l: "Chunk 3", sec: rv.chunk }] });
+  const CC = (id, t, w, n) => ({ id, kind: "ccs", t, w, tool: "ccs", caseNum: n || "", parts: [{ l: "Case", sec: S.caseSec }, { l: "Feedback", sec: S.feedbackSec }] });
+  const BIO = (id, t, w) => ({ id, kind: "bio", t, w, parts: [{ l: "Biostats", sec: S.bioSec }] });
+  const CL = (id, t, w, sec) => ({ id, kind: "close", t, w, parts: [{ l: t, sec: sec }] });
+  const TICK = (id, kind, t, w) => ({ id, kind, t, w, parts: [] });
+  let list;
+  if (tpl === "tonight") list = [
+    B("b1", "Block 1 · Biostatistics · 20 Q", "Recite the biostats cheat sheet for 3 minutes first. Draw the 2×2 before any calculation."),
+    BR("br1", "Break", "Out of the chair. Walk, water. No screen."),
+    B("b2", "Block 2 · Biostatistics", "Same checkpoints. Second read of a stem = flag."),
+    BR("br2", "Break", "Walk a lap."),
+    RV("r1", "Review Block 1", "Wrong first (5+3) → right ones with the time left (60 s). 30 · stand 10 · 30 · stand 10 · 30."),
+    BR("br3", "Break", "The pacer starts it by itself."),
+    RV("r2", "Review Block 2", "Same two timers. One Rule line per miss, in the UWorld note."),
+    BR("br4", "Break", "Out of the chair."),
+    CC("c1", "CCS case 1" + num(c1), "Four lines before the first order. Feedback → one missed order + misspelled words.", c1),
+    BR("br5", "Break", "Walk. Water."),
+    CC("c2", "CCS case 2" + num(c2) + " · if there is time", "First attempt only. Use the whole clock. Close line at the 2-minute warning.", c2),
+    CL("close", "Close · tomorrow's 4 tests created", "Create tomorrow's four random tests in UWorld · notebook line · pack the bag · Block 1 at 8:00 tomorrow.", S.closeSec)
+  ];
+  else if (tpl === "rehearsal") list = [
+    CL("arrive", "Arrive · exam hour · bag packed like the exam", "Permit, ID, snacks, water. Phone in the bag. Scratch paper with the checkpoint line.", S.arriveSec),
+    B("b1", "Block 1 · random · 20 Q", "Exam Day 1 in miniature. Start in UWorld and in the pacer."),
+    BR("br1", "Break · 10", "Like the exam's. Stand, water, no review.", S.shortSec),
+    B("b2", "Block 2 · random", "Same four checkpoints."),
+    BR("br2", "Break · 10", "Stand, water.", S.shortSec),
+    B("b3", "Block 3 · random", "Easy ones first. 2:00 left → fill every blank."),
+    ML("lunch", "Lunch · 25", "Eat, walk. No questions.", 1500),
+    B("b4", "Block 4 · random", "Second half. Same rules."),
+    BR("br3", "Break · 10", "Stand, water.", S.shortSec),
+    B("b5", "Block 5 · random", "Flag at 50 s when behind."),
+    BR("br4", "Break · 10", "Stand, water.", S.shortSec),
+    B("b6", "Block 6 · random", "The last one. Nothing left on the clock."),
+    BR("br5", "Break", "Out of the chair. The real break.", br),
+    RV("r1", "Wrong questions only · EO + Rule line", "All six blocks: wrong questions only, 2 minutes each — Educational Objective and one Rule line. 30 · stand 10 · 30 · stand 10 · 30, hard stop."),
+    CL("close", "Close · evening off", "Notebook line · tomorrow is OFF · lights out early.", S.closeSec)
+  ];
+  else if (tpl === "between") list = [
+    CL("arrive", "Arrive · sit · phone in the bag", "Yesterday's notes → the Rule lines once.", S.arriveSec),
+    B("b1", "Block 1 · random · 20 Q", "The one block of the day. Same checkpoints."),
+    BR("br1", "Break", "Out of the chair. Walk, water. No screen."),
+    RV("r1", "Review Block 1", "Wrong first (5+3) → right ones with the time left (60 s)."),
+    BR("br2", "Break", "The pacer starts it by itself."),
+    CC("c1", "Repeat case 1" + num(c1) + " · strict 12:30", "A case you have seen. Strict clock — the close line at the 2-minute warning.", c1),
+    BR("br3", "Break", "Walk. Water."),
+    CC("c2", "Repeat case 2" + num(c2) + " · strict 12:30", "Same four lines. No rereading the feedback of last time first.", c2),
+    ML("lunch", "Lunch", "Away from the desk."),
+    CC("c3", "Repeat case 3" + num(c3) + " · strict 12:30", "Last one. Then the day is done.", c3),
+    CL("close", "Close · done by early afternoon", "Notebook line · bag for the exam day · nothing in the evening.", S.closeSec)
+  ];
+  else if (tpl === "interface") list = [
+    CL("arrive", "Arrive · sit · phone in the bag", "Today is about the buttons, not the content.", S.arriveSec),
+    { id: "s1", kind: "block", t: "Official sample test · block 1", w: "USMLE's own software: highlight, strike-out, lab values, the flag, End Block. Learn where everything is.", parts: [{ l: "Block", sec: S.sampleSec }] },
+    BR("br1", "Break", "Out of the chair."),
+    { id: "s2", kind: "block", t: "Official sample test · block 2", w: "Same. Note anything that surprised you about the interface.", parts: [{ l: "Block", sec: S.sampleSec }] },
+    ML("lunch", "Lunch", "Eat, walk outside."),
+    CC("c1", "Official practice CCS · case 1", "The real order sheet, the real clock, the real location change. The same four lines.", ""),
+    BR("br2", "Break", "Walk. Water."),
+    CC("c2", "Official practice CCS · case 2", "Advance the clock the way the real software wants it.", ""),
+    BR("br3", "Break", "Out of the chair."),
+    { id: "notes", kind: "review", t: "All UWorld Notes once · the Rule lines", w: "40 minutes. Read, do not rewrite. Nothing new is learned today.", parts: [{ l: "Notes", sec: S.notesSec }] },
+    CL("close", "Close · early night", "Notebook line · bag · lights out early.", S.closeSec)
+  ];
+  else if (tpl === "minimum") list = [
+    CL("arrive", "Arrive · sit", "Done by noon today.", S.arriveSec),
+    { id: "s1", kind: "block", t: "Official sample test · 1 block", w: "Warm hands. Buttons, not content.", parts: [{ l: "Block", sec: S.sampleSec }] },
+    BR("br1", "Break", "Out of the chair."),
+    CC("c1", "Official practice CCS · 1 case", "The four lines, from memory.", ""),
+    { id: "pack", kind: "close", t: "Pack · permit, ID, snacks, water", w: "Everything in the bag tonight, by the door.", parts: [{ l: "Pack", sec: S.packSec }] },
+    { id: "sheet", kind: "ccs", t: "CCS cheat sheet from memory", w: "Write it from memory, then compare with the printed sheet.", parts: [{ l: "Sheet", sec: 900 }] },
+    CL("close", "Close · early lights out", "Nothing after noon. Alarms set. Sleep is the last study session.", S.closeSec)
+  ];
+  else if (tpl === "exam") list = [
+    TICK("alarm", "exam", "Same alarms, same breakfast", "The morning you rehearsed."),
+    TICK("bag", "exam", "Permit · ID · snacks · water in the bag", "Checked by the door."),
+    TICK("line", "exam", "The checkpoint line on the scratch paper", "Before Start on every block."),
+    TICK("fill", "exam", "2:00 left → fill every blank", "Never leave a blank."),
+    TICK("breaks", "exam", "No reviewing in the breaks", "Stand, water, snack. Out of the chair."),
+    TICK("lunch", "exam", "Lunch: eat, walk, no phone", "The afternoon blocks are the same blocks."),
+    TICK("home", "exam", "Home. Nothing about the exam tonight.", "Eat. Sleep. Tomorrow is its own day.")
+  ];
+  else if (tpl === "off") list = [
+    TICK("off", "off", "Day off", "Notebook photo to Claude. Nothing else. The day off is off."),
+    TICK("sleep", "off", "Lights out at the usual time", "Tomorrow starts at 8:00 again.")
+  ];
+  else list = [
+    CL("arrive", "Arrive · sit · phone in the bag", "Yesterday's 4 tests → Notes → read the Rule lines once. Checkpoints on scratch paper.", S.arriveSec),
+    B("b1", "Block 1 · random · 20 Q", "Start in UWorld and in the pacer. End block when UWorld ends."),
+    BR("br1", "Break", "Out of the chair. Walk, water. No screen."),
+    B("b2", "Block 2 · random", "Same four checkpoints. Second read of a stem = flag."),
+    BR("br2", "Break · the short one", "Like the exam's. Stand, water.", S.shortSec),
+    B("b3", "Block 3 · random", "Easy ones first. 2:00 left → fill every blank."),
+    BR("br3", "Break · snack", "Walk a lap."),
+    bioDay ? B("b4", "Block 4 · Biostatistics", "Biostats day: recite the biostats cheat sheet for 3 minutes first. Draw the 2×2 before any calculation.") : B("b4", "Block 4 · random", "Mon · Wed · Fri this block is Biostatistics."),
+    ML("lunch", "Lunch", "Eat, walk outside. Decide now: a 3rd case today? Only if Block 1 started at 8:00."),
+    BIO("bio", "Biostats contact · 4 questions", "Subject Review, today's topic" + (cal.note && /contact:\s*([^.]+)/i.test(cal.note) ? ": " + /contact:\s*([^.]+)/i.exec(cal.note)[1].trim() : "") + ". Draw the 2×2 first."),
+    CC("c1", "CCS case 1" + num(c1), "Four lines before the first order. Feedback → one missed order + misspelled words.", c1),
+    BR("br4", "Break", "The pacer starts it by itself."),
+    RV("r1", "Review Block 1", "Wrong first (5+3) → right ones with the time left (60 s). 30 · stand 10 · 30 · stand 10 · 30."),
+    BR("br5", "Break", "Out of the chair."),
+    RV("r2", "Review Block 2", "Same two timers. One Rule line per miss, in the UWorld note."),
+    BR("br6", "Break", "Walk. Water."),
+    CC("c2", "CCS case 2" + num(c2), "First attempt only. Use the whole clock. Close line at the 2-minute warning.", c2),
+    ML("dinner", "Dinner", "Away from the desk."),
+    RV("r3", "Review Block 3", "Same method. Correct questions: Educational Objective only."),
+    BR("br7", "Break", "Last one of the day."),
+    RV("r4", "Review Block 4", "Hard stop at 90. Ended early? → CCS 3" + (c3 ? " · № " + c3 : " (a retry)") + " fits here, strict clock."),
+    CL("close", "Close the day", "Tomorrow's 4 tests created · notebook line (date · 4 scores · K M T G) · pack · tick the day.", S.closeSec)
+  ];
+  list.forEach((s, i) => { s.n = i; s.total = s.parts.reduce((a, p) => a + p.sec, 0); s.study = s.parts.filter(p => !p.brk).reduce((a, p) => a + p.sec, 0); s.brk = s.total - s.study; });
+  return list;
+}
+function stepById(id) { return STEPS.find(s => s.id === id) || null; }
+function isDone(id) { return !!(D.steps[id] && D.steps[id].done); }
+function firstUndone(kind) { return STEPS.find(s => !isDone(s.id) && (!kind || s.kind === kind)) || null; }
+function current() { const c = D.cur && stepById(D.cur); if (c && !isDone(c.id)) return c; return firstUndone(); }
+function allDone() { return STEPS.length > 0 && STEPS.every(s => isDone(s.id)); }
+function anyDone() { return STEPS.some(s => isDone(s.id)); }
+
+/* ---------- storage ---------- */
+function loadSettings() {
+  const p = P.readJSON(LS_S, null);
+  if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p);
+  if (!parseKey(S.dayOne)) S.dayOne = DEFAULTS.dayOne;
+  if (!TPLS.includes(S.tpl)) S.tpl = "auto";
+  P.setSound(S.sound);
+}
+function saveSettings() { P.writeJSON(LS_S, S); }
+function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, startedAt: 0, finishedAt: 0, updatedAt: 0 }; }
+function persist(touch) { D.updatedAt = Date.now(); P.writeJSON(LS_D, D); if (touch !== false) P.live.touch(); }
+function history() { const h = P.readJSON(LS_H, []); return Array.isArray(h) ? h : []; }
+function archive(day) { // keep a finished day for the strip
+  if (!day || !day.date) return;
+  const steps = buildSteps(day.date, day.tpl || tplFor(day.date));
+  const done = steps.filter(s => day.steps[s.id] && day.steps[s.id].done);
+  const rec = { date: day.date, tpl: day.tpl || "study", done: done.length, total: steps.length, studySec: done.reduce((a, s) => a + s.study, 0), brkSec: done.reduce((a, s) => a + s.brk, 0), startedAt: day.startedAt || 0, finishedAt: day.finishedAt || 0 };
+  const h = history().filter(x => x.date !== day.date); h.push(rec); h.sort((a, b) => a.date < b.date ? -1 : 1);
+  P.writeJSON(LS_H, h.slice(-90));
+}
+function loadDay() {
+  const k = keyOf(Date.now());
+  const p = P.readJSON(LS_D, null);
+  if (p && typeof p === "object" && p.date === k) { D = Object.assign(freshDay(k), p); D.steps = D.steps || {}; D.consumed = D.consumed || {}; }
+  else { if (p && p.date) archive(p); D = freshDay(k); }
+  if (!TPLS.includes(D.tpl)) D.tpl = tplFor(k);
+  if (S.tpl !== "auto" && D.tpl !== S.tpl && !anyDoneRaw(D)) D.tpl = S.tpl;
+  STEPS = buildSteps(D.date, D.tpl);
+  if (!p || p.date !== k) persist(false);
+}
+function anyDoneRaw(day) { return Object.keys(day.steps || {}).some(id => day.steps[id] && day.steps[id].done); }
+function rollover() { // called every tick: a new day (after 4:00 AM) gets a fresh sheet
+  const k = keyOf(Date.now());
+  if (D.date === k) return false;
+  if (D.timer) { clearTimer(false); }
+  archive(D); D = freshDay(k); STEPS = buildSteps(k, D.tpl); builtFor = "";
+  persist(); return true;
+}
+
+/* ---------- the running countdown, normalized ---------- */
+function partSec(step, i) { const p = step.parts[i]; return p ? p.sec : 0; }
+function cd() {
+  const T = D.timer; if (!T) return null;
+  const step = stepById(T.stepId); if (!step) return null;
+  const now = Date.now();
+  if (T.shared) {
+    let b = P.breakGet();
+    if (!b && T.endAt && now - T.endAt < 3 * 3600000 && !T.gone) {   // picked up from another device: show the same break here
+      b = { startAt: T.startAt, endAt: T.endAt, sec: T.sec, label: T.label, from: "day", chimed: now >= T.endAt };
+      P.writeJSON(P.KEYS.brk, b);
+    }
+    if (!b) return null;
+    const left = P.breakLeft(b, now);
+    return { kind: "break", step, part: 0, label: step.parts[0] ? step.parts[0].l : "Break", startAt: b.startAt, pausedTotal: 0, sec: b.sec, el: b.sec - left, left, paused: false, over: left <= 0, chimed: !!b.chimed, warned: !!T.warned, reminded: T.reminded || 0, endAt: b.endAt, last: true, b };
+  }
+  const part = step.parts[T.part]; if (!part) return null;
+  const sec = part.sec + (T.extra || 0);
+  if (T.waiting) return { kind: "wait", step, part: T.part, label: part.l, sec, left: 0, el: sec, paused: false, over: false, chimed: true, last: false, next: step.parts[T.part + 1] };
+  const ref = T.pausedAt || now, el = Math.max(0, (ref - T.startAt - T.pausedTotal) / 1000), left = sec - el;
+  return { kind: "own", step, part: T.part, label: part.l, startAt: T.startAt, pausedTotal: T.pausedTotal, sec, el, left, paused: !!T.pausedAt, over: left <= 0, chimed: !!T.chimed, warned: !!T.warned, reminded: T.reminded || 0,
+    endAt: T.startAt + T.pausedTotal + sec * 1000 + (T.pausedAt ? now - T.pausedAt : 0), last: T.part >= step.parts.length - 1, next: step.parts[T.part + 1] };
+}
+function remainingPlanned() { // seconds of plan still ahead, the running countdown included
+  const c = cd(); let sum = 0;
+  STEPS.forEach(s => {
+    if (isDone(s.id)) return;
+    if (c && c.step.id === s.id) {
+      if (c.kind === "wait") { for (let i = c.part + 1; i < s.parts.length; i++) sum += s.parts[i].sec; }
+      else { sum += Math.max(0, c.left); for (let i = c.part + 1; i < s.parts.length; i++) sum += s.parts[i].sec; }
+    } else sum += s.total;
+  });
+  return sum;
+}
+
+/* ---------- actions ---------- */
+function markStarted() { if (!D.startedAt) D.startedAt = Date.now(); }
+function sharedMarker(stepId, b) { // the Day timer for a break step: points at the shared break and keeps a copy of it for the other devices
+  b = b || P.breakGet() || {};
+  return { stepId: stepId, shared: true, startAt: b.startAt || Date.now(), endAt: b.endAt || 0, sec: b.sec || 0, label: b.label || "", warned: false, reminded: 0 };
+}
+function startStep(step, part) {
+  if (!step || isDone(step.id) || !step.parts.length) return;
+  part = part || 0;
+  const now = Date.now();
+  P.audioInit();
+  if (step.parts[0].brk && step.parts.length === 1) {            // a break or a meal: the shared break, shown on every page
+    const b = P.breakStart(step.parts[0].sec, step.t, "day");
+    D.timer = sharedMarker(step.id, b);
+  } else {
+    P.breakStop();                                                 // a task starts: any break is over
+    D.timer = { stepId: step.id, part: part, startAt: now, pausedAt: 0, pausedTotal: 0, extra: 0, warned: false, chimed: false, reminded: 0, waiting: false };
+  }
+  D.cur = step.id; markStarted();
+  P.sfx("start"); P.keepAwake(); P.bg.runStart(step.t);
+  $("rulesFold").open = false;
+  persist(); render();
+}
+function startNextPart() {
+  const T = D.timer; if (!T || T.shared) return;
+  const step = stepById(T.stepId); if (!step || T.part + 1 >= step.parts.length) return;
+  const now = Date.now();
+  Object.assign(T, { part: T.part + 1, startAt: now, pausedAt: 0, pausedTotal: 0, extra: 0, warned: false, chimed: false, reminded: 0, waiting: false });
+  P.audioInit(); P.sfx("start"); P.keepAwake(); P.bg.runStart(step.t + " · " + step.parts[T.part].l);
+  persist(); render();
+}
+function clearTimer(stopBreak) {
+  if (D.timer && D.timer.shared && stopBreak !== false) P.breakStop();
+  D.timer = null; P.releaseWake(); P.bg.runEnd();
+}
+function nextUndoneAfter(step) { // the step to show next: the first undone one after this, else the first undone of the day
+  const i = STEPS.indexOf(step);
+  return STEPS.slice(i + 1).find(s => !isDone(s.id)) || firstUndone();
+}
+function finishStep(step, src) {
+  if (!step) return;
+  const now = Date.now();
+  const c = cd(), timed = !!(c && c.step.id === step.id);
+  const actual = timed && c.kind !== "wait" ? Math.round(sumActual(c)) : null;
+  D.steps[step.id] = { done: true, at: now, src: src || "tap", sec: actual };
+  if (D.timer && D.timer.stepId === step.id) clearTimer(true);
+  markStarted();
+  const nxt = nextUndoneAfter(step);
+  D.cur = nxt ? nxt.id : null;
+  if (allDone()) { D.finishedAt = now; P.sfx("day"); P.vibrate([300, 100, 300, 100, 700]); }
+  else if (timed && step.parts.length && !step.parts[step.parts.length - 1].brk) {   // a task ended on its timer: the break or meal right after it starts by itself
+    if (nxt && nxt.parts.length === 1 && nxt.parts[0].brk) { const b = P.breakStart(nxt.parts[0].sec, nxt.t, "day"); D.timer = sharedMarker(nxt.id, b); }
+  }
+  persist(); render();
+}
+function sumActual(c) { // seconds spent on the step so far: finished parts at plan length, the running one as elapsed
+  let s = 0; for (let i = 0; i < c.part; i++) s += c.step.parts[i].sec; return s + Math.min(c.el, c.sec + 3600);
+}
+function toggleStep(step) {
+  if (!step) return;
+  if (isDone(step.id)) {
+    delete D.steps[step.id];
+    Object.keys(D.consumed).forEach(sid => { if (D.consumed[sid] === step.id) D.consumed[sid] = "-"; });   // a session that ticked it stays consumed
+    D.finishedAt = 0;
+    persist(); render(); return;
+  }
+  finishStep(step, "tap");
+}
+function selectStep(step) {
+  if (!step || isDone(step.id)) return;
+  if (D.timer && D.timer.stepId !== step.id) { P.notice("A step is running. Finish it with Done, or Skip it, before changing the current step.", "warn", 6000); return; }
+  D.cur = step.id; persist(); render();
+}
+function extend(sec) {
+  const T = D.timer; if (!T) return;
+  if (T.shared) { P.breakExtend(sec); T.reminded = 0; persist(); render(); return; }
+  if (T.waiting) return;
+  T.extra = (T.extra || 0) + sec; T.chimed = false; T.reminded = 0; T.warned = false;
+  P.keepAwake(); P.bg.runStart(stepById(T.stepId).t);
+  persist(); render();
+}
+function pauseResume() {
+  const T = D.timer; if (!T || T.shared || T.waiting) return;
+  if (T.pausedAt) { T.pausedTotal += Date.now() - T.pausedAt; T.pausedAt = 0; P.keepAwake(); P.bg.runStart(stepById(T.stepId).t); }
+  else T.pausedAt = Date.now();
+  persist(); render();
+}
+function skipStep() { // double-tap: the running (or current) step is ticked as skipped
+  const step = current(); if (!step) return;
+  if (skipArmed && Date.now() - skipArmed < 3500) { skipArmed = 0; finishStep(step, "skip"); return; }
+  skipArmed = Date.now(); render();
+  setTimeout(() => { if (skipArmed && Date.now() - skipArmed >= 3500) { skipArmed = 0; render(); } }, 3600);
+}
+function stopTimerOnly() { // "Stop" on the Now card: the timer goes away, the step stays unticked
+  if (!D.timer) return;
+  clearTimer(true); persist(); render();
+}
+function newDay() {
+  if (newDayArmed && Date.now() - newDayArmed < 3500) {
+    newDayArmed = 0;
+    if (D.timer) clearTimer(true);
+    D = freshDay(keyOf(Date.now())); if (S.tpl !== "auto") D.tpl = S.tpl; STEPS = buildSteps(D.date, D.tpl); builtFor = "";
+    // what the other pages saved earlier today stays theirs: a blank sheet does not re-tick it
+    const start = dayStart(D.date), end = start + 86400000;
+    P.loadSessions().forEach(x => { const t = new Date(x.date).getTime(); if (t >= start && t < end) D.consumed[x.id] = "-"; });
+    [["step3pacer.run.v1", "sid"], ["step3pacer.review.run.v1", "id"], ["step3pacer.ccs.run.v1", "id"]].forEach(([k, f]) => { const r = P.readJSON(k, null); if (r && r[f] && r.startAt >= start && r.startAt < end) D.consumed[r[f]] = "-"; });
+    persist(); render(); settingsMsg("Today starts over."); return;
+  }
+  newDayArmed = Date.now(); render();
+  setTimeout(() => { if (newDayArmed && Date.now() - newDayArmed >= 3500) { newDayArmed = 0; render(); } }, 3600);
+}
+
+/* ---------- the other pages: a run in progress, and the sessions they save ---------- */
+function runFrom(type, st, where) { // a Block / Review / CCS run state → what the Now card shows, or null
+  if (!st) return null;
+  const now = Date.now();
+  if (type === "block" && (st.phase === "running" || st.phase === "paused") && now - st.startAt < 4 * 3600000) {
+    const bs = (st.blockSec > 0 ? st.blockSec : blockSec()), el = ((st.phase === "paused" ? st.pausedAt : now) - st.startAt - st.pausedTotal) / 1000;
+    return { kind: "block", id: st.sid, page: "Block", href: "./", label: "Block" + (st.label ? " · " + st.label : ""), left: bs - el, total: bs, sub: st.mode === "review" ? "flags · " + (st.reviewLeft || 0) + " left" : "Q" + Math.min(st.q || 1, 20), paused: st.phase === "paused", where };
+  }
+  if (type === "review" && (st.phase === "run" || st.phase === "sweep") && now - st.startAt < 8 * 3600000) {
+    const c = reviewCfg();
+    if (st.phase === "run" && st.pauseKind === "stand") return { kind: "review", id: st.id, page: "Review", href: "./review.html", label: "Review · stand", left: c.stand - (now - st.standStartAt) / 1000, total: c.stand, sub: "stand", paused: false, where };
+    const el = ((st.pauseKind ? st.pausedAt : now) - st.startAt - st.pausedTotal) / 1000;
+    return { kind: "review", id: st.id, page: "Review", href: "./review.html", label: "Review" + (st.label ? " · " + st.label : ""), left: st.phase === "sweep" ? 0 : c.limit - el, total: c.limit, sub: st.phase === "sweep" ? "EO sweep" : "chunk " + Math.min(3, Math.floor(el / c.chunk) + 1) + " of 3", paused: !!st.pauseKind && st.pauseKind !== "stand", where };
+  }
+  if (type === "ccs" && now - st.startAt < 4 * 3600000) {
+    if (st.phase === "run") { const el = ((st.pausedAt || now) - st.startAt - st.pausedTotal) / 1000; return { kind: "ccs", id: st.id, page: "CCS", href: "./ccs.html", label: "CCS case" + (st.label ? " · " + st.label : ""), left: st.limitSec - el, total: st.limitSec, sub: "case", paused: !!st.pausedAt, where }; }
+    if (st.phase === "done" && st.rev && st.rev.startAt && !st.rev.endAt) { const el = (now - st.rev.startAt) / 1000; return { kind: "ccs", id: st.id, page: "CCS", href: "./ccs.html", label: "CCS feedback" + (st.label ? " · " + st.label : ""), left: st.rev.limitSec - el, total: st.rev.limitSec, sub: "feedback", paused: false, where }; }
+  }
+  return null;
+}
+function toolRuns() {
+  const out = [], me = P.device().id;
+  const local = { block: P.readJSON("step3pacer.run.v1", null), review: P.readJSON("step3pacer.review.run.v1", null), ccs: P.readJSON("step3pacer.ccs.run.v1", null) };
+  ["block", "review", "ccs"].forEach(t => { const r = runFrom(t, local[t], ""); if (r) out.push(r); });
+  const doc = P.live.peek && P.live.peek();
+  if (doc) ["block", "review", "ccs"].forEach(t => {
+    const slot = doc[t]; if (!slot || slot.done || !slot.state || slot.deviceId === me || Date.now() - slot.savedAt > 6 * 3600000) return;
+    if (out.some(r => r.kind === t && r.id === (slot.state.sid || slot.state.id))) return;
+    const r = runFrom(t, slot.state, slot.deviceName || "your other device"); if (r) { r.fresh = Date.now() - slot.savedAt < 15 * 60000; out.push(r); }
+  });
+  return out;
+}
+function absorb() { // sessions and finished runs of today tick their steps, each one once
+  const start = dayStart(D.date), end = start + 86400000;
+  const inDay = ts => ts >= start && ts < end;
+  let changed = false;
+  const consume = (id, type, at) => {
+    if (D.consumed[id] !== undefined) return;
+    const step = firstUndone(type);
+    if (!step) { D.consumed[id] = "-"; changed = true; return; }
+    D.steps[step.id] = { done: true, at: at || Date.now(), src: "tool", sec: null };
+    D.consumed[id] = step.id; changed = true;
+    if (D.timer && D.timer.stepId === step.id) clearTimer(false);
+    const nxt = nextUndoneAfter(step); D.cur = nxt ? nxt.id : null;
+    markStarted();
+  };
+  P.loadSessions().forEach(s => {
+    const t = new Date(s.date).getTime();
+    if (!inDay(t) || !["block", "review", "ccs"].includes(s.type)) return;
+    const used = s.type === "block" ? (s.blockSec || 0) : (s.timeUsedSec || 0) + (s.reviewSec || 0);
+    consume(s.id, s.type, t + used * 1000);
+  });
+  const b = P.readJSON("step3pacer.run.v1", null); if (b && b.phase === "done" && b.sid && inDay(b.startAt)) consume(b.sid, "block", b.startAt + (b.endEl || 0));
+  const r = P.readJSON("step3pacer.review.run.v1", null); if (r && r.phase === "done" && r.id && inDay(r.startAt)) consume(r.id, "review", Date.now());
+  const c = P.readJSON("step3pacer.ccs.run.v1", null); if (c && c.phase === "done" && c.id && inDay(c.startAt) && (c.saved || (c.rev && c.rev.endAt))) consume(c.id, "ccs", Date.now());
+  // a block, review or case running right now means the breaks and meals before its step are over
+  toolRuns().filter(r => !r.where || r.fresh).forEach(r => {
+    const target = firstUndone(r.kind); if (!target) return;
+    const i = STEPS.indexOf(target);
+    for (let j = 0; j < i; j++) {
+      const st = STEPS[j];
+      if (isDone(st.id) || !st.parts.length || !st.parts[0].brk) continue;
+      if (D.timer && D.timer.stepId === st.id && cd()) continue;                  // that break is still running here
+      D.steps[st.id] = { done: true, at: Date.now(), src: "break", sec: null }; changed = true;
+      if (D.timer && D.timer.stepId === st.id) clearTimer(false);
+    }
+    if (changed && (!D.cur || isDone(D.cur))) D.cur = target.id;
+    markStarted();
+  });
+  if (changed) {
+    if (allDone()) { D.finishedAt = D.finishedAt || Date.now(); }
+    else { // a task finished elsewhere → its break is the shared one, adopt it
+      const nxt = firstUndone(), bk = P.breakGet();
+      if (bk && nxt && nxt.parts.length === 1 && nxt.parts[0].brk && !D.timer) { D.timer = sharedMarker(nxt.id, bk); D.cur = nxt.id; }
+    }
+    persist();
+  }
+  return changed;
+}
+
+/* ---------- tick ---------- */
+function tick() {
+  if (rollover()) { render(); return; }
+  const now = Date.now();
+  if (now - lastAbsorb > 2000) { lastAbsorb = now; absorb(); }
+  if (now - lastRebuild > 5000) { lastRebuild = now; const fresh = buildSteps(D.date, D.tpl); if (JSON.stringify(fresh.map(x => [x.id, x.total, x.t])) !== JSON.stringify(STEPS.map(x => [x.id, x.total, x.t]))) STEPS = fresh; }
+  const c = cd(), T = D.timer;
+  if (c && c.kind === "break" && T && (T.endAt !== c.b.endAt || T.sec !== c.b.sec)) { T.startAt = c.b.startAt; T.endAt = c.b.endAt; T.sec = c.b.sec; T.label = c.b.label || T.label; persist(); }
+  if (T && T.shared && !c) {                                        // the shared break ended elsewhere (skipped or dismissed): the step is over
+    const step = stepById(T.stepId); D.timer = null; P.bg.runEnd();
+    if (step && !isDone(step.id)) { D.steps[step.id] = { done: true, at: now, src: "break", sec: null }; D.cur = null; }
+    persist();
+  } else if (c && c.kind !== "wait" && !c.paused) {
+    if (c.sec >= 300 && !c.warned && c.left <= 60 && c.left > 0) { setWarned(c); P.sfx("dayWarn"); P.vibrate([100]); persist(); }
+    if (c.over && !c.chimed) { onPartEnd(c); }
+    else if (c.over && c.chimed && c.last && S.remind) {
+      const n = Math.min(REMIND_MAX, Math.floor(-c.left / 60));
+      if (n > c.reminded) { setReminded(c, n); P.sfx("day"); P.vibrate([300, 100, 300, 100, 700]); persist(); }
+    }
+  }
+  render();
+}
+function setWarned(c) { if (c.kind === "break") { D.timer.warned = true; } else if (D.timer) D.timer.warned = true; }
+function setChimed(c) { if (c.kind === "break" && c.b) { c.b.chimed = true; P.writeJSON(P.KEYS.brk, c.b); } else if (D.timer) D.timer.chimed = true; }
+function setReminded(c, n) { if (D.timer) D.timer.reminded = Math.max(D.timer.reminded || 0, n); }
+function onPartEnd(c, quiet) {
+  setChimed(c);
+  if (c.last) { if (!quiet) { P.sfx("day"); P.vibrate([300, 100, 300, 100, 300, 100, 700]); } persist(); return; }
+  const T = D.timer, step = c.step, nxt = step.parts[c.part + 1];
+  if (!quiet) { P.sfx("dayPart"); P.vibrate([200, 80, 200]); }
+  if (nxt && nxt.auto) {                                             // the stand after a chunk starts by itself, at the moment the chunk ended
+    const endedAt = Math.min(Date.now(), c.startAt + (c.pausedTotal || 0) + c.sec * 1000);
+    Object.assign(T, { part: c.part + 1, startAt: endedAt, pausedAt: 0, pausedTotal: 0, extra: 0, warned: false, chimed: false, reminded: 0, waiting: false });
+    P.bg.runStart(step.t + " · " + nxt.l);
+  } else { T.waiting = true; P.bg.runEnd(); }
+  persist();
+}
+/* events of the running countdown, for the catch-up after the page was hidden and the notifications while hidden */
+function events() {
+  const c = cd(); if (!c || c.kind === "wait") return [];
+  const out = [], step = c.step;
+  if (c.sec >= 300) out.push({ el: c.sec - 60, tag: "warn", title: "One minute left — " + step.t, body: c.label, sfx: "dayWarn", fired: () => { const x = cd(); return !x || x.warned; }, mark: () => { const x = cd(); if (x) setWarned(x); } });
+  const nxt = c.next;
+  out.push({ el: c.sec, tag: "end", title: step.t + (c.last ? " — time" : " · " + c.label + " over"), body: c.last ? "Tick it and start the next step." : nxt && nxt.auto ? nxt.l + " started by itself." : "Press Start for " + ((nxt && nxt.l) || "the next part") + ".", sfx: c.last ? "day" : "dayPart", important: true,
+    fired: () => { const x = cd(); return !x || x.chimed || x.kind === "wait" || x.part !== c.part; }, mark: () => { const x = cd(); if (x && x.kind !== "wait" && x.part === c.part && !x.chimed) onPartEnd(x, true); } });
+  if (c.last && S.remind) for (let i = 1; i <= REMIND_MAX; i++) out.push({ el: c.sec + 60 * i, tag: "rem" + i, title: "Still not ticked — " + step.t, body: fmt(60 * i) + " over. Done, or +5:00.", sfx: "day", important: true, fired: () => { const x = cd(); return !x || x.reminded >= i; }, mark: () => { const x = cd(); if (x) setReminded(x, i); } });
+  return out.sort((a, b) => a.el - b.el);
+}
+
+/* ---------- render ---------- */
+const KIND_NAMES = { block: "Block", brk: "Break", meal: "Meal", bio: "Biostats", ccs: "CCS", review: "Review", close: "Arrive · close", exam: "Exam day", off: "Day off" };
+function buildList() {
+  const sig = D.date + "|" + D.tpl + "|" + STEPS.map(s => s.id + ":" + s.total + ":" + s.t).join(",");
+  if (sig === builtFor) return;
+  builtFor = sig;
+  const ol = $("steps"); ol.innerHTML = "";
+  STEPS.forEach(s => {
+    const li = document.createElement("li");
+    li.className = "st tint " + s.kind; li.dataset.kind = s.kind; li.dataset.id = s.id; li.tabIndex = 0; li.setAttribute("role", "button");
+    li.innerHTML = '<button type="button" class="box" aria-label="Tick ' + esc(s.t) + '"></button><span class="n">' + s.n + '</span><div class="txt"><div class="t">' + esc(s.t) + '</div><div class="w">' + esc(s.w) + '</div></div><div><div class="d">' + (s.parts.length ? durText(s) : "tick") + '</div><div class="at"></div></div>';
+    li.querySelector(".box").addEventListener("click", e => { e.stopPropagation(); toggleStep(s); });
+    li.addEventListener("click", e => { selectStep(s); if (e.detail > 0) li.blur(); });
+    li.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); toggleStep(s); } });
+    ol.appendChild(li);
+  });
+  const kinds = []; STEPS.forEach(s => { if (!kinds.includes(s.kind)) kinds.push(s.kind); });
+  $("legend").innerHTML = kinds.map(k => '<span data-kind="' + k + '"><i></i>' + KIND_NAMES[k] + "</span>").join("");
+}
+function durText(s) {
+  if (s.kind === "review" && s.parts.length === 5) return fmt(s.parts[0].sec * 3).replace(/:00$/, "") + " + 2×" + fmt(s.parts[1].sec).replace(/:00$/, "");
+  if (s.kind === "ccs" && s.parts.length === 2) return fmt(s.parts[0].sec) + " + " + fmt(s.parts[1].sec).replace(/:00$/, "");
+  const t = fmt(s.total); return s.total % 60 === 0 && s.total >= 600 ? t.replace(/:00$/, "") + " min" : t;
+}
+function render() {
+  buildList();
+  const now = Date.now(), c = cd(), cur = current(), runs = toolRuns();
+  const cal = calFor(D.date), n = dayNumber(D.date);
+  const tplName = { tonight: "tonight's list", rehearsal: "rehearsal day", between: "between exam days", interface: "interface day", minimum: "minimum day", exam: "exam day", off: "day off" }[D.tpl];
+  $("tagline").textContent = dayLabel(D.date) + (n >= 1 && n <= S.nDays ? " · Day " + n + " of " + S.nDays : n === 0 ? " · tomorrow is Day 1" : "") + (tplName ? " · " + tplName : "");
+  $("planStart").textContent = S.planStart || "8:00 AM"; $("planEnd").textContent = S.planEnd || "~10:00 PM";
+  renderProjection(now, c, runs);
+  renderNow(now, c, cur, runs);
+  renderTotals(now);
+  renderList(now, c, cur, runs);
+  renderTen();
+  $("seqMeta").textContent = STEPS.filter(s => isDone(s.id)).length + " of " + STEPS.length + " ticked" + (cal.note ? " · " + cal.note : "");
+}
+function renderProjection(now, c, runs) {
+  const el = $("proj");
+  if (!STEPS.some(s => s.parts.length)) { el.textContent = calFor(D.date).note || ""; el.className = "proj"; return; }
+  if (allDone()) { el.innerHTML = "Day ticked · started <b>" + esc(clockOf(D.startedAt || now)) + "</b> · done <b>" + esc(clockOf(D.finishedAt || now)) + "</b>"; el.className = "proj done"; return; }
+  let rem = remainingPlanned();
+  const cur = current(), run = cur && !c ? runs.find(r => r.kind === cur.kind) : null;
+  if (run) { // the current step runs in its own page: its time left replaces the plan's, the parts after it stay
+    rem -= cur.total;
+    rem += Math.max(0, run.left);
+    if (cur.kind === "ccs" && run.sub === "case") rem += S.feedbackSec;
+    if (cur.kind === "review" && run.sub !== "stand") rem += 2 * reviewCfg().stand;
+  }
+  const endAt = now + rem * 1000;
+  const late = endAt > dayStart(D.date) + (22.5 - ROLL_HOUR) * 3600000;
+  el.innerHTML = (D.startedAt ? "Started <b>" + esc(clockOf(D.startedAt)) + "</b> · " : "") + "on this pace, done at <b>" + esc(clockOf(endAt)) + "</b> · " + esc(fmtH(rem)) + " to go";
+  el.className = "proj" + (late ? " late" : "");
+}
+function btn(label, cls, id) { return '<button type="button" class="' + (cls || "") + '" data-act="' + id + '">' + label + "</button>"; }
+const TOOL_PAGE = { block: ["Block", "./"], review: ["Review", "./review.html"], ccs: ["CCS", "./ccs.html"] };
+let nowSig = "", stripSig = "";
+function renderNow(now, c, cur, runs) {
+  const box = $("now");
+  const step = c ? c.step : cur;
+  const big = $("nowBig"), stage = $("nowStage"), cue = $("nowCue"), parts = $("nowParts"), mirror = $("nowMirror");
+  if (!step) { // every step ticked
+    const sig = "done|" + D.date;
+    if (nowSig !== sig) {
+      nowSig = sig; box.dataset.kind = "off";
+      $("nowPill").textContent = "Done"; $("nowWho").textContent = dayLabel(D.date);
+      $("nowTitle").innerHTML = '<span class="n">✓</span>The day is ticked.';
+      $("nowWhy").textContent = STEPS.length + " of " + STEPS.length + ". Lights out within the hour — tomorrow's 8:00 depends on it.";
+      $("nowCase").hidden = true; mirror.hidden = true; parts.innerHTML = ""; stage.innerHTML = ""; cue.textContent = "";
+      $("nowBtns").innerHTML = ""; $("nowSub").innerHTML = ""; $("nowLinks").innerHTML = "";
+      $("mirrorStrip").hidden = true;
+    }
+    box.dataset.tone = "idle";
+    big.textContent = D.startedAt && D.finishedAt ? fmtH((D.finishedAt - D.startedAt) / 1000) : "✓";
+    return;
+  }
+  const run = runs.find(r => r.kind === step.kind) || null;
+  const others = runs.filter(r => r !== run);
+  // the thin line about a run of another kind (e.g. a review running while the current step is a case)
+  const strip = $("mirrorStrip");
+  if (others.length) {
+    const r = others[0], ss = r.kind + "|" + r.id + "|" + (r.where || "") + "|" + r.href;
+    if (stripSig !== ss) { stripSig = ss; strip.hidden = false; strip.dataset.kind = r.kind; strip.innerHTML = "<span>Also running — " + esc(r.label) + (r.where ? " on your " + esc(r.where) : " in the " + r.page + " page") + ' · <b class="sl"></b> left</span>' + (r.where ? "" : '<a href="' + r.href + '">Open</a>'); }
+    strip.querySelector(".sl").textContent = fmt(Math.max(0, Math.ceil(r.left)));
+  } else if (!strip.hidden || stripSig) { strip.hidden = true; stripSig = ""; }
+
+  const mode = c ? (c.kind === "wait" ? "wait" : "run") : run ? "mirror" : "idle";
+  const idx = STEPS.indexOf(step), after = STEPS[idx + 1];
+  const over = !!(c && c.kind !== "wait" && c.over), paused = !!(c && c.paused);
+  const sig = [D.date, step.id, mode, c ? c.part : "", c ? c.kind : "", over, paused, skipArmed ? 1 : 0, S.sound ? 1 : 0, run ? run.href + run.paused + run.sub + (run.where || "") : ""].join("|");
+  if (nowSig !== sig) {
+    nowSig = sig;
+    box.dataset.kind = step.kind;
+    $("nowTitle").innerHTML = '<span class="n">' + step.n + "</span>" + esc(step.t);
+    $("nowWhy").textContent = step.w;
+    const caseEl = $("nowCase");
+    if (step.kind === "ccs" && step.caseNum) { caseEl.hidden = false; caseEl.innerHTML = '<span class="casenum">Case number <b>' + esc(step.caseNum) + "</b></span>"; } else caseEl.hidden = true;
+    const tp = step.tool ? TOOL_PAGE[step.tool] : null;
+    $("nowLinks").innerHTML = (tp && mode !== "mirror" ? '<a href="' + tp[1] + '">Open the ' + tp[0] + " page ↗</a>" : "") +
+      (step.kind === "bio" ? '<a class="plain" href="https://claude.ai/artifact/1UrfVMa6zbxTSL6HjHd7sL" target="_blank" rel="noopener">Biostats cheat sheet</a>' : "") +
+      (step.kind === "ccs" ? '<a class="plain" href="https://claude.ai/artifact/Cwf9KyimSGTQvzEjEBr3HG" target="_blank" rel="noopener">CCS cheat sheet</a>' : "");
+    const btns = $("nowBtns"), sub = $("nowSub");
+    if (mode === "mirror") {
+      $("nowPill").textContent = "Running"; $("nowWho").textContent = run.where ? "on your " + run.where : "in the " + run.page + " page";
+      mirror.hidden = false; mirror.className = "mirror";
+      mirror.innerHTML = '<div class="mrow"><span>' + esc(run.label) + " · " + esc(run.sub) + (run.paused ? " · paused" : "") + '</span><b class="ml"></b></div><p class="note">This step ticks itself when the ' + run.page + " page saves it. The time left comes from that page.</p>";
+      cue.textContent = run.kind === "block" ? "Tap in the Block page as you submit each question." : run.kind === "review" ? "Timer B lives in the Review page." : "The case clock lives in the CCS page.";
+      btns.innerHTML = (run.where ? "" : '<a class="go" href="' + run.href + '" style="display:grid;place-items:center;text-decoration:none;border-radius:12px;font-weight:700;font-size:18px;min-height:72px;background:var(--kc);color:#fff">Go to the ' + run.page + " page</a>") + btn("Tick done ✓", "done" + (run.where ? " solo" : ""), "done");
+      sub.innerHTML = "";
+    } else if (mode === "idle") {
+      mirror.hidden = true;
+      $("nowPill").textContent = idx === 0 ? "First" : "Next"; $("nowWho").textContent = step.parts.length ? durText(step) : "tick when done";
+      stage.innerHTML = step.parts.length > 1 ? "<span>" + step.parts.map(p => esc(p.l) + " " + fmt(p.sec).replace(/:00$/, "")).join(" · ") + "</span>" : (after ? "<span>then · " + after.n + " " + esc(after.t) + "</span>" : "");
+      cue.textContent = step.parts.length ? (step.tool ? "Start here, or run it in the " + TOOL_PAGE[step.tool][0] + " page — the step ticks itself." : "Press Start when you begin.") : "Tap Done when it is done.";
+      btns.innerHTML = (step.parts.length ? btn("Start · " + fmt(step.parts[0].sec), "go", "start") : "") + btn("Done ✓", "done" + (step.parts.length ? "" : " solo"), "done");
+      sub.innerHTML = (idx > 0 ? btn("↑ Previous", "", "prev") : "") + (after ? btn("Next ↓", "", "next") : "") + btn(skipArmed ? "Skip — sure?" : "Skip", skipArmed ? "armed" : "", "skip") + btn(S.sound ? "Sound on" : "Sound off", "", "sound");
+    } else if (mode === "wait") {
+      mirror.hidden = true;
+      $("nowPill").textContent = c.label + " over"; $("nowWho").textContent = "part " + (c.part + 1) + " of " + step.parts.length + " done";
+      stage.innerHTML = "<span>next · " + esc(c.next ? c.next.l : "") + "</span><span>" + esc(step.parts.slice(c.part + 2).map(p => p.l).join(" · ")) + "</span>";
+      cue.textContent = c.next && c.next.l === "Feedback" ? "Open the feedback. One missed order, the misspelled words." : "Back at the desk? Start " + (c.next ? c.next.l : "the next part") + ".";
+      btns.innerHTML = btn("Start " + esc(c.next ? c.next.l : "") + " · " + fmt(c.next ? c.next.sec : 0), "go", "part") + btn("Done ✓ · end the step", "done", "done");
+      sub.innerHTML = btn(skipArmed ? "Skip — sure?" : "Skip", skipArmed ? "armed" : "", "skip") + btn("Stop", "", "stop") + btn(S.sound ? "Sound on" : "Sound off", "", "sound");
+    } else { // run
+      mirror.hidden = true;
+      $("nowPill").textContent = paused ? "Paused" : over ? "Time" : c.kind === "break" ? "Break" : "Running";
+      $("nowWho").textContent = c.kind === "break" ? "the break shows on every page" : step.parts.length > 1 ? c.label + " · part " + (c.part + 1) + " of " + step.parts.length : c.label;
+      cue.textContent = over ? (c.last ? "Tick it. The next step is waiting." : c.label + " is over.") : c.kind === "break" ? "Out of the chair. No screen." : step.kind === "block" ? "Easy ones first. 2:00 left → fill every blank." : step.kind === "review" ? (c.label === "Stand" ? "Stand. Walk. Water. No phone." : "Wrong first, 5+3. Right ones 60 s.") : step.kind === "ccs" ? (c.label === "Feedback" ? "One missed order + the misspelled words." : "Location → stabilize → orders → advance the clock → reassess → close line.") : step.kind === "meal" ? "Away from the desk." : step.kind === "bio" ? "Draw the 2×2 first." : "";
+      btns.innerHTML = btn(over ? "Done ✓ · next step" : "Done ✓", "done" + (over ? " solo" : ""), "done") + (over ? "" : btn("+5:00", "", "ext"));
+      sub.innerHTML = (c.kind === "own" ? btn(paused ? "Resume" : "Pause", "", "pause") : btn("+5:00", "", "ext")) + btn(skipArmed ? "Skip — sure?" : "Skip", skipArmed ? "armed" : "", "skip") + btn("Stop", "", "stop") + btn(S.sound ? "Sound on" : "Sound off", "", "sound");
+    }
+    wire();
+  }
+  // the parts bar
+  if (step.parts.length > 1) {
+    parts.innerHTML = step.parts.map((p, i) => { const done = c && (c.part > i || (c.kind === "wait" && c.part >= i)); const curP = c && c.part === i && c.kind !== "wait"; const w = curP ? Math.min(100, c.el / c.sec * 100) : done ? 100 : 0; return '<i class="' + (p.brk ? "brk " : "") + (done ? "done " : "") + (curP ? "cur" : "") + '" style="flex:' + p.sec + '"><b style="width:' + w + '%"></b></i>'; }).join("");
+  } else if (c && c.kind !== "wait") parts.innerHTML = '<i class="cur"><b style="width:' + Math.min(100, c.el / c.sec * 100) + '%"></b></i>';
+  else parts.innerHTML = "";
+  // the clock and the line under it
+  if (mode === "mirror") {
+    box.dataset.tone = run.paused ? "paused" : "normal";
+    const left = Math.max(0, Math.ceil(run.left));
+    big.textContent = fmt(left); const ml = mirror.querySelector(".ml"); if (ml) ml.textContent = fmt(left);
+    stage.innerHTML = "<span>" + esc(run.page) + " page · " + esc(run.sub) + "</span><span>ends at <b>" + esc(clockOf(now + left * 1000)) + "</b></span>";
+  } else if (mode === "idle") {
+    box.dataset.tone = "idle";
+    big.textContent = step.parts.length ? fmt(step.parts[0].sec) : "—";
+  } else if (mode === "wait") {
+    box.dataset.tone = "idle";
+    big.textContent = fmt(c.next ? c.next.sec : 0);
+  } else {
+    box.dataset.tone = paused ? "paused" : over ? "over" : (c.left <= 60 && c.sec >= 300) ? "warn" : "normal";
+    big.textContent = over ? "+" + fmt(-c.left) : fmt(Math.ceil(c.left));
+    stage.innerHTML = "<span>" + (over ? '<span class="over">over by ' + esc(fmt(-c.left)) + "</span>" : "of " + esc(fmt(c.sec))) + "</span><span>" + (paused ? "paused" : (over ? "ended at" : "ends at") + " <b>" + esc(clockOf(c.endAt)) + "</b>") + "</span>";
+  }
+}
+function wire() {
+  $("now").querySelectorAll("[data-act]").forEach(b => {
+    b.onclick = e => {
+      const a = b.dataset.act, c = cd(), s = c ? c.step : current();
+      if (a === "start") startStep(s, 0);
+      else if (a === "part") startNextPart();
+      else if (a === "done") finishStep(s, c ? "timer" : "tap");
+      else if (a === "ext") extend(300);
+      else if (a === "pause") pauseResume();
+      else if (a === "skip") skipStep();
+      else if (a === "stop") stopTimerOnly();
+      else if (a === "sound") { S.sound = !S.sound; P.setSound(S.sound); saveSettings(); if (S.sound) { P.audioInit(); P.sfx("start"); } render(); }
+      else if (a === "prev") { const i = STEPS.indexOf(s); for (let j = i - 1; j >= 0; j--) if (!isDone(STEPS[j].id)) { D.cur = STEPS[j].id; persist(); render(); return; } }
+      else if (a === "next") { const i = STEPS.indexOf(s); for (let j = i + 1; j < STEPS.length; j++) if (!isDone(STEPS[j].id)) { D.cur = STEPS[j].id; persist(); render(); return; } }
+      if (e.detail > 0) b.blur();
+    };
+  });
+}
+function renderTotals(now) {
+  const done = STEPS.filter(s => isDone(s.id));
+  const study = done.reduce((a, s) => a + s.study, 0), brk = done.reduce((a, s) => a + s.brk, 0);
+  const c = cd(); let liveStudy = 0, liveBrk = 0;
+  if (c && c.kind !== "wait") { const sofar = Math.min(c.el, c.sec); if (c.step.parts[c.part] && c.step.parts[c.part].brk) liveBrk = sofar; else liveStudy = sofar; for (let i = 0; i < c.part; i++) { const p = c.step.parts[i]; if (p.brk) liveBrk += p.sec; else liveStudy += p.sec; } }
+  const dayEl = D.startedAt ? ((allDone() && D.finishedAt ? D.finishedAt : now) - D.startedAt) / 1000 : 0;
+  $("tots").innerHTML =
+    '<div class="tot" data-k="study"><span class="l">Study</span><span class="v">' + esc(fmtH(study + liveStudy)) + '</span><span class="d">blocks · reviews · cases</span></div>' +
+    '<div class="tot" data-k="brk"><span class="l">Breaks</span><span class="v">' + esc(fmtH(brk + liveBrk)) + '</span><span class="d">breaks · meals · stands</span></div>' +
+    '<div class="tot" data-k="done"><span class="l">Ticked</span><span class="v">' + done.length + " / " + STEPS.length + '</span><span class="d">' + esc(STEPS.length - done.length ? (STEPS.length - done.length) + " to go" : "all of it") + '</span></div>' +
+    '<div class="tot" data-k="day"><span class="l">Day</span><span class="v">' + esc(D.startedAt ? fmtH(dayEl) : "—") + '</span><span class="d">' + esc(D.startedAt ? "since " + clockOf(D.startedAt) : "not started") + "</span></div>";
+}
+function renderList(now, c, cur, runs) {
+  const run = cur ? runs.find(r => r.kind === cur.kind) : null;
+  Array.from($("steps").children).forEach(li => {
+    const s = stepById(li.dataset.id); if (!s) return;
+    const done = isDone(s.id), isCur = cur && cur.id === s.id && !done, running = c && c.step.id === s.id;
+    li.classList.toggle("done", done); li.classList.toggle("cur", !!isCur && !running); li.classList.toggle("run", !!running);
+    li.setAttribute("aria-current", isCur ? "step" : "false");
+    const box = li.querySelector(".box"); box.textContent = done ? "✓" : ""; box.setAttribute("aria-pressed", done ? "true" : "false");
+    const d = li.querySelector(".d"), at = li.querySelector(".at");
+    if (running) d.textContent = c.kind === "wait" ? "next part" : (c.over ? "+" + fmt(-c.left) : fmt(Math.ceil(c.left)));
+    else if (isCur && run) d.textContent = fmt(Math.max(0, Math.ceil(run.left)));
+    else d.textContent = s.parts.length ? durText(s) : "tick";
+    const rec = D.steps[s.id];
+    at.textContent = done && rec ? clockOf(rec.at) + (rec.src === "tool" ? " · from the page" : rec.src === "skip" ? " · skipped" : rec.src === "timer" || rec.src === "break" ? "" : " · by hand") : "";
+  });
+}
+function renderTen() {
+  const sig = D.date + "|" + D.tpl + "|" + STEPS.filter(s => isDone(s.id)).length + "|" + STEPS.length + "|" + S.dayOne + "|" + S.nDays;
+  if (sig === tenSig) return; tenSig = sig;
+  const h = history(), byDate = {}; h.forEach(r => { byDate[r.date] = r; });
+  const cal = calendar(), today = D.date, cells = [];
+  for (let i = 0; i < S.nDays; i++) {
+    const k = addDays(S.dayOne, i), rec = k === today ? { done: STEPS.filter(s => isDone(s.id)).length, total: STEPS.length, tpl: D.tpl } : byDate[k];
+    const tpl = rec ? rec.tpl : (cal[k] ? cal[k].tpl : "study");
+    const future = k > today, d = parseKey(k);
+    let cls = future ? "future" : rec ? (rec.total && rec.done >= rec.total ? "all" : rec.done ? "part" : "") : "";
+    if (tpl === "off") cls += " off";
+    if (k === today) cls += " today";
+    cells.push('<div class="' + cls.trim() + '"><span class="dl">' + d.toLocaleDateString(undefined, { weekday: "short" }) + " " + d.getDate() + '</span><span class="dv">' + (tpl === "off" ? "off" : rec ? rec.done + "/" + rec.total : "·") + "</span></div>");
+  }
+  $("ten").innerHTML = cells.join("");
+  $("tenTitle").textContent = S.nDays === 10 ? "The ten days" : "The " + S.nDays + " days";
+  const past = h.filter(r => r.date >= S.dayOne && r.date < today && r.tpl !== "off");
+  $("tenMeta").textContent = past.length ? past.filter(r => r.total && r.done >= r.total).length + " of " + past.length + " past days fully ticked" : dayLabel(S.dayOne) + " → " + dayLabel(addDays(S.dayOne, S.nDays - 1));
+}
+
+/* ---------- settings ---------- */
+function settingsMsg(t) { $("settingsMsg").textContent = t; }
+const DUR_FIELDS = [["arriveSec", "Arrive"], ["shortSec", "Short break"], ["mealSec", "Lunch · dinner"], ["bioSec", "Biostats contact"], ["caseSec", "CCS case"], ["feedbackSec", "CCS feedback"], ["closeSec", "Close the day"], ["sampleSec", "Official sample block"], ["notesSec", "Notes read (Nov 16)"], ["packSec", "Pack (Nov 17)"]];
+function fillSettings() {
+  $("fDayOne").value = S.dayOne; $("fDays").value = S.nDays; $("fPlanStart").value = S.planStart; $("fPlanEnd").value = S.planEnd; $("fTpl").value = S.tpl; $("fRemind").checked = !!S.remind; $("fTheme").value = P.getTheme();
+  $("fCal").value = S.cal;
+  const rv = reviewCfg();
+  $("durs").innerHTML = DUR_FIELDS.map(([k, l]) => '<label>' + l + '<input type="text" inputmode="numeric" data-dur="' + k + '" value="' + fmt(S[k]) + '"></label>').join("") +
+    '<label>Block<span class="ro">' + fmt(blockSec()) + ' · Block page</span></label><label>Break after a task<span class="ro">' + fmt(breakSec()) + ' · Breaks below</span></label><label>Review chunk · stand<span class="ro">' + fmt(rv.chunk) + " · " + fmt(rv.stand) + ' · Review page</span></label>';
+}
+function applySettings() {
+  const dayOne = $("fDayOne").value, nDays = parseInt($("fDays").value, 10);
+  if (!parseKey(dayOne) || !nDays || nDays < 1 || nDays > 60) { settingsMsg("Check Day 1 and the number of days."); return; }
+  const durs = {};
+  for (const [k] of DUR_FIELDS) { const v = parseMS($("durs").querySelector('[data-dur="' + k + '"]').value); if (v == null || v < 60 || v > 4 * 3600) { settingsMsg("Durations as mm:ss, 1:00 to 240:00."); return; } durs[k] = v; }
+  const tpl = TPLS.includes($("fTpl").value) ? $("fTpl").value : "auto";
+  S = Object.assign({}, S, durs, { dayOne: dayOne, nDays: nDays, planStart: $("fPlanStart").value.trim() || "8:00 AM", planEnd: $("fPlanEnd").value.trim() || "~10:00 PM", tpl: tpl, remind: $("fRemind").checked, cal: $("fCal").value, v: 1 });
+  saveSettings();
+  const want = tplFor(D.date);
+  if (want !== D.tpl) {
+    if (anyDone() || D.timer) { settingsMsg("Saved. Today keeps its current list — \"Start today over\" switches it to " + want + "."); }
+    else { D.tpl = want; }
+  } else settingsMsg("Saved.");
+  STEPS = buildSteps(D.date, D.tpl); builtFor = ""; persist(); fillSettings(); render();
+}
+
+/* ---------- wiring ---------- */
+function init() {
+  P.applyTheme(); P.renderNav("day");
+  loadSettings(); loadDay(); fillSettings();
+  $("btnApply").addEventListener("click", applySettings);
+  $("btnCalReset").addEventListener("click", () => { $("fCal").value = CAL_DEFAULT; settingsMsg("Calendar reset to the plan — press Save settings."); });
+  $("btnNewDay").addEventListener("click", newDay);
+  $("fTheme").addEventListener("change", () => P.setTheme($("fTheme").value));
+  document.addEventListener("keydown", e => {
+    const t = e.target, tag = t && t.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || tag === "SUMMARY" || (t && t.classList && t.classList.contains("st"))) return;
+    const c = cd(), s = c ? c.step : current();
+    if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); if (!s) return; if (!c) startStep(s, 0); else if (c.kind === "wait") startNextPart(); else finishStep(s, "timer"); }
+    else if (e.key === "d" || e.key === "D") { if (s) finishStep(s, c ? "timer" : "tap"); }
+    else if (e.key === "n" || e.key === "N") { if (c && c.kind === "wait") startNextPart(); }
+    else if (e.key === "p" || e.key === "P") pauseResume();
+    else if (e.key === "e" || e.key === "E") extend(300);
+  });
+  P.bg.bind({
+    type: "day",
+    running: () => { const c = cd(); return !!c && c.kind !== "wait" && !c.paused && (!c.chimed || (c.last && S.remind && c.reminded < REMIND_MAX)); },
+    events: events,
+    elapsedAt: ts => { const c = cd(); return c && c.kind !== "wait" ? Math.max(0, (ts - c.startAt - (c.pausedTotal || 0)) / 1000) : 0; },
+    epochOf: el => { const c = cd(); return c && c.kind !== "wait" ? c.startAt + (c.pausedTotal || 0) + el * 1000 : Date.now(); },
+    label: () => { const c = cd(); return c ? c.step.t + " · " + c.label : "Day"; },
+    after: () => { persist(); render(); }
+  });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { const c = cd(); if (c && c.kind !== "wait" && !c.paused) P.keepAwake(); lastAbsorb = 0; tick(); } });
+  window.addEventListener("storage", e => {
+    if (!e.key || e.key.indexOf("step3pacer.") !== 0 || e.key === LS_D) return;
+    lastAbsorb = 0;
+    if (e.key === P.KEYS.brk && (e.newValue === null || e.newValue === "null") && D.timer && D.timer.shared) { D.timer.gone = true; tick(); }   // Skip / Dismiss pressed on another page of this device
+  });
+  P.renderBgSettings($("bgSettings"), { note: "The end of a step and the minute reminders are notified while the page is hidden; what was missed is caught up when you come back." });
+  P.renderBreakSettings($("brkSettings"));
+  P.live.bind({
+    type: "day", noun: "day", statusEl: $("liveStatus"), get: () => D, idOf: s => s && s.date,
+    active: () => anyDone() || !!D.timer,
+    apply: state => {
+      if (!state || state.date !== keyOf(Date.now())) return;
+      D = Object.assign(freshDay(state.date), state); D.steps = D.steps || {}; D.consumed = D.consumed || {};
+      STEPS = buildSteps(D.date, D.tpl); builtFor = ""; P.writeJSON(LS_D, D);
+      const c = cd(); if (c && c.kind !== "wait" && !c.paused) { P.keepAwake(); P.bg.runStart(c.step.t); }
+      render();
+    }
+  });
+  const c0 = cd(); if (c0 && c0.kind !== "wait" && !c0.paused) P.bg.runStart(c0.step.t);
+  $("installNote").hidden = P.standalone();
+  setInterval(tick, 250);
+  render();
+  /* a small hook for the automated checks: read the state, move a running timer in time */
+  window.__day = { state: () => D, steps: () => STEPS, patchTimer: patch => { if (D.timer) { Object.assign(D.timer, patch); persist(); tick(); } } };
+}
+init();
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); }); }
+})();
+</script>
+</body>
+</html>

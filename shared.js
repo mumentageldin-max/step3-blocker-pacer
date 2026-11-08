@@ -155,7 +155,13 @@ window.Pacer = (() => {
     budget: () => { tone(523, .14, 0, "sine", .07); tone(659, .14, .16, "sine", .07); tone(523, .3, .32, "sine", .07); },
     /* CCS phases: soft sine pairs, rising for a new phase, falling for the close phase */
     phase: () => { tone(659, .12, 0, "sine", .08); tone(880, .22, .14, "sine", .08); },
-    close: () => { tone(880, .12, 0, "sine", .08); tone(659, .12, .14, "sine", .08); tone(523, .3, .28, "sine", .08); }
+    close: () => { tone(880, .12, 0, "sine", .08); tone(659, .12, .14, "sine", .08); tone(523, .3, .28, "sine", .08); },
+    /* the Day page: a rising four-note arpeggio with a held top note, played twice — the only melody in the app, so a
+       step's end is never mistaken for a block, review or case sound. dayPart = one pass for a part inside a step
+       (case → feedback, chunk → stand); dayWarn = two soft notes one minute before the end. */
+    day: () => { [0, 1.15].forEach(o => { [[523, 0], [659, .13], [784, .26], [1047, .39]].forEach(([f, at]) => { tone(f, .14, o + at, "triangle", .13); tone(f / 2, .14, o + at, "sine", .05); }); tone(1047, .55, o + .55, "triangle", .13); tone(523, .55, o + .55, "sine", .06); }); },
+    dayPart: () => { [[523, 0], [659, .13], [784, .26]].forEach(([f, at]) => tone(f, .14, at, "triangle", .12)); tone(784, .4, .42, "triangle", .12); },
+    dayWarn: () => { tone(784, .16, 0, "sine", .07); tone(659, .3, .2, "sine", .07); }
   };
   function sfx(kind) { audioInit(); const f = SFX[kind]; if (f) f(); }
   function sfxLater(kinds, gapMs) { // several chimes one after the other (catch-up after being hidden)
@@ -177,7 +183,7 @@ window.Pacer = (() => {
   function renderNav(active) {
     const el = document.getElementById("pnav");
     if (!el) return;
-    const items = [["block", "./", "Block"], ["review", "./review.html", "Review"], ["ccs", "./ccs.html", "CCS"], ["stats", "./stats.html", "Stats"]];
+    const items = [["day", "./day.html", "Day"], ["block", "./", "Block"], ["review", "./review.html", "Review"], ["ccs", "./ccs.html", "CCS"], ["stats", "./stats.html", "Stats"]];
     el.className = "pnav";
     el.innerHTML = items.map(([k, href, label]) => '<a href="' + href + '"' + (k === active ? ' aria-current="page"' : "") + ">" + label + "</a>").join("");
   }
@@ -366,7 +372,8 @@ window.Pacer = (() => {
       if (!B || !on()) return;
       clearTimeout(pushTimer); push();
     }
-    return { bind, touch, pull, clear, on, status };
+    function peek() { return doc; }          // the last live document fetched (all slots), or null
+    return { bind, touch, pull, clear, on, status, peek };
   })();
 
   /* ---------- background: catch-up on return, notifications while hidden, keep-alive audio, PiP ----------

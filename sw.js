@@ -3,11 +3,12 @@
    Holds the pacer's upcoming events while the page is hidden and shows them as notifications (best effort:
    the browser may stop an idle worker, so the page re-checks on return). Bump VERSION whenever a page changes
    so installed copies pick up the update. */
-const VERSION = "pacer-v13";
+const VERSION = "pacer-v14";
 const FONT_CACHE = "pacer-fonts";
 const SHELL = [
   "./",
   "./index.html",
+  "./day.html",
   "./review.html",
   "./stats.html",
   "./ccs.html",
@@ -17,6 +18,7 @@ const SHELL = [
   "./manifest.webmanifest",
   "./manifest-review.webmanifest",
   "./manifest-ccs.webmanifest",
+  "./manifest-day.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
@@ -28,7 +30,11 @@ const SHELL = [
   "./icons/ccs-192.png",
   "./icons/ccs-512.png",
   "./icons/ccs-maskable-512.png",
-  "./icons/ccs-apple-touch-icon.png"
+  "./icons/ccs-apple-touch-icon.png",
+  "./icons/day-192.png",
+  "./icons/day-512.png",
+  "./icons/day-maskable-512.png",
+  "./icons/day-apple-touch-icon.png"
 ];
 
 self.addEventListener("install", event => {

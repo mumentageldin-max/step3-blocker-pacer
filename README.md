@@ -1,6 +1,8 @@
-# Step 3 Pacer — Block, Review, CCS and Stats
+# Step 3 Pacer — Day, Block, Review, CCS and Stats
 
-Four pages, one installable app:
+Five pages, one installable app:
+
+- **Day** (`day.html`, since Nov 7) — the study day as one sequence. The 22 steps of a study day (arrive · 4 blocks with their breaks · lunch · biostats contact · 2 CCS cases · 4 reviews · dinner · close) as a tickable list, color-coded like the printed sheet, and one **Now** card that runs the current step's timer: 37:30 for a block, 10 or 20 for a break, 30 for a meal, 12:30 + 10:00 feedback for a case (two parts), 30 · stand 10 · 30 · stand 10 · 30 for a review (five parts; the stand starts by itself, the next chunk waits for a tap). **Start** runs the step, **Done** ticks it and moves on; a break or meal starts by itself when the task before it ends on its timer, and it is the same shared break the other pages show. The end of a step has its own sound — a rising four-note melody played twice, the only melody in the app — with a long vibration where the device allows it, two soft notes one minute before, and a repeat once a minute (five at most) until the step is ticked; all of it also as notifications while the page is hidden. A block, review or case run in its own page is mirrored on the card ("Running in the Block page · 27:30") and ticks its step by itself when that page saves it; the breaks before it are ticked too. Totals (study, breaks, ticked, day clock), the time you will be done on this pace, a ten-day strip, and other sequences from the calendar: tonight (Nov 7), rehearsal (Nov 14), interface and minimum days (Nov 16–17), exam days, days off, the between-exam days. The day rolls over at 4:00 AM. Durations, Day 1, the calendar (date | sequence | case numbers | note) are in Settings; the block, break and review lengths come from their own pages.
 
 - **Block** (`index.html`) — 37:30 countdown for a 20-question UWorld block, checkpoint targets, ahead/behind verdicts, flag-at-50 mode, the 2:00 fill-every-blank alert. The time on the current question is big and in minutes (m:ss): amber from 1:00, orange from 1:30, red from 1:52 (37:30 ÷ 20) with its own soft sound once per question; violet "flag & move" from 0:50 after a behind checkpoint. Each stage has a word, not only a color. Since Nov 7 the last tap does not end the block: the clock keeps running for flags and blanks and the block ends when you press **End block** (the moment you press End Block in UWorld) or at 0:00 — Settings → "After the last question is tapped" brings back the old end-at-last-tap behaviours.
 - **Review** (`review.html`) — Timer A (90:00 in three 30-minute chunks with a 10-minute stand between them) and Timer B (5:00 + 3:00 per wrong question, 60 s per right one), K/M/T/G tagging, parking lot, EO-only sweep at the hard stop, notebook line. Default order since Nov 7: **wrong questions first** (UWorld Results → Show: Incorrect), then the right ones with whatever time is left — the chooser offers only the kind that is due and shows "time left ÷ right questions left"; "Any order" in the setup restores the free chooser.
@@ -15,7 +17,7 @@ and push the same commit to both `main` and `gh-pages`.
 
 ## Install
 
-- **iPad Pro:** open the address in Safari → Share → **Add to Home Screen**. Do it from the Block, Review and CCS pages if you want three icons.
+- **iPad Pro:** open the address in Safari → Share → **Add to Home Screen**. Do it from the Day, Block, Review and CCS pages if you want four icons.
 - **Galaxy Z Fold 7:** open it in Chrome or Samsung Internet → ⋮ menu → **Install app**. The Review page offers its own install too.
 - **iMac / Mac mini:** Safari → File → **Add to Dock**; or Chrome → the install icon at the right of the address bar.
 
@@ -46,5 +48,5 @@ Blocks, reviews and CCS cases save themselves on the device they ran on. Stats �
 
 ## Notes
 
-- Settings (block length, checkpoint targets, review timers, case clock direction, theme) are per device. Background & sound settings are per device too, but shared by all four pages.
+- Settings (block length, checkpoint targets, review timers, case clock direction, day durations and calendar, theme) are per device. Background & sound settings are per device too, but shared by all five pages. The Day page's ticks and running step travel between devices through the live-sync file like a running block does.
 - Installed copies pick up a new `VERSION` of `sw.js` on their next open.
