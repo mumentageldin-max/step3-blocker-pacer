@@ -202,7 +202,7 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
           <li><b>Steps with parts</b> — a CCS case is 12:30 then 10:00 of feedback; a review is 30 · stand 10 · 30 · stand 10 · 30. The stand starts by itself; the next chunk and the feedback wait for your tap.</li>
           <li><b>The sound.</b> A step's end is a rising four-note melody played twice, with a long vibration where the device allows it (Android; iPad and iPhone do not vibrate from a web app). One minute before the end: two soft notes. If you do not tick within a minute, the melody repeats — once a minute, five times at most (Settings).</li>
           <li><b>The other pages still work.</b> Run a block in the Block page, a review in the Review page, a case in the CCS page: this card shows it running, and the step ticks itself when it is saved. The 20-minute break after a block, a review or a case is the same break on every page.</li>
-          <li><b>Tick by hand</b> when you did a step without a timer: tap its box. Tap a row to make it the current step. Tap a ticked box to untick.</li>
+          <li><b>Tick by hand</b> when you did a step without a timer: tap its box. Tap a row to make it the current step. Tap a ticked box to untick — a step you untick stays unticked until you tick it; the page never re-ticks it on its own.</li>
           <li><b>Hidden app.</b> Allow notifications (Settings → Background &amp; sound): the end of a step, and the reminders, arrive as notifications when the page is hidden. On iPad, open the pacer from the Home Screen icon. Whatever was missed is caught up the moment you come back.</li>
           <li>The day rolls over at <b>4:00 AM</b>, so a night that runs past midnight stays one day. Days are kept for the ten-day strip.</li>
         </ol>
@@ -463,7 +463,7 @@ function loadSettings() {
   P.setSound(S.sound);
 }
 function saveSettings() { P.writeJSON(LS_S, S); }
-function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, startedAt: 0, finishedAt: 0, updatedAt: 0 }; }
+function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, startedAt: 0, finishedAt: 0, updatedAt: 0 }; }
 function persist(touch) { D.updatedAt = Date.now(); P.writeJSON(LS_D, D); if (touch !== false) P.live.touch(); }
 function history() { const h = P.readJSON(LS_H, []); return Array.isArray(h) ? h : []; }
 function archive(day) { // keep a finished day for the strip
@@ -477,7 +477,7 @@ function archive(day) { // keep a finished day for the strip
 function loadDay() {
   const k = keyOf(Date.now());
   const p = P.readJSON(LS_D, null);
-  if (p && typeof p === "object" && p.date === k) { D = Object.assign(freshDay(k), p); D.steps = D.steps || {}; D.consumed = D.consumed || {}; }
+  if (p && typeof p === "object" && p.date === k) { D = Object.assign(freshDay(k), p); D.steps = D.steps || {}; D.consumed = D.consumed || {}; D.manual = D.manual || {}; }
   else { if (p && p.date) archive(p); D = freshDay(k); }
   if (!TPLS.includes(D.tpl)) D.tpl = tplFor(k);
   if (S.tpl !== "auto" && D.tpl !== S.tpl && !anyDoneRaw(D)) D.tpl = S.tpl;
@@ -573,6 +573,8 @@ function finishStep(step, src) {
   const c = cd(), timed = !!(c && c.step.id === step.id);
   const actual = timed && c.kind !== "wait" ? Math.round(sumActual(c)) : null;
   D.steps[step.id] = { done: true, at: now, src: src || "tap", sec: actual };
+  delete D.manual[step.id];
+  if (src === "tap" || src === "skip" || !src) claimRun(step);
   if (D.timer && D.timer.stepId === step.id) clearTimer(true);
   markStarted();
   const nxt = nextUndoneAfter(step);
@@ -590,6 +592,8 @@ function toggleStep(step) {
   if (!step) return;
   if (isDone(step.id)) {
     delete D.steps[step.id];
+    D.manual[step.id] = Date.now();                                                                        // unticked by hand: stays unticked until a hand ticks it
+    if (D.timer && D.timer.stepId === step.id) clearTimer(true);
     Object.keys(D.consumed).forEach(sid => { if (D.consumed[sid] === step.id) D.consumed[sid] = "-"; });   // a session that ticked it stays consumed
     D.finishedAt = 0;
     persist(); render(); return;
@@ -672,13 +676,27 @@ function toolRuns() {
   });
   return out;
 }
+function claimRun(step) { // a step ticked by hand takes the one unclaimed run or session of its kind from today (running, finished or saved), so that run cannot tick the next step of that kind later
+  if (!step || !["block", "review", "ccs"].includes(step.kind)) return;
+  const start = dayStart(D.date), end = start + 86400000, inDay = ts => ts >= start && ts < end;
+  const ids = [];
+  P.loadSessions().forEach(x => { const t = new Date(x.date).getTime(); if (x.type === step.kind && inDay(t) && D.consumed[x.id] === undefined) ids.push([t, x.id]); });
+  const k = { block: ["step3pacer.run.v1", "sid"], review: ["step3pacer.review.run.v1", "id"], ccs: ["step3pacer.ccs.run.v1", "id"] }[step.kind];
+  const r = P.readJSON(k[0], null); if (r && r[k[1]] && r.startAt && inDay(r.startAt) && D.consumed[r[k[1]]] === undefined) ids.push([r.startAt, r[k[1]]]);
+  const doc = P.live.peek && P.live.peek(), slot = doc && doc[step.kind];
+  if (slot && slot.state) { const id = slot.state.sid || slot.state.id; if (id && D.consumed[id] === undefined) ids.push([slot.state.startAt || Date.now(), id]); }
+  if (!ids.length) return;
+  ids.sort((a, b) => b[0] - a[0]);
+  D.consumed[ids[0][1]] = step.id;                                   // the most recent one is the one this tick means
+}
 function absorb() { // sessions and finished runs of today tick their steps, each one once
   const start = dayStart(D.date), end = start + 86400000;
   const inDay = ts => ts >= start && ts < end;
   let changed = false;
   const consume = (id, type, at) => {
     if (D.consumed[id] !== undefined) return;
-    const step = firstUndone(type);
+    const cur = D.cur && stepById(D.cur);
+    const step = (cur && !isDone(cur.id) && cur.kind === type) ? cur : firstUndone(type);
     if (!step) { D.consumed[id] = "-"; changed = true; return; }
     D.steps[step.id] = { done: true, at: at || Date.now(), src: "tool", sec: null };
     D.consumed[id] = step.id; changed = true;
@@ -697,11 +715,15 @@ function absorb() { // sessions and finished runs of today tick their steps, eac
   const c = P.readJSON("step3pacer.ccs.run.v1", null); if (c && c.phase === "done" && c.id && inDay(c.startAt) && (c.saved || (c.rev && c.rev.endAt))) consume(c.id, "ccs", Date.now());
   // a block, review or case running right now means the breaks and meals before its step are over
   toolRuns().filter(r => !r.where || r.fresh).forEach(r => {
-    const target = firstUndone(r.kind); if (!target) return;
+    if (D.consumed["brk:" + r.id] !== undefined) return;             // the breaks before this run were handled once already
+    D.consumed["brk:" + r.id] = "-";
+    const cur = D.cur && stepById(D.cur);
+    const target = (cur && !isDone(cur.id) && cur.kind === r.kind) ? cur : firstUndone(r.kind); if (!target) return;
     const i = STEPS.indexOf(target);
-    for (let j = 0; j < i; j++) {
+    let from = i; while (from > 0 && STEPS[from - 1].parts.length && STEPS[from - 1].parts[0].brk) from--;   // only the break(s) directly before the task, nothing earlier
+    for (let j = from; j < i; j++) {
       const st = STEPS[j];
-      if (isDone(st.id) || !st.parts.length || !st.parts[0].brk) continue;
+      if (isDone(st.id) || D.manual[st.id]) continue;
       if (D.timer && D.timer.stepId === st.id && cd()) continue;                  // that break is still running here
       D.steps[st.id] = { done: true, at: Date.now(), src: "break", sec: null }; changed = true;
       if (D.timer && D.timer.stepId === st.id) clearTimer(false);
@@ -730,7 +752,7 @@ function tick() {
   if (c && c.kind === "break" && T && (T.endAt !== c.b.endAt || T.sec !== c.b.sec)) { T.startAt = c.b.startAt; T.endAt = c.b.endAt; T.sec = c.b.sec; T.label = c.b.label || T.label; persist(); }
   if (T && T.shared && !c) {                                        // the shared break ended elsewhere (skipped or dismissed): the step is over
     const step = stepById(T.stepId); D.timer = null; P.bg.runEnd();
-    if (step && !isDone(step.id)) { D.steps[step.id] = { done: true, at: now, src: "break", sec: null }; D.cur = null; }
+    if (step && !isDone(step.id) && !D.manual[step.id]) { D.steps[step.id] = { done: true, at: now, src: "break", sec: null }; D.cur = null; }
     persist();
   } else if (c && c.kind !== "wait" && !c.paused) {
     if (c.sec >= 300 && !c.warned && c.left <= 60 && c.left > 0) { setWarned(c); P.sfx("dayWarn"); P.vibrate([100]); persist(); }
@@ -1058,7 +1080,7 @@ function init() {
     active: () => anyDone() || !!D.timer,
     apply: state => {
       if (!state || state.date !== keyOf(Date.now())) return;
-      D = Object.assign(freshDay(state.date), state); D.steps = D.steps || {}; D.consumed = D.consumed || {};
+      D = Object.assign(freshDay(state.date), state); D.steps = D.steps || {}; D.consumed = D.consumed || {}; D.manual = D.manual || {};
       STEPS = buildSteps(D.date, D.tpl); builtFor = ""; P.writeJSON(LS_D, D);
       const c = cd(); if (c && c.kind !== "wait" && !c.paused) { P.keepAwake(); P.bg.runStart(c.step.t); }
       render();
