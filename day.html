@@ -73,6 +73,7 @@
 .now .sub{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .now .sub button{min-height:44px;font-size:14px;padding:8px 4px;white-space:nowrap}
 .now .sub button.armed{border-color:var(--crit);color:var(--crit)}
+.now .sub button.len.on{background:var(--kc);color:#fff;border-color:var(--kc)}
 .now .links{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .now .links a{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border:1px solid var(--kc);border-radius:999px;color:var(--kc);text-decoration:none;font-weight:700;font-size:14px;min-height:42px;white-space:nowrap}
 .now .links a.plain{border-color:var(--line);color:var(--fg)}
@@ -227,7 +228,7 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
         <div class="durs" id="durs"></div>
         <div class="rowhead"><h2>Calendar</h2><span class="meta">date | sequence | case numbers | note</span></div>
         <textarea class="cal" id="fCal" spellcheck="false"></textarea>
-        <p class="note">Case numbers: the first two are case 1 and case 2 of that day, a third is the retry for the 3rd slot. Sequences: study · tonight · rehearsal · between · interface · minimum · exam · off. A date that is not listed gets a study day.</p>
+        <p class="note">Case numbers: the first two are case 1 and case 2 of that day, a third is the retry for the 3rd slot. An L after a number (94L) is a 20-minute case → 25:00 on the clock; without it the case gets 12:30. The Now card lets you switch 12:30 / 25:00 before Start either way. Sequences: study · tonight · rehearsal · between · interface · minimum · exam · off. A date that is not listed gets a study day.</p>
         <div class="formrow">
           <button type="button" id="btnApply">Save settings</button>
           <button type="button" id="btnCalReset">Calendar back to the plan</button>
@@ -285,9 +286,16 @@ const CAL_V1 = [
   "2026-11-24 | exam | | EXAM DAY 3 — 9 blocks. Nov 14 is what makes this familiar.",
   "2026-11-25 | exam | | EXAM DAY 4 — CCS. Location → stabilize → orders → advance the clock → reassess → close line."
 ].join("\n");
-const CAL_DEFAULT = CAL_V1.replace(
+const CAL_V16 = CAL_V1.replace(
   "2026-11-11 | study | 10, 8, 113 | Biostats contact: Odds Ratio & Relative Risk.",
   "2026-11-11 | study | 94, 8, 113 | Biostats contact: Odds Ratio & Relative Risk. (94 replaces 10, done Nov 7.)");
+// L after a case number = a 20-minute case → 25:00 on the clock (12:30 otherwise). Either can be switched on the Now card before Start.
+const CAL_DEFAULT = CAL_V16
+  .replace("| 94, 8, 113 |", "| 94L, 8, 113 |")
+  .replace("| 48, 126, 90 |", "| 48L, 126, 90L |")
+  .replace("| 116, 75, 39 |", "| 116L, 75, 39 |")
+  .replace("| 11, 15, 39 |", "| 11L, 15, 39 |")
+  .replace("| 32, 6, 9 |", "| 32, 6L, 9 |");
 const TPLS = ["study", "tonight", "rehearsal", "between", "interface", "minimum", "exam", "off"];
 const DEFAULTS = { arriveSec: 300, shortSec: 600, mealSec: 1800, bioSec: 600, caseSec: 750, feedbackSec: 600, closeSec: 600, sampleSec: 3600, notesSec: 2400, packSec: 900,
   remind: true, sound: true, dayOne: "2026-11-08", nDays: 10, planStart: "8:00 AM", planEnd: "~10:00 PM", tpl: "auto", cal: CAL_DEFAULT, v: 1 };
@@ -316,12 +324,13 @@ function calendar() { // { key: { tpl, cases: [], note } }
     const parts = line.split("|").map(s => s.trim());
     if (!parseKey(parts[0])) return;
     const tpl = TPLS.includes((parts[1] || "").toLowerCase()) ? parts[1].toLowerCase() : "study";
-    const cases = (parts[2] || "").split(/[^0-9]+/).filter(Boolean);
-    out[parts[0]] = { tpl: tpl, cases: cases, note: parts.slice(3).join(" | ") };
+    const cases = [], long = {};
+    (parts[2] || "").split(/[,\s]+/).forEach(tok => { const m = /^(\d+)\s*(L|l|\*|:25)?$/.exec(tok); if (!m) return; cases.push(m[1]); if (m[2]) long[m[1]] = true; });
+    out[parts[0]] = { tpl: tpl, cases: cases, long: long, note: parts.slice(3).join(" | ") };
   });
   return out;
 }
-function calFor(k) { return calendar()[k] || { tpl: "study", cases: [], note: "" }; }
+function calFor(k) { return calendar()[k] || { tpl: "study", cases: [], long: {}, note: "" }; }
 function tplFor(k) { return S.tpl !== "auto" ? S.tpl : calFor(k).tpl; }
 
 /* ---------- durations that live on the other pages ---------- */
@@ -339,7 +348,8 @@ function buildSteps(k, tpl) {
   const BR = (id, t, w, sec) => ({ id, kind: "brk", t, w, parts: [{ l: "Break", sec: sec || br, brk: true }] });
   const ML = (id, t, w, sec) => ({ id, kind: "meal", t, w, parts: [{ l: t, sec: sec || S.mealSec, brk: true }] });
   const RV = (id, t, w) => ({ id, kind: "review", t, w, tool: "review", parts: [{ l: "Chunk 1", sec: rv.chunk }, { l: "Stand", sec: rv.stand, auto: true, brk: true }, { l: "Chunk 2", sec: rv.chunk }, { l: "Stand", sec: rv.stand, auto: true, brk: true }, { l: "Chunk 3", sec: rv.chunk }] });
-  const CC = (id, t, w, n) => ({ id, kind: "ccs", t, w, tool: "ccs", caseNum: n || "", parts: [{ l: "Case", sec: S.caseSec }, { l: "Feedback", sec: S.feedbackSec }] });
+  const longSec = S.caseSec * 2;                                   // 12:30 → 25:00 under the accommodation
+  const CC = (id, t, w, n) => { const sec = (D && D.caseLen && D.caseLen[id]) || (n && cal.long[n] ? longSec : S.caseSec); return { id, kind: "ccs", t: t + (sec >= longSec ? " · 25:00" : ""), w, tool: "ccs", caseNum: n || "", parts: [{ l: "Case", sec: sec }, { l: "Feedback", sec: S.feedbackSec }] }; };
   const BIO = (id, t, w) => ({ id, kind: "bio", t, w, parts: [{ l: "Biostats", sec: S.bioSec }] });
   const CL = (id, t, w, sec) => ({ id, kind: "close", t, w, parts: [{ l: t, sec: sec }] });
   const TICK = (id, kind, t, w) => ({ id, kind, t, w, parts: [] });
@@ -463,7 +473,7 @@ function loadSettings() {
   if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p);
   // Nov 11 fix: case 10 was done Nov 7; 94 takes its slot. An untouched calendar takes the new default; an edited one gets just that line patched.
   const calBefore = S.cal;
-  if (S.cal === CAL_V1) S.cal = CAL_DEFAULT;
+  if (S.cal === CAL_V1 || S.cal === CAL_V16) S.cal = CAL_DEFAULT;
   else if (/2026-11-11 \| study \| 10, 8, 113/.test(S.cal || "")) S.cal = S.cal.replace("2026-11-11 | study | 10, 8, 113", "2026-11-11 | study | 94, 8, 113");
   if (p && S.cal !== calBefore) P.writeJSON(LS_S, S);
   if (!parseKey(S.dayOne)) S.dayOne = DEFAULTS.dayOne;
@@ -471,7 +481,7 @@ function loadSettings() {
   P.setSound(S.sound);
 }
 function saveSettings() { P.writeJSON(LS_S, S); }
-function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, startedAt: 0, finishedAt: 0, updatedAt: 0 }; }
+function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, startedAt: 0, finishedAt: 0, updatedAt: 0 }; }
 function persist(touch) { D.updatedAt = Date.now(); P.writeJSON(LS_D, D); if (touch !== false) P.live.touch(); }
 function history() { const h = P.readJSON(LS_H, []); return Array.isArray(h) ? h : []; }
 function archive(day) { // keep a finished day for the strip
@@ -485,7 +495,7 @@ function archive(day) { // keep a finished day for the strip
 function loadDay() {
   const k = keyOf(Date.now());
   const p = P.readJSON(LS_D, null);
-  if (p && typeof p === "object" && p.date === k) { D = Object.assign(freshDay(k), p); D.steps = D.steps || {}; D.consumed = D.consumed || {}; D.manual = D.manual || {}; }
+  if (p && typeof p === "object" && p.date === k) { D = Object.assign(freshDay(k), p); D.steps = D.steps || {}; D.consumed = D.consumed || {}; D.manual = D.manual || {}; D.caseLen = D.caseLen || {}; }
   else { if (p && p.date) archive(p); D = freshDay(k); }
   if (!TPLS.includes(D.tpl)) D.tpl = tplFor(k);
   if (S.tpl !== "auto" && D.tpl !== S.tpl && !anyDoneRaw(D)) D.tpl = S.tpl;
@@ -889,7 +899,7 @@ function renderNow(now, c, cur, runs) {
   const mode = c ? (c.kind === "wait" ? "wait" : "run") : run ? "mirror" : "idle";
   const idx = STEPS.indexOf(step), after = STEPS[idx + 1];
   const over = !!(c && c.kind !== "wait" && c.over), paused = !!(c && c.paused);
-  const sig = [D.date, step.id, mode, c ? c.part : "", c ? c.kind : "", over, paused, skipArmed ? 1 : 0, S.sound ? 1 : 0, run ? run.href + run.paused + run.sub + (run.where || "") : ""].join("|");
+  const sig = [D.date, step.id, mode, c ? c.part : "", c ? c.kind : "", over, paused, skipArmed ? 1 : 0, S.sound ? 1 : 0, step.parts.length ? step.parts[0].sec : 0, run ? run.href + run.paused + run.sub + (run.where || "") : ""].join("|");
   if (nowSig !== sig) {
     nowSig = sig;
     box.dataset.kind = step.kind;
@@ -915,7 +925,8 @@ function renderNow(now, c, cur, runs) {
       stage.innerHTML = step.parts.length > 1 ? "<span>" + step.parts.map(p => esc(p.l) + " " + fmt(p.sec).replace(/:00$/, "")).join(" · ") + "</span>" : (after ? "<span>then · " + after.n + " " + esc(after.t) + "</span>" : "");
       cue.textContent = step.parts.length ? (step.tool ? "Start here, or run it in the " + TOOL_PAGE[step.tool][0] + " page — the step ticks itself." : "Press Start when you begin.") : "Tap Done when it is done.";
       btns.innerHTML = (step.parts.length ? btn("Start · " + fmt(step.parts[0].sec), "go", "start") : "") + btn("Done ✓", "done" + (step.parts.length ? "" : " solo"), "done");
-      sub.innerHTML = (idx > 0 ? btn("↑ Previous", "", "prev") : "") + (after ? btn("Next ↓", "", "next") : "") + btn(skipArmed ? "Skip — sure?" : "Skip", skipArmed ? "armed" : "", "skip") + btn(S.sound ? "Sound on" : "Sound off", "", "sound");
+      const lenBtns = step.kind === "ccs" && step.parts.length === 2 ? btn("12:30" + (step.parts[0].sec < S.caseSec * 2 ? " ✓" : ""), "len" + (step.parts[0].sec < S.caseSec * 2 ? " on" : ""), "len12") + btn("25:00" + (step.parts[0].sec >= S.caseSec * 2 ? " ✓" : ""), "len" + (step.parts[0].sec >= S.caseSec * 2 ? " on" : ""), "len25") : "";
+      sub.innerHTML = lenBtns + (idx > 0 ? btn("↑ Previous", "", "prev") : "") + (after ? btn("Next ↓", "", "next") : "") + btn(skipArmed ? "Skip — sure?" : "Skip", skipArmed ? "armed" : "", "skip") + btn(S.sound ? "Sound on" : "Sound off", "", "sound");
     } else if (mode === "wait") {
       mirror.hidden = true;
       $("nowPill").textContent = c.label + " over"; $("nowWho").textContent = "part " + (c.part + 1) + " of " + step.parts.length + " done";
@@ -967,6 +978,7 @@ function wire() {
       else if (a === "pause") pauseResume();
       else if (a === "skip") skipStep();
       else if (a === "stop") stopTimerOnly();
+      else if (a === "len12" || a === "len25") { if (s && s.kind === "ccs" && !D.timer) { D.caseLen[s.id] = a === "len25" ? S.caseSec * 2 : S.caseSec; STEPS = buildSteps(D.date, D.tpl); builtFor = ""; persist(); render(); } }
       else if (a === "sound") { S.sound = !S.sound; P.setSound(S.sound); saveSettings(); if (S.sound) { P.audioInit(); P.sfx("start"); } render(); }
       else if (a === "prev") { const i = STEPS.indexOf(s); for (let j = i - 1; j >= 0; j--) if (!isDone(STEPS[j].id)) { D.cur = STEPS[j].id; persist(); render(); return; } }
       else if (a === "next") { const i = STEPS.indexOf(s); for (let j = i + 1; j < STEPS.length; j++) if (!isDone(STEPS[j].id)) { D.cur = STEPS[j].id; persist(); render(); return; } }
@@ -1088,7 +1100,7 @@ function init() {
     active: () => anyDone() || !!D.timer,
     apply: state => {
       if (!state || state.date !== keyOf(Date.now())) return;
-      D = Object.assign(freshDay(state.date), state); D.steps = D.steps || {}; D.consumed = D.consumed || {}; D.manual = D.manual || {};
+      D = Object.assign(freshDay(state.date), state); D.steps = D.steps || {}; D.consumed = D.consumed || {}; D.manual = D.manual || {}; D.caseLen = D.caseLen || {};
       STEPS = buildSteps(D.date, D.tpl); builtFor = ""; P.writeJSON(LS_D, D);
       const c = cd(); if (c && c.kind !== "wait" && !c.paused) { P.keepAwake(); P.bg.runStart(c.step.t); }
       render();
