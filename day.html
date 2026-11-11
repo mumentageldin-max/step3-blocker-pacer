@@ -264,7 +264,7 @@ const ROLL_HOUR = 4;              // a study day that runs past midnight is stil
 const REMIND_MAX = 5;
 
 /* ---------- the plan's calendar (editable in Settings) ---------- */
-const CAL_DEFAULT = [
+const CAL_V1 = [
   "2026-11-07 | tonight | 94, 34 | 2 Biostatistics blocks + their reviews. Tomorrow's 4 tests created before bed. Tomorrow is the promise.",
   "2026-11-08 | study | 21, 77, 122 | Block 1 at 8:00 — Day 1 of the clock. Biostats contact: Sensitivity & Specificity.",
   "2026-11-09 | study | 18, 47, 11 | Biostats contact: Predictive Values.",
@@ -285,6 +285,9 @@ const CAL_DEFAULT = [
   "2026-11-24 | exam | | EXAM DAY 3 — 9 blocks. Nov 14 is what makes this familiar.",
   "2026-11-25 | exam | | EXAM DAY 4 — CCS. Location → stabilize → orders → advance the clock → reassess → close line."
 ].join("\n");
+const CAL_DEFAULT = CAL_V1.replace(
+  "2026-11-11 | study | 10, 8, 113 | Biostats contact: Odds Ratio & Relative Risk.",
+  "2026-11-11 | study | 94, 8, 113 | Biostats contact: Odds Ratio & Relative Risk. (94 replaces 10, done Nov 7.)");
 const TPLS = ["study", "tonight", "rehearsal", "between", "interface", "minimum", "exam", "off"];
 const DEFAULTS = { arriveSec: 300, shortSec: 600, mealSec: 1800, bioSec: 600, caseSec: 750, feedbackSec: 600, closeSec: 600, sampleSec: 3600, notesSec: 2400, packSec: 900,
   remind: true, sound: true, dayOne: "2026-11-08", nDays: 10, planStart: "8:00 AM", planEnd: "~10:00 PM", tpl: "auto", cal: CAL_DEFAULT, v: 1 };
@@ -458,6 +461,11 @@ function anyDone() { return STEPS.some(s => isDone(s.id)); }
 function loadSettings() {
   const p = P.readJSON(LS_S, null);
   if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p);
+  // Nov 11 fix: case 10 was done Nov 7; 94 takes its slot. An untouched calendar takes the new default; an edited one gets just that line patched.
+  const calBefore = S.cal;
+  if (S.cal === CAL_V1) S.cal = CAL_DEFAULT;
+  else if (/2026-11-11 \| study \| 10, 8, 113/.test(S.cal || "")) S.cal = S.cal.replace("2026-11-11 | study | 10, 8, 113", "2026-11-11 | study | 94, 8, 113");
+  if (p && S.cal !== calBefore) P.writeJSON(LS_S, S);
   if (!parseKey(S.dayOne)) S.dayOne = DEFAULTS.dayOne;
   if (!TPLS.includes(S.tpl)) S.tpl = "auto";
   P.setSound(S.sound);
