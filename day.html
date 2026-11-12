@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Martian+Mono:wght@500;700&display=swap">
 <link rel="stylesheet" href="./shared.css">
 <style>
-/* The day page: one "Now" card that runs the current step's timer, the sequence as a tickable list, totals, the ten-day strip.
+/* The day page: one "Now" card that runs the current step's timer, the sequence as a tickable list, totals, the calendar to the exam.
    Colors follow the printed sheet: block blue, review violet, CCS orange, biostats teal, break green, meal grey, arrive/close ink. */
 :root{--kc:var(--fg)}
 [data-kind="block"]{--kc:var(--accent)} [data-kind="review"]{--kc:var(--t)} [data-kind="ccs"]{--kc:var(--g)} [data-kind="bio"]{--kc:var(--m)}
@@ -70,15 +70,25 @@
 .now .btns button.solo{grid-column:1/-1}
 .now .btns button.done{border-color:var(--fg)}
 .now[data-tone="over"] .btns button.done{background:var(--crit);color:var(--on-crit);border-color:var(--crit)}
-.now .sub{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.now .sub{display:grid;gap:8px}
+.now .sub .row{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:8px}
 .now .sub button{min-height:44px;font-size:14px;padding:8px 4px;white-space:nowrap}
+.now .sub .row.tight button{font-size:13px;padding:8px 2px}
+@container (max-width: 330px){ .now .sub .row.tight button{font-size:12px;padding:8px 1px} }
 .now .sub button.armed{border-color:var(--crit);color:var(--crit)}
 .now .sub button.len.on{background:var(--kc);color:#fff;border-color:var(--kc)}
+.now[data-kind="meal"] .sub button.len.on,.now[data-kind="close"] .sub button.len.on{color:var(--bg)}
 .now .links{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .now .links a{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border:1px solid var(--kc);border-radius:999px;color:var(--kc);text-decoration:none;font-weight:700;font-size:14px;min-height:42px;white-space:nowrap}
 .now .links a.plain{border-color:var(--line);color:var(--fg)}
 .now .casenum{display:inline-flex;align-items:center;gap:8px;border:2px dashed var(--kc);border-radius:10px;padding:6px 12px;font-weight:700;color:var(--kc);font-size:15px}
 .now .casenum b{font-family:var(--font-num);font-size:26px;line-height:1}
+.scores{display:grid;gap:6px;border:1px dashed var(--kc);border-radius:10px;padding:8px 10px;background:var(--bg)}
+.scores .lbl{font-size:12.5px;color:var(--muted);font-weight:700;line-height:1.3}
+.scores .srow{display:grid;grid-template-columns:repeat(auto-fit,minmax(36px,1fr));gap:6px}
+.scores label{display:grid;gap:2px;font-size:11px;color:var(--muted);font-weight:700;text-align:center}
+.scores input{font:inherit;font-family:var(--font-num);font-size:16px;font-weight:700;text-align:center;padding:6px 2px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);width:100%;min-width:0;user-select:text;-webkit-user-select:text;-moz-appearance:textfield;appearance:textfield}
+.scores input::-webkit-outer-spin-button,.scores input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .mirror{display:grid;gap:6px;border:1px dashed var(--kc);border-radius:10px;padding:10px 12px;background:var(--bg)}
 .mirror .mrow{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted);font-weight:700}
 .mirror .mrow b{font-family:var(--font-num);color:var(--kc);font-size:22px}
@@ -122,16 +132,19 @@
 .st .at{font-size:11px;color:var(--muted);font-family:var(--font-num);text-align:right;white-space:nowrap}
 .st.exam .box,.st.off .box{border-radius:50%}
 
-/* ten days */
-.ten{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
-.ten div{border:1px solid var(--line);border-radius:8px;padding:6px 2px 5px;display:grid;gap:2px;text-align:center;min-width:0;background:var(--surface)}
-.ten .dl{font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ten .dv{font-family:var(--font-num);font-size:12px;font-weight:700;white-space:nowrap}
-.ten div.today{outline:2px solid var(--accent);outline-offset:-1px}
-.ten div.all{background:var(--good);border-color:var(--good)} .ten div.all .dl,.ten div.all .dv{color:var(--on-good)}
-.ten div.part{background:var(--warn-bg)} .ten div.off{background:var(--bg);border-style:dashed}
-.ten div.future{opacity:.55}
-@media (max-width:420px){ .ten{grid-template-columns:repeat(5,minmax(0,1fr))} }
+/* the days to the exam: a calendar in weeks */
+.cal7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal7 .wd{font-size:10.5px;color:var(--muted);font-weight:700;text-align:center;letter-spacing:.04em;text-transform:uppercase;padding-bottom:1px}
+.cal7 .c{border:1px solid var(--line);border-radius:8px;padding:5px 2px;display:grid;gap:1px;text-align:center;min-width:0;background:var(--surface);min-height:46px;align-content:center}
+.cal7 .c.blank{border-color:transparent;background:transparent}
+.cal7 .dn{font-family:var(--font-num);font-size:13px;font-weight:700;white-space:nowrap;line-height:1.15}
+.cal7 .dn small{font-family:inherit;font-size:9.5px;color:var(--muted);font-weight:700;margin-right:3px;text-transform:uppercase;letter-spacing:.02em}
+.cal7 .dv{font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;line-height:1.2}
+.cal7 .c.did{background:color-mix(in srgb,var(--good) 16%,var(--surface))} .cal7 .c.did .dv{color:var(--fg)}
+.cal7 .c.today{outline:2.5px solid var(--accent);outline-offset:-1px}
+.cal7 .c.off{border-style:dashed;background:var(--bg)}
+.cal7 .c.exam{background:var(--crit);border-color:var(--crit)} .cal7 .c.exam .dn,.cal7 .c.exam .dv,.cal7 .c.exam .dn small{color:var(--on-crit)}
+.cal7 .c.future:not(.exam){opacity:.75}
 
 /* settings */
 .durs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
@@ -177,6 +190,7 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
       <h2 class="title" id="nowTitle"><span class="n">0</span>Arrive · sit · phone in the bag</h2>
       <p class="why" id="nowWhy"></p>
       <div id="nowCase" hidden></div>
+      <div class="scores" id="nowScores" hidden></div>
       <div id="nowMirror" hidden></div>
       <div class="big" id="nowBig">5:00</div>
       <div class="parts" id="nowParts" aria-hidden="true"></div>
@@ -191,8 +205,9 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
     <div class="tots" id="tots"></div>
 
     <section class="card" id="tenCard">
-      <div class="rowhead"><h2 id="tenTitle">The ten days</h2><span class="meta" id="tenMeta"></span></div>
-      <div class="ten" id="ten"></div>
+      <div class="rowhead"><h2 id="tenTitle">To the exam</h2><span class="meta" id="tenMeta"></span></div>
+      <div class="cal7" id="ten"></div>
+      <p class="note" id="tenNote" style="margin:8px 0 0">Past days: what you did — B blocks · C CCS cases · R reviews. Coming days: the plan.</p>
     </section>
 
     <details class="fold" id="rulesFold">
@@ -200,12 +215,16 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
       <div class="body">
         <ol class="rules">
           <li><b>One card, one step.</b> The Now card always shows the next step of the day. <b>Start</b> runs its timer; <b>Done</b> ticks it and moves to the next. A break or a meal starts by itself when the step before it ends on its timer.</li>
-          <li><b>Steps with parts</b> — a CCS case is 12:30 then 10:00 of feedback; a review is 30 · stand 10 · 30 · stand 10 · 30. The stand starts by itself; the next chunk and the feedback wait for your tap.</li>
+          <li><b>Your order.</b> The blocks in a row with the same break between them, then the CCS cases — each with its feedback right after — then lunch, then the reviews. On a break card, <b>Lunch now · break later ⇄</b> trades the two in one tap; on the lunch card, <b>Lunch later · break now ⇄</b> does the reverse (dinner the same way). <b>Move ▲ / Move ▼</b> moves any step earlier or later for today. Settings → The study day sets the number of blocks and cases and where lunch usually sits.</li>
+          <li><b>Every length can change, at any moment.</b> Before Start: <b>12:30 / 25:00</b> on a case, <b>30 · 45 · 60 · 90 min</b> on a review, <b>−5:00 / +5:00</b> on the rest. While it runs: <b>−5:00 · −1:00 · +1:00 · +5:00</b>; <b>12:30 / 25:00</b> in the middle of a case (the time already used stays); <b>Feedback ▸</b> or <b>Stand ▸</b> ends a part early (two taps, like Skip). Settings can be saved while a timer runs.</li>
+          <li><b>Steps with parts</b> — a CCS case is its clock, then 10:00 of feedback; a review is 30-minute chunks with a 10-minute stand between them. The stand starts by itself; the next chunk and the feedback wait for your tap.</li>
+          <li><b>Reviews, lowest score first.</b> On the first review card, type today's scores once (B1 … B6) — or type each score on the Block page's summary. Every review step then names its block, lowest score first, and gets 5:00 per wrong question and 1:00 per right one (Settings → Review per block for a fixed length). The Review page lists the blocks in the same order.</li>
+          <li><b>The totals are measured.</b> A step that ran on a timer — here or in its own page — counts the time it really took. A step ticked by hand counts its planned length. A skipped step counts nothing.</li>
           <li><b>The sound.</b> A step's end is a rising four-note melody played twice, with a long vibration where the device allows it (Android; iPad and iPhone do not vibrate from a web app). One minute before the end: two soft notes. If you do not tick within a minute, the melody repeats — once a minute, five times at most (Settings).</li>
           <li><b>The other pages still work.</b> Run a block in the Block page, a review in the Review page, a case in the CCS page: this card shows it running, and the step ticks itself when it is saved. The 20-minute break after a block, a review or a case is the same break on every page.</li>
-          <li><b>Tick by hand</b> when you did a step without a timer: tap its box. Tap a row to make it the current step. Tap a ticked box to untick — a step you untick stays unticked until you tick it; the page never re-ticks it on its own.</li>
+          <li><b>Tick by hand</b> when you did a step without a timer: tap its box. Tap a row to make it the current step; during a break, that ends the break. Tap a ticked box to untick — a step you untick stays unticked until you tick it; the page never re-ticks it on its own.</li>
           <li><b>Hidden app.</b> Allow notifications (Settings → Background &amp; sound): the end of a step, and the reminders, arrive as notifications when the page is hidden. On iPad, open the pacer from the Home Screen icon. Whatever was missed is caught up the moment you come back.</li>
-          <li>The day rolls over at <b>4:00 AM</b>, so a night that runs past midnight stays one day. Days are kept for the ten-day strip.</li>
+          <li>The day rolls over at <b>4:00 AM</b>, so a night that runs past midnight stays one day. Days are kept for the calendar at the bottom.</li>
         </ol>
         <p class="note">Keys: <kbd>Space</kbd> Start or Done · <kbd>N</kbd> next part · <kbd>P</kbd> pause · <kbd>E</kbd> +5:00 · <kbd>D</kbd> done.</p>
       </div>
@@ -214,13 +233,21 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
     <details class="fold" id="settingsFold">
       <summary>Settings</summary>
       <div class="body">
-        <div class="rowhead"><h2>The ten days</h2><span class="meta">Day 1 is the first 8:00 start</span></div>
+        <div class="rowhead"><h2>The study day</h2><span class="meta">Change it at any moment — today's ticks stay</span></div>
+        <div class="form">
+          <label>Blocks in a row<input type="number" id="fBlocks" min="1" max="9" inputmode="numeric"></label>
+          <label>CCS cases after the blocks<input type="number" id="fCases" min="0" max="4" inputmode="numeric"></label>
+          <label>Lunch<select id="fLunch"><option value="cases">After the CCS cases</option><option value="blocks">After the blocks, before the cases</option></select></label>
+          <label>Review per block<select id="fReview"><option value="-1">By the score · 5 min per wrong, 1 per right</option><option value="1800">30 min</option><option value="2700">45 min</option><option value="3600">60 min</option><option value="5400">90 min</option><option value="0">As the Review page (Timer A)</option></select></label>
+        </div>
+        <label class="check wide"><input type="checkbox" id="fBio"> Biostats contact step (4 questions) before the reviews</label>
+        <div class="rowhead"><h2>The calendar</h2><span class="meta">From Day 1 to the last exam day</span></div>
         <div class="form">
           <label>Day 1<input type="date" id="fDayOne"></label>
-          <label>Number of days<input type="number" id="fDays" min="1" max="60" inputmode="numeric"></label>
+          <label>Days, if no exam day is listed<input type="number" id="fDays" min="1" max="60" inputmode="numeric"></label>
           <label>Start badge<input type="text" id="fPlanStart" placeholder="8:00 AM"></label>
           <label>Done badge<input type="text" id="fPlanEnd" placeholder="~10:00 PM"></label>
-          <label class="wide">Today's sequence<select id="fTpl"><option value="auto">From the calendar below</option><option value="study">Study day · 4 blocks, 2 cases, 4 reviews</option><option value="tonight">Nov 7 tonight · 2 biostats blocks, 2 reviews, 2 cases</option><option value="rehearsal">Rehearsal · 6 blocks in a row, then wrong questions only</option><option value="between">Between exam days · 1 block, 1 review, 3 repeat cases</option><option value="interface">Interface day · official sample blocks and official CCS</option><option value="minimum">Minimum day · 1 block, 1 case, pack</option><option value="exam">Exam day · the morning list</option><option value="off">Day off</option></select></label>
+          <label class="wide">Today's sequence<select id="fTpl"><option value="auto">From the calendar below</option><option value="study">Study day · blocks in a row, cases, reviews</option><option value="tonight">Nov 7 tonight · 2 biostats blocks, 2 reviews, 2 cases</option><option value="rehearsal">Rehearsal · 6 blocks in a row, then wrong questions only</option><option value="between">Between exam days · 1 block, 1 review, 3 repeat cases</option><option value="interface">Interface day · official sample blocks and official CCS</option><option value="minimum">Minimum day · 1 block, 1 case, pack</option><option value="exam">Exam day · the morning list</option><option value="off">Day off</option></select></label>
           <label>Theme<select id="fTheme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
         </div>
         <label class="check wide"><input type="checkbox" id="fRemind"> Repeat the end sound every minute until I tick the step (five times at most)</label>
@@ -228,7 +255,7 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
         <div class="durs" id="durs"></div>
         <div class="rowhead"><h2>Calendar</h2><span class="meta">date | sequence | case numbers | note</span></div>
         <textarea class="cal" id="fCal" spellcheck="false"></textarea>
-        <p class="note">Case numbers: the first two are case 1 and case 2 of that day, a third is the retry for the 3rd slot. An L after a number (94L) is a 20-minute case → 25:00 on the clock; without it the case gets 12:30. The Now card lets you switch 12:30 / 25:00 before Start either way. Sequences: study · tonight · rehearsal · between · interface · minimum · exam · off. A date that is not listed gets a study day.</p>
+        <p class="note">Case numbers: the first two are case 1 and case 2 of that day, a third is the retry for the 3rd slot. An L after a number (94L) is a 20-minute case → 25:00 on the clock; without it the case gets 12:30. The Now card switches 12:30 / 25:00 at any moment, also in the middle of a case. Sequences: study · tonight · rehearsal · between · interface · minimum · exam · off. A date that is not listed gets a study day.</p>
         <div class="formrow">
           <button type="button" id="btnApply">Save settings</button>
           <button type="button" id="btnCalReset">Calendar back to the plan</button>
@@ -298,13 +325,18 @@ const CAL_DEFAULT = CAL_V16
   .replace("| 32, 6, 9 |", "| 32, 6L, 9 |");
 const TPLS = ["study", "tonight", "rehearsal", "between", "interface", "minimum", "exam", "off"];
 const DEFAULTS = { arriveSec: 300, shortSec: 600, mealSec: 1800, bioSec: 600, caseSec: 750, feedbackSec: 600, closeSec: 600, sampleSec: 3600, notesSec: 2400, packSec: 900,
+  nBlocks: 6, nCases: 2, lunchAfter: "cases", bio: true, reviewSec: -1,   // the study day: blocks in a row → cases → lunch → reviews. reviewSec: -1 by the block's score, 0 the Review page's Timer A, else seconds
   remind: true, sound: true, dayOne: "2026-11-08", nDays: 10, planStart: "8:00 AM", planEnd: "~10:00 PM", tpl: "auto", cal: CAL_DEFAULT, v: 1 };
+const DAYV = 18;                   // version of a day's saved state; a day begun on an older page is fitted to the new list once
+const OLD_STUDY_IDS = ["arrive", "b1", "b2", "b3", "b4", "br1", "br2", "br3", "br4", "br5", "br6", "br7", "lunch", "bio", "c1", "c2", "dinner", "r1", "r2", "r3", "r4", "close"];
+const LS_CASES = "step3pacer.day.cases.v1";   // today's cases (number, length) for the CCS page
+const LS_BSEEN = "step3pacer.day.brkseen.v1"; // this device only: the shared break (step @ start) it has already had on its own pages
 
 let S = Object.assign({}, DEFAULTS);
 let D = null;                      // today's state
 let STEPS = [];                    // today's steps, built from the template and the durations
 let builtFor = "";                 // STEPS signature, so the list is rebuilt only when it changes
-let newDayArmed = 0, skipArmed = 0, lastAbsorb = 0, lastRebuild = 0, tenSig = "";
+let newDayArmed = 0, skipArmed = 0, partArmed = 0, lastAbsorb = 0, lastRebuild = 0, tenSig = "", lastHandoff = "", workCache = { at: 0, map: {} };
 
 /* ---------- dates ---------- */
 function pad(n) { return String(n).padStart(2, "0"); }
@@ -335,23 +367,68 @@ function tplFor(k) { return S.tpl !== "auto" ? S.tpl : calFor(k).tpl; }
 
 /* ---------- durations that live on the other pages ---------- */
 function blockSec() { const p = P.readJSON("step3pacer.settings.v1", null); return (p && p.blockSec > 0) ? p.blockSec : 2250; }
-function reviewCfg() { const p = P.readJSON("step3pacer.review.settings.v1", null) || {}; return { chunk: p.chunkSec > 0 ? p.chunkSec : 1800, stand: p.standSec > 0 ? p.standSec : 600, limit: p.limitSec > 0 ? p.limitSec : 5400 }; }
+function reviewCfg() { const p = P.readJSON("step3pacer.review.settings.v1", null) || {}; return { chunk: p.chunkSec > 0 ? p.chunkSec : 1800, stand: p.standSec > 0 ? p.standSec : 600, limit: p.limitSec > 0 ? p.limitSec : 5400, b: p.bSec > 0 ? p.bSec : 300, eo: p.eoSec > 0 ? p.eoSec : 60 }; }
 function breakSec() { return P.getBreaks().taskSec; }
 
 /* ---------- the templates ---------- */
+let dayScores = [];               // today's blocks and their scores, as the list was last built
+function blockScores(nB) { // today's blocks, one per block step: its number, its score when it is known (typed here, on the Block page or on the Review page), whether its review is already saved
+  const start = dayStart(D.date), end = start + 86400000, sess = {}, byStep = {};
+  P.loadSessions().forEach(x => { if (x.type !== "block") return; const t = new Date(x.date).getTime(); if (t >= start && t < end) sess[x.id] = x; });
+  Object.keys(D.consumed || {}).forEach(sid => { const st = D.consumed[sid]; if (sess[sid] && st && st !== "-") byStep[st] = sess[sid]; });
+  const out = [];
+  for (let i = 1; i <= nB; i++) {
+    const id = "b" + i, x = byStep[id] || null, own = D.scores ? D.scores[id] : null;
+    out.push({ id: id, n: i, sid: x ? x.id : null, nQ: (x && x.nQ) || 20, correct: own != null ? own : (x && x.correct != null ? x.correct : null), reviewed: !!(x && x.reviewId) });
+  }
+  return out;
+}
+function reviewPlan(nB, blocks) { // which block each review step is for: fixed once that review was started or ticked; the others take today's scored blocks, lowest score first
+  const byId = {}; blocks.forEach(b => { byId[b.id] = b; });
+  const map = D.rv || {}, taken = {}; Object.keys(map).forEach(k => { taken[map[k]] = true; });
+  const pool = blocks.filter(b => b.correct != null && !taken[b.id] && !b.reviewed).sort((a, b) => (a.correct / a.nQ - b.correct / b.nQ) || (a.n - b.n));
+  const out = [];
+  for (let i = 1; i <= nB; i++) {
+    const id = "r" + i;
+    if (map[id]) out.push(byId[map[id]] || null);
+    else if (D.steps[id] && D.steps[id].done) out.push(null);
+    else out.push(pool.shift() || null);
+  }
+  return out;
+}
+function applyOrder(list, order) { // today's own order: the ids it lists, in that order; a step it does not know goes right after its neighbor in the plan
+  const byId = {}; list.forEach(x => { byId[x.id] = x; });
+  const out = order.filter((id, i) => byId[id] && order.indexOf(id) === i).map(id => byId[id]);
+  list.forEach((x, i) => {
+    if (out.indexOf(x) >= 0) return;
+    let at = 0;
+    for (let j = i - 1; j >= 0; j--) { const q = out.indexOf(list[j]); if (q >= 0) { at = q + 1; break; } }
+    out.splice(at, 0, x);
+  });
+  return out;
+}
 function buildSteps(k, tpl) {
   const cal = calFor(k), c1 = cal.cases[0] || "", c2 = cal.cases[1] || "", c3 = cal.cases[2] || "";
   const rv = reviewCfg(), bs = blockSec(), br = breakSec();
-  const d = parseKey(k), wd = d ? d.getDay() : 0, bioDay = wd === 1 || wd === 3 || wd === 5;
+  const live = !!(D && D.date === k);                              // today's own changes — lengths, order, which block a review is for — apply to today's list only
+  const L = (id, def) => (live && D.len && D.len[id] > 0) ? D.len[id] : def;
   const num = n => n ? " · № " + n : "";
-  const B = (id, t, w) => ({ id, kind: "block", t, w, tool: "block", parts: [{ l: "Block", sec: bs }] });
-  const BR = (id, t, w, sec) => ({ id, kind: "brk", t, w, parts: [{ l: "Break", sec: sec || br, brk: true }] });
-  const ML = (id, t, w, sec) => ({ id, kind: "meal", t, w, parts: [{ l: t, sec: sec || S.mealSec, brk: true }] });
-  const RV = (id, t, w) => ({ id, kind: "review", t, w, tool: "review", parts: [{ l: "Chunk 1", sec: rv.chunk }, { l: "Stand", sec: rv.stand, auto: true, brk: true }, { l: "Chunk 2", sec: rv.chunk }, { l: "Stand", sec: rv.stand, auto: true, brk: true }, { l: "Chunk 3", sec: rv.chunk }] });
+  const B = (id, t, w) => ({ id, kind: "block", t, w, tool: "block", parts: [{ l: "Block", sec: L(id, bs) }] });
+  const BR = (id, t, w, sec) => ({ id, kind: "brk", t, w, parts: [{ l: "Break", sec: L(id, sec || br), brk: true }] });
+  const ML = (id, t, w, sec) => ({ id, kind: "meal", t, w, parts: [{ l: t, sec: L(id, sec || S.mealSec), brk: true }] });
+  const RV = (id, t, w, def) => {                                  // a review: its minutes of work cut into chunks, a stand between two chunks
+    const total = Math.max(300, L(id, def > 0 ? def : rv.limit)), chunks = [];
+    const n = Math.floor(total / rv.chunk), rem = total - n * rv.chunk;
+    for (let i = 0; i < n; i++) chunks.push(rv.chunk);
+    if (!n) chunks.push(total); else if (rem >= 600) chunks.push(rem); else chunks[chunks.length - 1] += rem;
+    const parts = [];
+    chunks.forEach((sec, i) => { if (i && rv.stand > 0) parts.push({ l: "Stand", sec: rv.stand, auto: true, brk: true }); parts.push({ l: chunks.length > 1 ? "Chunk " + (i + 1) : "Review", sec: sec }); });
+    return { id, kind: "review", t, w, tool: "review", parts: parts };
+  };
   const longSec = S.caseSec * 2;                                   // 12:30 → 25:00 under the accommodation
-  const CC = (id, t, w, n) => { const sec = (D && D.caseLen && D.caseLen[id]) || (n && cal.long[n] ? longSec : S.caseSec); return { id, kind: "ccs", t: t + (sec >= longSec ? " · 25:00" : ""), w, tool: "ccs", caseNum: n || "", parts: [{ l: "Case", sec: sec }, { l: "Feedback", sec: S.feedbackSec }] }; };
-  const BIO = (id, t, w) => ({ id, kind: "bio", t, w, parts: [{ l: "Biostats", sec: S.bioSec }] });
-  const CL = (id, t, w, sec) => ({ id, kind: "close", t, w, parts: [{ l: t, sec: sec }] });
+  const CC = (id, t, w, n) => { const sec = L(id, n && cal.long[n] ? longSec : S.caseSec); return { id, kind: "ccs", t: t + (sec !== S.caseSec ? " · " + fmt(sec) : ""), w, tool: "ccs", caseNum: n || "", parts: [{ l: "Case", sec: sec }, { l: "Feedback", sec: S.feedbackSec }] }; };
+  const BIO = (id, t, w) => ({ id, kind: "bio", t, w, parts: [{ l: "Biostats", sec: L(id, S.bioSec) }] });
+  const CL = (id, t, w, sec) => ({ id, kind: "close", t, w, parts: [{ l: t, sec: L(id, sec) }] });
   const TICK = (id, kind, t, w) => ({ id, kind, t, w, parts: [] });
   let list;
   if (tpl === "tonight") list = [
@@ -391,11 +468,11 @@ function buildSteps(k, tpl) {
     BR("br1", "Break", "Out of the chair. Walk, water. No screen."),
     RV("r1", "Review Block 1", "Wrong first (5+3) → right ones with the time left (60 s)."),
     BR("br2", "Break", "The pacer starts it by itself."),
-    CC("c1", "Repeat case 1" + num(c1) + " · strict 12:30", "A case you have seen. Strict clock — the close line at the 2-minute warning.", c1),
+    CC("c1", "Repeat case 1" + num(c1) + " · strict clock", "A case you have seen. Strict clock — the close line at the 2-minute warning.", c1),
     BR("br3", "Break", "Walk. Water."),
-    CC("c2", "Repeat case 2" + num(c2) + " · strict 12:30", "Same four lines. No rereading the feedback of last time first.", c2),
+    CC("c2", "Repeat case 2" + num(c2) + " · strict clock", "Same four lines. No rereading the feedback of last time first.", c2),
     ML("lunch", "Lunch", "Away from the desk."),
-    CC("c3", "Repeat case 3" + num(c3) + " · strict 12:30", "Last one. Then the day is done.", c3),
+    CC("c3", "Repeat case 3" + num(c3) + " · strict clock", "Last one. Then the day is done.", c3),
     CL("close", "Close · done by early afternoon", "Notebook line · bag for the exam day · nothing in the evening.", S.closeSec)
   ];
   else if (tpl === "interface") list = [
@@ -433,30 +510,41 @@ function buildSteps(k, tpl) {
     TICK("off", "off", "Day off", "Notebook photo to Claude. Nothing else. The day off is off."),
     TICK("sleep", "off", "Lights out at the usual time", "Tomorrow starts at 8:00 again.")
   ];
-  else list = [
-    CL("arrive", "Arrive · sit · phone in the bag", "Yesterday's 4 tests → Notes → read the Rule lines once. Checkpoints on scratch paper.", S.arriveSec),
-    B("b1", "Block 1 · random · 20 Q", "Start in UWorld and in the pacer. End block when UWorld ends."),
-    BR("br1", "Break", "Out of the chair. Walk, water. No screen."),
-    B("b2", "Block 2 · random", "Same four checkpoints. Second read of a stem = flag."),
-    BR("br2", "Break · the short one", "Like the exam's. Stand, water.", S.shortSec),
-    B("b3", "Block 3 · random", "Easy ones first. 2:00 left → fill every blank."),
-    BR("br3", "Break · snack", "Walk a lap."),
-    bioDay ? B("b4", "Block 4 · Biostatistics", "Biostats day: recite the biostats cheat sheet for 3 minutes first. Draw the 2×2 before any calculation.") : B("b4", "Block 4 · random", "Mon · Wed · Fri this block is Biostatistics."),
-    ML("lunch", "Lunch", "Eat, walk outside. Decide now: a 3rd case today? Only if Block 1 started at 8:00."),
-    BIO("bio", "Biostats contact · 4 questions", "Subject Review, today's topic" + (cal.note && /contact:\s*([^.]+)/i.test(cal.note) ? ": " + /contact:\s*([^.]+)/i.exec(cal.note)[1].trim() : "") + ". Draw the 2×2 first."),
-    CC("c1", "CCS case 1" + num(c1), "Four lines before the first order. Feedback → one missed order + misspelled words.", c1),
-    BR("br4", "Break", "The pacer starts it by itself."),
-    RV("r1", "Review Block 1", "Wrong first (5+3) → right ones with the time left (60 s). 30 · stand 10 · 30 · stand 10 · 30."),
-    BR("br5", "Break", "Out of the chair."),
-    RV("r2", "Review Block 2", "Same two timers. One Rule line per miss, in the UWorld note."),
-    BR("br6", "Break", "Walk. Water."),
-    CC("c2", "CCS case 2" + num(c2), "First attempt only. Use the whole clock. Close line at the 2-minute warning.", c2),
-    ML("dinner", "Dinner", "Away from the desk."),
-    RV("r3", "Review Block 3", "Same method. Correct questions: Educational Objective only."),
-    BR("br7", "Break", "Last one of the day."),
-    RV("r4", "Review Block 4", "Hard stop at 90. Ended early? → CCS 3" + (c3 ? " · № " + c3 : " (a retry)") + " fits here, strict clock."),
-    CL("close", "Close the day", "Tomorrow's 4 tests created · notebook line (date · 4 scores · K M T G) · pack · tick the day.", S.closeSec)
-  ];
+  else { // the study day, the way it is really done: the blocks in a row, the cases with their feedback, lunch, then the reviews from the lowest score up
+    const nB = Math.max(1, Math.min(9, parseInt(S.nBlocks, 10) || 6)), nCraw = parseInt(S.nCases, 10), nC = Math.max(0, Math.min(4, isNaN(nCraw) ? 2 : nCraw));
+    const cs = cal.cases, blocks = live ? blockScores(nB) : [], plan = live ? reviewPlan(nB, blocks) : [], retry = cs[nC] || "";
+    if (live) dayScores = blocks;
+    const revDef = pl => {                                         // minutes of work for a review that today has not sized by hand
+      if (S.reviewSec > 0) return S.reviewSec;
+      if (S.reviewSec === 0) return rv.limit;
+      if (pl && pl.correct != null) return Math.max(900, Math.min(rv.limit, Math.ceil((Math.max(0, pl.nQ - pl.correct) * rv.b + pl.correct * rv.eo) / 300) * 300));   // 5:00 per wrong + 1:00 per right, to the next 5 minutes
+      return Math.min(rv.limit, 3600);
+    };
+    const topic = cal.note && /contact:\s*([^.]+)/i.test(cal.note) ? " Focus: " + /contact:\s*([^.]+)/i.exec(cal.note)[1].trim() + "." : "";
+    const tips = ["Start in UWorld and in the pacer. End block when UWorld ends.", "Same four checkpoints. Second read of a stem = flag.", "Easy ones first. 2:00 left → fill every blank.", "Behind at a checkpoint → flag at 50 s.", "Same checkpoints as Block 1. Tired = flag sooner, not read faster.", "The last one. Same checkpoints, every blank filled."];
+    list = [CL("arrive", "Arrive · sit · phone in the bag", "Yesterday's tests → Notes → read the Rule lines once. Checkpoints on scratch paper.", S.arriveSec)];
+    for (let i = 1; i <= nB; i++) {
+      list.push(B("b" + i, "Block " + i + " · random" + (i === 1 ? " · 20 Q" : ""), tips[Math.min(i, tips.length) - 1]));
+      if (i < nB) list.push(BR(i <= 3 ? "br" + i : "bb" + i, "Break", i === 1 ? "Out of the chair. Walk, water. No screen." : "Stand, water. No screen."));
+    }
+    const lunch = ML("lunch", "Lunch", "Eat, walk outside. Away from the desk.");
+    if (S.lunchAfter === "blocks") list.push(lunch); else if (nC) list.push(BR("bb" + nB, "Break", "Out of the chair. Then the cases."));
+    for (let j = 1; j <= nC; j++) list.push(CC("c" + j, "CCS case " + j + num(cs[j - 1] || ""), j === 1 ? "Four lines before the first order. Feedback right after: one missed order + the misspelled words." : "First attempt only. Use the whole clock. Close line at the 2-minute warning. Feedback right after.", cs[j - 1] || ""));
+    if (S.lunchAfter !== "blocks") list.push(lunch); else if (nC) list.push(BR("br4", "Break", "Out of the chair."));
+    if (S.bio) list.push(BIO("bio", "Biostats contact · 4 questions", "A 4-question Biostatistics test in the QBank (pool Incorrect when Unused is empty)." + topic + " Draw the 2×2 first."));
+    const dinnerAfter = Math.ceil(nB / 2);
+    for (let i = 1; i <= nB; i++) {
+      const pl = plan[i - 1] || null;
+      const t = "Review " + i + (pl ? " · Block " + pl.n + (pl.correct != null ? " · " + pl.correct + "/" + pl.nQ : "") : nB === 1 ? "" : i === 1 ? " · lowest score first" : i === nB ? " · highest score" : " · next lowest");
+      const w = i === 1 ? "Lowest score first, then upward. Wrong first (5+3) → right ones with the time left (60 s)." : i === nB ? "Hard stop. Ended early? → CCS " + (nC + 1) + (retry ? " · № " + retry : " (a retry)") + " fits here, strict clock." : "Same two timers. One Rule line per miss, in the UWorld note.";
+      const st = RV("r" + i, t, w, revDef(pl)); st.blk = pl ? pl.id : null; st.blkInfo = pl;
+      list.push(st);
+      if (i < nB) list.push(i === dinnerAfter ? ML("dinner", "Dinner", "Away from the desk.") : BR(i <= 3 ? "br" + (i + 4) : "rb" + i, "Break", "Out of the chair."));
+    }
+    list.push(CL("close", "Close the day", "Tomorrow's " + nB + " tests created · notebook line (date · scores · K M T G) · pack · tick the day.", S.closeSec));
+  }
+  if (live && D.len) list.forEach(x => { if (D.len[x.id] > 0 && x.tool !== "review" && x.parts.length) x.parts[0].sec = D.len[x.id]; });
+  if (live && Array.isArray(D.order) && D.order.length) list = applyOrder(list, D.order);
   list.forEach((s, i) => { s.n = i; s.total = s.parts.reduce((a, p) => a + p.sec, 0); s.study = s.parts.filter(p => !p.brk).reduce((a, p) => a + p.sec, 0); s.brk = s.total - s.study; });
   return list;
 }
@@ -478,36 +566,125 @@ function loadSettings() {
   if (p && S.cal !== calBefore) P.writeJSON(LS_S, S);
   if (!parseKey(S.dayOne)) S.dayOne = DEFAULTS.dayOne;
   if (!TPLS.includes(S.tpl)) S.tpl = "auto";
+  S.nBlocks = Math.max(1, Math.min(9, parseInt(S.nBlocks, 10) || 6));
+  const nc = parseInt(S.nCases, 10); S.nCases = isNaN(nc) ? 2 : Math.max(0, Math.min(4, nc));
+  if (S.lunchAfter !== "blocks") S.lunchAfter = "cases";
+  S.reviewSec = [-1, 0, 1800, 2700, 3600, 5400].includes(+S.reviewSec) ? +S.reviewSec : -1;
+  S.bio = S.bio !== false;
   P.setSound(S.sound);
 }
 function saveSettings() { P.writeJSON(LS_S, S); }
-function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, startedAt: 0, finishedAt: 0, updatedAt: 0 }; }
+function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, len: {}, order: [], rv: {}, scores: {}, v: DAYV, startedAt: 0, finishedAt: 0, updatedAt: 0 }; }
 function persist(touch) { D.updatedAt = Date.now(); P.writeJSON(LS_D, D); if (touch !== false) P.live.touch(); }
 function history() { const h = P.readJSON(LS_H, []); return Array.isArray(h) ? h : []; }
-function archive(day) { // keep a finished day for the strip
+function spentRec(step, rec) { // [study, break] seconds a ticked step counts for: measured when it ran on a timer or in its page; the plan when it was ticked by hand; nothing when it was skipped before it began
+  if (!rec || !rec.done) return [0, 0];
+  if (rec.study != null || rec.brk != null) return [rec.study || 0, rec.brk || 0];
+  if (rec.sec != null) { const tot = step ? step.total : 0; return tot > 0 ? [rec.sec * step.study / tot, rec.sec * step.brk / tot] : [rec.sec, 0]; }
+  if (rec.src === "skip") return [0, 0];
+  return step ? [step.study, step.brk] : [0, 0];
+}
+function toolSpent(x) { // [study, break] seconds of a block, review or case as its own page saved it
+  if (x.type === "block") return [x.usedSec > 0 ? x.usedSec : (x.endedEarly && Array.isArray(x.qTimes) && x.qTimes.length ? x.qTimes.reduce((a, b) => a + b, 0) : (x.blockSec || 0)), 0];
+  if (x.type === "review") return [x.timeUsedSec || 0, (x.stands || 0) * reviewCfg().stand];
+  if (x.type === "ccs") return [(x.caseTimed === false ? 0 : (x.timeUsedSec || 0)) + (x.reviewSec || 0), 0];
+  return [0, 0];
+}
+function archive(day) { // keep a finished day for the calendar: what was ticked, by kind, and the time it really took
   if (!day || !day.date) return;
-  const steps = buildSteps(day.date, day.tpl || tplFor(day.date));
-  const done = steps.filter(s => day.steps[s.id] && day.steps[s.id].done);
-  const rec = { date: day.date, tpl: day.tpl || "study", done: done.length, total: steps.length, studySec: done.reduce((a, s) => a + s.study, 0), brkSec: done.reduce((a, s) => a + s.brk, 0), startedAt: day.startedAt || 0, finishedAt: day.finishedAt || 0 };
+  const steps = buildSteps(day.date, day.tpl || tplFor(day.date)), kinds = {};
+  let done = 0, study = 0, brk = 0;
+  steps.forEach(st => { const r = day.steps[st.id]; if (!r || !r.done) return; done++; const sp = spentRec(st, r); study += sp[0]; brk += sp[1]; if (r.src !== "skip") kinds[st.kind] = (kinds[st.kind] || 0) + 1; });
+  const rec = { date: day.date, tpl: day.tpl || "study", done: done, total: steps.length, kinds: kinds, studySec: Math.round(study), brkSec: Math.round(brk), startedAt: day.startedAt || 0, finishedAt: day.finishedAt || 0 };
   const h = history().filter(x => x.date !== day.date); h.push(rec); h.sort((a, b) => a.date < b.date ? -1 : 1);
   P.writeJSON(LS_H, h.slice(-90));
+}
+function normDay() { // every field present, whichever page version or device saved the day
+  ["steps", "consumed", "manual", "caseLen", "len", "rv", "scores"].forEach(f => { if (!D[f] || typeof D[f] !== "object" || Array.isArray(D[f])) D[f] = {}; });
+  if (!Array.isArray(D.order)) D.order = [];
+  Object.keys(D.caseLen).forEach(id => { if (!(D.len[id] > 0) && D.caseLen[id] > 0) D.len[id] = D.caseLen[id]; });
+  if (!TPLS.includes(D.tpl)) D.tpl = tplFor(D.date);
+}
+function adopt(p) { // today's state, from storage or from another device; true when it came from the page before this one
+  const old = p.v !== DAYV;
+  D = Object.assign(freshDay(p.date), p); normDay();
+  if (old) { try { fitOldDay(); } catch (e) { console.warn("day: could not fit the earlier list", e); } }
+  D.v = DAYV;
+  return old;
+}
+function fitOldDay() { // a day begun on the earlier page (4 blocks, the cases between the reviews): its ticks are fitted to the order of today's list, once
+  if (D.tpl !== "study") return;
+  if (D.timer && !D.timer.shared && /^r\d+$/.test(D.timer.stepId) && !(D.len[D.timer.stepId] > 0)) D.len[D.timer.stepId] = reviewCfg().limit;   // a review already running keeps the shape it was started with
+  if (!anyDoneRaw(D)) return;
+  const list = buildSteps(D.date, D.tpl);
+  const has = id => !!(D.steps[id] && D.steps[id].done);
+  const isTask = st => ["block", "review", "ccs", "bio"].includes(st.kind);
+  const brkLike = st => st.parts.length === 1 && !!st.parts[0].brk;
+  const start = dayStart(D.date), end = start + 86400000;
+  // 1 · blocks, reviews and cases that their pages saved today and that found no step on the old list take the steps that are new
+  const today = P.loadSessions().map(x => ({ x: x, t: new Date(x.date).getTime() })).filter(o => o.t >= start && o.t < end).sort((a, b) => a.t - b.t);
+  ["block", "review", "ccs"].forEach(type => {
+    const mine = list.filter(st => st.kind === type);
+    if (mine.some(st => !has(st.id) && OLD_STUDY_IDS.indexOf(st.id) >= 0)) return;          // an old step of this kind is still open: nothing was left over
+    const placed = today.filter(o => o.x.type === type && D.consumed[o.x.id] && D.consumed[o.x.id] !== "-");
+    const after = placed.length ? placed[placed.length - 1].t : mine.reduce((a, st) => has(st.id) ? Math.max(a, D.steps[st.id].at || 0) : a, 0) - 60000;   // only what began after the last one that found its step
+    today.filter(o => o.x.type === type && D.consumed[o.x.id] === "-" && o.t > after).forEach(o => {
+      const st = mine.find(q => !has(q.id) && !D.manual[q.id] && OLD_STUDY_IDS.indexOf(q.id) < 0);
+      if (!st) return;
+      const sp = toolSpent(o.x);
+      D.steps[st.id] = { done: true, at: o.t + (sp[0] + sp[1]) * 1000, src: "tool", sec: sp[0] + sp[1], study: sp[0], brk: sp[1] };
+      D.consumed[o.x.id] = st.id;
+    });
+  });
+  let lastTask = -1; list.forEach((st, i) => { if (isTask(st) && has(st.id)) lastTask = i; });
+  // a task in progress — its timer runs here, or its own page is running it — is the point the day has reached
+  let going = -1;
+  if (D.timer && !D.timer.shared) going = list.findIndex(st => st.id === D.timer.stepId && isTask(st));
+  [["step3pacer.run.v1", "block"], ["step3pacer.review.run.v1", "review"], ["step3pacer.ccs.run.v1", "ccs"]].forEach(([k, kind]) => {
+    const r = runFrom(kind, P.readJSON(k, null), ""); if (!r || D.consumed[r.id] !== undefined) return;
+    const i = list.findIndex(st => st.kind === kind && !has(st.id)); if (i > going) going = i;
+  });
+  if (going > lastTask) lastTask = going; else going = -1;
+  if (lastTask < 0) return;
+  // 2 · a break that lies before the last finished task was taken: tick it, unless a hand unticked it
+  for (let i = 0; i < lastTask; i++) { const st = list[i]; if (st.kind === "brk" && !has(st.id) && !D.manual[st.id]) D.steps[st.id] = { done: true, at: 0, src: "break", sec: null }; }
+  // 3 · a break or meal ticked ahead of the work: the old page ticked it by itself, or it was really the pause right after the last task
+  const slot = () => { for (let j = lastTask + 1; j < list.length; j++) { const st = list[j]; if (isTask(st) && !has(st.id)) return null; if (brkLike(st) && !has(st.id) && !D.manual[st.id]) return st; } return null; };
+  const openTaskBefore = i => { for (let j = lastTask + 1; j < i; j++) if (isTask(list[j]) && !has(list[j].id)) return true; return false; };
+  for (let i = lastTask + 1; i < list.length; i++) {
+    const st = list[i], rec = D.steps[st.id];
+    if (!brkLike(st) || !rec || !rec.done) continue;
+    if (rec.src === "break") { delete D.steps[st.id]; continue; }
+    if (openTaskBefore(i)) { delete D.steps[st.id]; const to = slot(); if (to && to.kind === st.kind) D.steps[to.id] = rec; }
+  }
+  // 4 · a break or meal still running is the pause right after the last finished task
+  if (D.timer) {
+    const cur = list.find(st => st.id === D.timer.stepId) || null;
+    if (D.timer.shared) { const to = slot(); if (to) D.timer.stepId = to.id; else if (!cur || has(cur.id)) D.timer = null; }
+    else if (!cur) D.timer = null;
+  }
+  // 5 · the card shows the step after the last finished task
+  if (D.timer) D.cur = D.timer.stepId;
+  else if (going >= 0) D.cur = list[going].id;
+  else { const nx = list.slice(lastTask + 1).find(st => !has(st.id)) || list.find(st => !has(st.id)); D.cur = nx ? nx.id : null; }
+  D.order = [];
 }
 function loadDay() {
   const k = keyOf(Date.now());
   const p = P.readJSON(LS_D, null);
-  if (p && typeof p === "object" && p.date === k) { D = Object.assign(freshDay(k), p); D.steps = D.steps || {}; D.consumed = D.consumed || {}; D.manual = D.manual || {}; D.caseLen = D.caseLen || {}; }
-  else { if (p && p.date) archive(p); D = freshDay(k); }
-  if (!TPLS.includes(D.tpl)) D.tpl = tplFor(k);
+  let save = true;
+  if (p && typeof p === "object" && p.date === k) save = adopt(p);
+  else { if (p && typeof p === "object" && p.date) { try { D = Object.assign(freshDay(p.date), p); normDay(); archive(D); } catch (e) { console.warn("day: could not archive the earlier day", e); } } D = freshDay(k); }
   if (S.tpl !== "auto" && D.tpl !== S.tpl && !anyDoneRaw(D)) D.tpl = S.tpl;
   STEPS = buildSteps(D.date, D.tpl);
-  if (!p || p.date !== k) persist(false);
+  if (save) persist(false);
 }
 function anyDoneRaw(day) { return Object.keys(day.steps || {}).some(id => day.steps[id] && day.steps[id].done); }
 function rollover() { // called every tick: a new day (after 4:00 AM) gets a fresh sheet
   const k = keyOf(Date.now());
   if (D.date === k) return false;
   if (D.timer) { clearTimer(false); }
-  archive(D); D = freshDay(k); STEPS = buildSteps(k, D.tpl); builtFor = "";
+  archive(D); D = freshDay(k); rebuild();
   persist(); return true;
 }
 
@@ -519,10 +696,10 @@ function cd() {
   const now = Date.now();
   if (T.shared) {
     let b = P.breakGet();
-    if (!b && T.endAt && now - T.endAt < 3 * 3600000 && !T.gone) {   // picked up from another device: show the same break here
+    if (!b && T.endAt && now - T.endAt < 3 * 3600000 && !T.gone && !brkSeen(T)) {   // a break begun on another device, never yet on this one: show the same break here
       b = { startAt: T.startAt, endAt: T.endAt, sec: T.sec, label: T.label, from: "day", chimed: now >= T.endAt };
-      P.writeJSON(P.KEYS.brk, b);
-    }
+      P.writeJSON(P.KEYS.brk, b); markBrkSeen(T);
+    }                                                               // had it here and it is gone: a page of this device ended it (a block, review or case was started, or Skip / Dismiss)
     if (!b) return null;
     const left = P.breakLeft(b, now);
     return { kind: "break", step, part: 0, label: step.parts[0] ? step.parts[0].l : "Break", startAt: b.startAt, pausedTotal: 0, sec: b.sec, el: b.sec - left, left, paused: false, over: left <= 0, chimed: !!b.chimed, warned: !!T.warned, reminded: T.reminded || 0, endAt: b.endAt, last: true, b };
@@ -534,24 +711,39 @@ function cd() {
   return { kind: "own", step, part: T.part, label: part.l, startAt: T.startAt, pausedTotal: T.pausedTotal, sec, el, left, paused: !!T.pausedAt, over: left <= 0, chimed: !!T.chimed, warned: !!T.warned, reminded: T.reminded || 0,
     endAt: T.startAt + T.pausedTotal + sec * 1000 + (T.pausedAt ? now - T.pausedAt : 0), last: T.part >= step.parts.length - 1, next: step.parts[T.part + 1] };
 }
-function remainingPlanned() { // seconds of plan still ahead, the running countdown included
-  const c = cd(); let sum = 0;
-  STEPS.forEach(s => {
-    if (isDone(s.id)) return;
+function breakEndedAt(T, now) { // when a break that vanished really ended: the start of the block, review or case that replaced it, else now
+  let t = now; toolRuns().forEach(r => { if (r.startAt && r.startAt >= T.startAt && r.startAt < t) t = r.startAt; });
+  return t;
+}
+function brkSeen(T) { return P.readJSON(LS_BSEEN, "") === T.stepId + "@" + T.startAt; }
+function markBrkSeen(T) { P.writeJSON(LS_BSEEN, T.stepId + "@" + T.startAt); }
+function remainingPlanned(from) { // seconds of plan from the step on the card to the end of the list, the running countdown included; unticked steps left behind the card are not counted
+  const c = cd(), i0 = from ? Math.max(0, STEPS.indexOf(from)) : 0; let sum = 0;
+  STEPS.forEach((s, i) => {
+    if (isDone(s.id) || i < i0) return;
     if (c && c.step.id === s.id) {
-      if (c.kind === "wait") { for (let i = c.part + 1; i < s.parts.length; i++) sum += s.parts[i].sec; }
-      else { sum += Math.max(0, c.left); for (let i = c.part + 1; i < s.parts.length; i++) sum += s.parts[i].sec; }
+      if (c.kind === "wait") { for (let j = c.part + 1; j < s.parts.length; j++) sum += s.parts[j].sec; }
+      else { sum += Math.max(0, c.left); for (let j = c.part + 1; j < s.parts.length; j++) sum += s.parts[j].sec; }
     } else sum += s.total;
   });
   return sum;
 }
 
 /* ---------- actions ---------- */
+function rebuild() { STEPS = buildSteps(D.date, D.tpl); builtFor = ""; nowSig = ""; writeHandoff(); }
 function markStarted() { if (!D.startedAt) D.startedAt = Date.now(); }
 function sharedMarker(stepId, b) { // the Day timer for a break step: points at the shared break and keeps a copy of it for the other devices
   b = b || P.breakGet() || {};
-  return { stepId: stepId, shared: true, startAt: b.startAt || Date.now(), endAt: b.endAt || 0, sec: b.sec || 0, label: b.label || "", warned: false, reminded: 0 };
+  const m = { stepId: stepId, shared: true, startAt: b.startAt || Date.now(), endAt: b.endAt || 0, sec: b.sec || 0, label: b.label || "", warned: false, reminded: 0 };
+  if (b.startAt) markBrkSeen(m);
+  return m;
 }
+function undoneNeighbor(step, dir) { // the nearest step not yet ticked, above (-1) or below (+1)
+  const i = STEPS.indexOf(step); if (i < 0) return null;
+  for (let j = i + dir; j >= 0 && j < STEPS.length; j += dir) if (!isDone(STEPS[j].id)) return STEPS[j];
+  return null;
+}
+function lenOf(step) { return !step || !step.parts.length ? 0 : step.tool === "review" ? step.study : step.parts[0].sec; }   // what the length buttons change: the first part; for a review, its minutes of work
 function startStep(step, part) {
   if (!step || isDone(step.id) || !step.parts.length) return;
   part = part || 0;
@@ -562,20 +754,36 @@ function startStep(step, part) {
     D.timer = sharedMarker(step.id, b);
   } else {
     P.breakStop();                                                 // a task starts: any break is over
-    D.timer = { stepId: step.id, part: part, startAt: now, pausedAt: 0, pausedTotal: 0, extra: 0, warned: false, chimed: false, reminded: 0, waiting: false };
+    D.timer = { stepId: step.id, part: part, startAt: now, pausedAt: 0, pausedTotal: 0, extra: 0, warned: false, chimed: false, reminded: 0, waiting: false, acc: [0, 0], banked: -1, bankAmt: 0 };
   }
+  if (step.tool === "review" && step.blk) D.rv[step.id] = step.blk;   // this review is for that block from here on, whatever the other scores turn out to be
   D.cur = step.id; markStarted();
   P.sfx("start"); P.keepAwake(); P.bg.runStart(step.t);
   $("rulesFold").open = false;
   persist(); render();
 }
-function startNextPart() {
+function bank(c) { // the part that just ended joins the step's measured time: [study, break]
+  const T = D.timer; if (!T || T.shared || !c || c.kind !== "own" || T.banked === c.part) return;
+  if (!Array.isArray(T.acc)) { T.acc = [0, 0]; for (let i = 0; i < c.part; i++) { const q = c.step.parts[i]; T.acc[q.brk ? 1 : 0] += q.sec; } }
+  const p = c.step.parts[c.part], used = Math.max(0, Math.min(c.el, c.sec));
+  T.acc[p && p.brk ? 1 : 0] += used; T.banked = c.part; T.bankAmt = used;
+}
+function startNextPart() { // from the wait after a part, or in the middle of one ("Feedback ▸", "Stand ▸"): the next part starts now
   const T = D.timer; if (!T || T.shared) return;
   const step = stepById(T.stepId); if (!step || T.part + 1 >= step.parts.length) return;
+  bank(cd());
   const now = Date.now();
   Object.assign(T, { part: T.part + 1, startAt: now, pausedAt: 0, pausedTotal: 0, extra: 0, warned: false, chimed: false, reminded: 0, waiting: false });
   P.audioInit(); P.sfx("start"); P.keepAwake(); P.bg.runStart(step.t + " · " + step.parts[T.part].l);
   persist(); render();
+}
+function nextPartTap() { // "Feedback ▸" / "Stand ▸": after a part ended, one tap; in the middle of a part, two taps like Skip — it cannot be taken back
+  const c = cd(); if (!c) return;
+  if (c.kind === "wait") { partArmed = 0; startNextPart(); return; }
+  if (c.kind !== "own" || c.last) return;
+  if (partArmed && Date.now() - partArmed < 3500) { partArmed = 0; startNextPart(); return; }
+  partArmed = Date.now(); render();
+  setTimeout(() => { if (partArmed && Date.now() - partArmed >= 3500) { partArmed = 0; render(); } }, 3600);
 }
 function clearTimer(stopBreak) {
   if (D.timer && D.timer.shared && stopBreak !== false) P.breakStop();
@@ -585,51 +793,145 @@ function nextUndoneAfter(step) { // the step to show next: the first undone one 
   const i = STEPS.indexOf(step);
   return STEPS.slice(i + 1).find(s => !isDone(s.id)) || firstUndone();
 }
-function finishStep(step, src) {
+function spentNow(c) { // [study, break] seconds really spent so far on the step whose timer runs here
+  const T = D.timer;
+  let acc;
+  if (T && !T.shared && Array.isArray(T.acc)) acc = T.acc.slice();
+  else { acc = [0, 0]; if (c.kind !== "break") for (let i = 0; i < c.part; i++) { const q = c.step.parts[i]; acc[q.brk ? 1 : 0] += q.sec; } }
+  if (c.kind === "wait") { if (!(T && T.banked === c.part)) { const q = c.step.parts[c.part]; acc[q && q.brk ? 1 : 0] += c.sec; } return acc; }
+  const used = Math.max(0, Math.min(c.el, c.sec + 3600));
+  if (c.kind === "break") return [0, used];
+  if (T && T.banked === c.part) return acc;
+  const p = c.step.parts[c.part]; acc[p && p.brk ? 1 : 0] += used;
+  return acc;
+}
+function finishStep(step, src, opts) {
   if (!step) return;
-  const now = Date.now();
+  const now = Date.now(), goTo = opts && opts.next;
   const c = cd(), timed = !!(c && c.step.id === step.id);
-  const actual = timed && c.kind !== "wait" ? Math.round(sumActual(c)) : null;
-  D.steps[step.id] = { done: true, at: now, src: src || "tap", sec: actual };
+  const rec = { done: true, at: now, src: src || "tap", sec: null };
+  if (timed) { const sp = spentNow(c); rec.study = Math.round(sp[0]); rec.brk = Math.round(sp[1]); rec.sec = rec.study + rec.brk; }
+  else if (src === "skip") { rec.study = 0; rec.brk = 0; rec.sec = 0; }
+  D.steps[step.id] = rec;
   delete D.manual[step.id];
+  if (step.tool === "review" && step.blk && src !== "skip") D.rv[step.id] = step.blk;
   if (src === "tap" || src === "skip" || !src) claimRun(step);
   if (D.timer && D.timer.stepId === step.id) clearTimer(true);
   markStarted();
-  const nxt = nextUndoneAfter(step);
+  if (step.tool === "review" || step.kind === "block") rebuild();   // the plan of the reviews follows what was just finished
+  const nxt = (goTo && stepById(goTo.id)) || nextUndoneAfter(stepById(step.id) || step);
   D.cur = nxt ? nxt.id : null;
   if (allDone()) { D.finishedAt = now; P.sfx("day"); P.vibrate([300, 100, 300, 100, 700]); }
-  else if (timed && step.parts.length && !step.parts[step.parts.length - 1].brk) {   // a task ended on its timer: the break or meal right after it starts by itself
+  else if (!goTo && timed && step.parts.length && !step.parts[step.parts.length - 1].brk) {   // a task ended on its timer: the break or meal right after it starts by itself
     if (nxt && nxt.parts.length === 1 && nxt.parts[0].brk) { const b = P.breakStart(nxt.parts[0].sec, nxt.t, "day"); D.timer = sharedMarker(nxt.id, b); }
   }
   persist(); render();
-}
-function sumActual(c) { // seconds spent on the step so far: finished parts at plan length, the running one as elapsed
-  let s = 0; for (let i = 0; i < c.part; i++) s += c.step.parts[i].sec; return s + Math.min(c.el, c.sec + 3600);
 }
 function toggleStep(step) {
   if (!step) return;
   if (isDone(step.id)) {
     delete D.steps[step.id];
     D.manual[step.id] = Date.now();                                                                        // unticked by hand: stays unticked until a hand ticks it
+    delete D.rv[step.id];
     if (D.timer && D.timer.stepId === step.id) clearTimer(true);
     Object.keys(D.consumed).forEach(sid => { if (D.consumed[sid] === step.id) D.consumed[sid] = "-"; });   // a session that ticked it stays consumed
     D.finishedAt = 0;
+    if (step.tool === "review" || step.kind === "block") rebuild();
     persist(); render(); return;
   }
   finishStep(step, "tap");
 }
-function selectStep(step) {
+function selectStep(step) { // a tap on a row: that step becomes the one on the card
   if (!step || isDone(step.id)) return;
-  if (D.timer && D.timer.stepId !== step.id) { P.notice("A step is running. Finish it with Done, or Skip it, before changing the current step.", "warn", 6000); return; }
+  const c = cd();
+  if (c && c.step.id !== step.id) {
+    if (c.kind === "break") { finishStep(c.step, "timer", { next: step }); return; }   // a break ends the moment you move on: ticked with the time it really took
+    P.notice("A step is running. Finish it with Done, or Stop it, before changing the current step.", "warn", 6000); return;
+  }
+  if (D.timer && !c) D.timer = null;
   D.cur = step.id; persist(); render();
 }
-function extend(sec) {
-  const T = D.timer; if (!T) return;
-  if (T.shared) { P.breakExtend(sec); T.reminded = 0; persist(); render(); return; }
-  if (T.waiting) return;
-  T.extra = (T.extra || 0) + sec; T.chimed = false; T.reminded = 0; T.warned = false;
-  P.keepAwake(); P.bg.runStart(stepById(T.stepId).t);
+function retime() { // after a change of length: the flags of the running part follow the new time left
+  const T = D.timer; if (!T || T.shared) return;
+  const step = stepById(T.stepId), part = step && step.parts[T.part]; if (!part) return;
+  const sec = part.sec + (T.extra || 0), ref = T.pausedAt || Date.now(), left = sec - (ref - T.startAt - T.pausedTotal) / 1000;
+  if (left > 0) {
+    T.chimed = false; T.reminded = 0;
+    if (T.waiting) {                                                 // the part had ended and was waiting: with more time on it, it runs again from where the clock really is
+      T.waiting = false;
+      if (T.banked === T.part && Array.isArray(T.acc)) { const k = part.brk ? 1 : 0; T.acc[k] = Math.max(0, T.acc[k] - (T.bankAmt || 0)); }
+      T.banked = -1; T.bankAmt = 0;
+      P.keepAwake(); P.bg.runStart(step.t);
+    }
+  }
+  if (left > 60) T.warned = false;
+}
+function setLen(step, sec) { // today's own length for a step — also in the middle of it (a case that turns out to be 25:00)
+  if (!step || !step.parts.length || !(sec > 0)) return;
+  sec = Math.max(60, Math.min(4 * 3600, Math.round(sec)));
+  D.len[step.id] = sec; if (step.kind === "ccs") D.caseLen[step.id] = sec;
+  const T = D.timer;
+  if (T && !T.shared && T.stepId === step.id && T.part === 0 && step.tool !== "review") T.extra = 0;
+  rebuild(); retime(); persist(); render();
+}
+function adjust(delta) { // more or less time: on the countdown that is running, or on the step's length before Start
+  const T = D.timer, c = cd();
+  if (!c) { if (T) return; const step = cardStep(null); if (step && step.parts.length) setLen(step, Math.max(step.tool === "review" ? 300 : 60, lenOf(step) + delta)); return; }
+  if (c.kind === "wait") return;
+  if (c.kind === "break") {
+    const d = Math.max(delta, 60 - c.b.sec);                         // a break keeps at least one minute on its clock
+    if (!d) return;
+    P.breakExtend(d); T.reminded = 0; if (P.breakLeft() > 60) T.warned = false;
+    persist(); render(); return;
+  }
+  const part = c.step.parts[c.part];
+  T.extra = Math.max(60 - part.sec, (T.extra || 0) + delta);
+  retime(); P.keepAwake(); P.bg.runStart(c.step.t);
   persist(); render();
+}
+function extend(sec) { adjust(sec); }
+function moveStep(step, dir) { // today's order: the step trades places with the nearest step not yet ticked, above or below
+  if (!step || D.timer) return;
+  const other = undoneNeighbor(step, dir); if (!other) return;
+  const ids = STEPS.map(s => s.id), a = ids.indexOf(step.id), b = ids.indexOf(other.id);
+  ids.splice(a, 1); ids.splice(b, 0, step.id);
+  D.order = ids; D.cur = dir < 0 ? step.id : other.id;                // moved earlier: it is the next thing; moved later: the step that came up is
+  rebuild(); persist(); render();
+}
+function mealSwap(step) { // the one-tap trade on a break or meal card: this break ↔ the next meal, or this meal ↔ the next break — when no more than two tasks lie between them
+  if (!step || step.parts.length !== 1 || !step.parts[0].brk || (step.kind !== "brk" && step.kind !== "meal")) return null;
+  const want = step.kind === "brk" ? "meal" : "brk", i = STEPS.indexOf(step);
+  let tasks = 0;
+  for (let j = i + 1; j < STEPS.length; j++) {
+    const o = STEPS[j]; if (isDone(o.id)) continue;
+    if (o.kind === want && o.parts.length === 1) return { other: o, label: step.kind === "brk" ? o.t + " now · break later" : step.t + " later · break now" };
+    if (!(o.parts.length === 1 && o.parts[0].brk) && ++tasks > 2) return null;
+  }
+  return null;
+}
+function doMealSwap() {
+  const c = cd(), step = cardStep(c), sw = mealSwap(step); if (!sw) return;
+  if (c && c.kind !== "break") return;
+  const startAt = c ? c.startAt : 0;
+  const ids = STEPS.map(s => s.id), i = ids.indexOf(step.id), j = ids.indexOf(sw.other.id);
+  ids[i] = sw.other.id; ids[j] = step.id; D.order = ids;
+  rebuild();
+  const now = stepById(sw.other.id);
+  if (c && now) {                                                    // the pause was already running: it goes on as the other one, counted from the same moment
+    const b = P.breakStart(now.parts[0].sec, now.t, "day");
+    b.startAt = startAt; b.endAt = startAt + b.sec * 1000; P.writeJSON(P.KEYS.brk, b);
+    D.timer = sharedMarker(now.id, b);
+  }
+  D.cur = sw.other.id; persist(); render();
+}
+function setScore(bid, raw) { // a block's score, typed on the review card: it orders the reviews and goes to the block's saved session
+  raw = String(raw == null ? "" : raw).trim();
+  const v = raw === "" ? null : parseInt(raw, 10);
+  if (v != null && (isNaN(v) || v < 0 || v > 60)) { render(); return; }
+  if (v == null) delete D.scores[bid]; else D.scores[bid] = v;
+  const sid = Object.keys(D.consumed).find(k => D.consumed[k] === bid);
+  if (sid && v != null) { const x = P.loadSessions().find(q => q.id === sid && q.type === "block"); if (x && x.correct !== v) { x.correct = v; P.saveSession(x); } }
+  rebuild(); persist(); render();
 }
 function pauseResume() {
   const T = D.timer; if (!T || T.shared || T.waiting) return;
@@ -638,20 +940,23 @@ function pauseResume() {
   persist(); render();
 }
 function skipStep() { // double-tap: the running (or current) step is ticked as skipped
-  const step = current(); if (!step) return;
+  const step = cardStep(cd()); if (!step) return;
   if (skipArmed && Date.now() - skipArmed < 3500) { skipArmed = 0; finishStep(step, "skip"); return; }
   skipArmed = Date.now(); render();
   setTimeout(() => { if (skipArmed && Date.now() - skipArmed >= 3500) { skipArmed = 0; render(); } }, 3600);
 }
 function stopTimerOnly() { // "Stop" on the Now card: the timer goes away, the step stays unticked
   if (!D.timer) return;
-  clearTimer(true); persist(); render();
+  const id = D.timer.stepId, step = stepById(id);
+  clearTimer(true);
+  if (step && step.tool === "review" && D.rv[id]) { delete D.rv[id]; rebuild(); }
+  persist(); render();
 }
 function newDay() {
   if (newDayArmed && Date.now() - newDayArmed < 3500) {
     newDayArmed = 0;
     if (D.timer) clearTimer(true);
-    D = freshDay(keyOf(Date.now())); if (S.tpl !== "auto") D.tpl = S.tpl; STEPS = buildSteps(D.date, D.tpl); builtFor = "";
+    D = freshDay(keyOf(Date.now())); if (S.tpl !== "auto") D.tpl = S.tpl; rebuild();
     // what the other pages saved earlier today stays theirs: a blank sheet does not re-tick it
     const start = dayStart(D.date), end = start + 86400000;
     P.loadSessions().forEach(x => { const t = new Date(x.date).getTime(); if (t >= start && t < end) D.consumed[x.id] = "-"; });
@@ -661,6 +966,21 @@ function newDay() {
   newDayArmed = Date.now(); render();
   setTimeout(() => { if (newDayArmed && Date.now() - newDayArmed >= 3500) { newDayArmed = 0; render(); } }, 3600);
 }
+function writeHandoff() { try { writeHandoffNow(); } catch (e) { console.warn("day: could not write the plan for the CCS page", e); } }
+function writeHandoffNow() { // today's and the coming days' cases — number and length — where the CCS page can read them
+  const cal = calendar(), days = {};
+  const add = (k, steps) => {
+    const ck = cal[k] || { cases: [], long: {} }, list = [], seen = {};
+    steps.forEach(st => { if (st.tool === "ccs" && st.caseNum) { list.push({ num: st.caseNum, sec: st.parts[0].sec }); seen[st.caseNum] = true; } });
+    ck.cases.forEach(n => { if (!seen[n]) list.push({ num: n, sec: ck.long[n] ? S.caseSec * 2 : S.caseSec }); });
+    if (list.length) days[k] = list;
+  };
+  add(D.date, STEPS);
+  Object.keys(cal).forEach(k => { if (k > D.date) add(k, buildSteps(k, cal[k].tpl)); });
+  const body = JSON.stringify(days);
+  if (body === lastHandoff) return;
+  lastHandoff = body; P.writeJSON(LS_CASES, { v: 1, at: Date.now(), days: days });
+}
 
 /* ---------- the other pages: a run in progress, and the sessions they save ---------- */
 function runFrom(type, st, where) { // a Block / Review / CCS run state → what the Now card shows, or null
@@ -668,29 +988,31 @@ function runFrom(type, st, where) { // a Block / Review / CCS run state → what
   const now = Date.now();
   if (type === "block" && (st.phase === "running" || st.phase === "paused") && now - st.startAt < 4 * 3600000) {
     const bs = (st.blockSec > 0 ? st.blockSec : blockSec()), el = ((st.phase === "paused" ? st.pausedAt : now) - st.startAt - st.pausedTotal) / 1000;
-    return { kind: "block", id: st.sid, page: "Block", href: "./", label: "Block" + (st.label ? " · " + st.label : ""), left: bs - el, total: bs, sub: st.mode === "review" ? "flags · " + (st.reviewLeft || 0) + " left" : "Q" + Math.min(st.q || 1, 20), paused: st.phase === "paused", where };
+    return { kind: "block", id: st.sid, startAt: st.startAt, spent: [Math.max(0, el), 0], page: "Block", href: "./", label: "Block" + (st.label ? " · " + st.label : ""), left: bs - el, total: bs, sub: st.mode === "review" ? "flags · " + (st.reviewLeft || 0) + " left" : "Q" + Math.min(st.q || 1, 20), paused: st.phase === "paused", where };
   }
   if (type === "review" && (st.phase === "run" || st.phase === "sweep") && now - st.startAt < 8 * 3600000) {
     const c = reviewCfg();
-    if (st.phase === "run" && st.pauseKind === "stand") return { kind: "review", id: st.id, page: "Review", href: "./review.html", label: "Review · stand", left: c.stand - (now - st.standStartAt) / 1000, total: c.stand, sub: "stand", paused: false, where };
+    const used = st.phase === "sweep" ? (st.endEl || 0) / 1000 : Math.max(0, ((st.pauseKind ? st.pausedAt : now) - st.startAt - st.pausedTotal) / 1000), spent = [used, ((st.standsDone || 0) + (st.manualStands || 0)) * c.stand];
+    if (st.phase === "run" && st.pauseKind === "stand") return { kind: "review", id: st.id, startAt: st.startAt, spent: spent, page: "Review", href: "./review.html", label: "Review · stand", left: c.stand - (now - st.standStartAt) / 1000, total: c.stand, sub: "stand", paused: false, where };
     const el = ((st.pauseKind ? st.pausedAt : now) - st.startAt - st.pausedTotal) / 1000;
-    return { kind: "review", id: st.id, page: "Review", href: "./review.html", label: "Review" + (st.label ? " · " + st.label : ""), left: st.phase === "sweep" ? 0 : c.limit - el, total: c.limit, sub: st.phase === "sweep" ? "EO sweep" : "chunk " + Math.min(3, Math.floor(el / c.chunk) + 1) + " of 3", paused: !!st.pauseKind && st.pauseKind !== "stand", where };
+    return { kind: "review", id: st.id, startAt: st.startAt, spent: spent, page: "Review", href: "./review.html", label: "Review" + (st.label ? " · " + st.label : ""), left: st.phase === "sweep" ? 0 : c.limit - el, total: c.limit, sub: st.phase === "sweep" ? "EO sweep" : "chunk " + Math.min(3, Math.floor(el / c.chunk) + 1) + " of 3", paused: !!st.pauseKind && st.pauseKind !== "stand", where };
   }
   if (type === "ccs" && now - st.startAt < 4 * 3600000) {
-    if (st.phase === "run") { const el = ((st.pausedAt || now) - st.startAt - st.pausedTotal) / 1000; return { kind: "ccs", id: st.id, page: "CCS", href: "./ccs.html", label: "CCS case" + (st.label ? " · " + st.label : ""), left: st.limitSec - el, total: st.limitSec, sub: "case", paused: !!st.pausedAt, where }; }
-    if (st.phase === "done" && st.rev && st.rev.startAt && !st.rev.endAt) { const el = (now - st.rev.startAt) / 1000; return { kind: "ccs", id: st.id, page: "CCS", href: "./ccs.html", label: "CCS feedback" + (st.label ? " · " + st.label : ""), left: st.rev.limitSec - el, total: st.rev.limitSec, sub: "feedback", paused: false, where }; }
+    if (st.phase === "run") { const el = ((st.pausedAt || now) - st.startAt - st.pausedTotal) / 1000; return { kind: "ccs", id: st.id, startAt: st.startAt, spent: [Math.max(0, el), 0], page: "CCS", href: "./ccs.html", label: "CCS case" + (st.label ? " · " + st.label : ""), left: st.limitSec - el, total: st.limitSec, sub: "case", paused: !!st.pausedAt, where }; }
+    if (st.phase === "done" && st.rev && st.rev.startAt && !st.rev.endAt) { const el = (now - st.rev.startAt) / 1000; return { kind: "ccs", id: st.id, startAt: st.startAt, spent: [(st.caseTimed === false ? 0 : (st.endEl || 0)) + Math.max(0, el), 0], page: "CCS", href: "./ccs.html", label: "CCS feedback" + (st.label ? " · " + st.label : ""), left: st.rev.limitSec - el, total: st.rev.limitSec, sub: "feedback", paused: false, where }; }
   }
   return null;
 }
 function toolRuns() {
   const out = [], me = P.device().id;
   const local = { block: P.readJSON("step3pacer.run.v1", null), review: P.readJSON("step3pacer.review.run.v1", null), ccs: P.readJSON("step3pacer.ccs.run.v1", null) };
-  ["block", "review", "ccs"].forEach(t => { const r = runFrom(t, local[t], ""); if (r) out.push(r); });
+  const open = r => r && D.consumed[r.id] === undefined;             // a run whose step is already ticked (a saved case whose feedback timer still runs, a run ticked by hand) is not shown again on the next step of its kind
+  ["block", "review", "ccs"].forEach(t => { const r = runFrom(t, local[t], ""); if (open(r)) out.push(r); });
   const doc = P.live.peek && P.live.peek();
   if (doc) ["block", "review", "ccs"].forEach(t => {
     const slot = doc[t]; if (!slot || slot.done || !slot.state || slot.deviceId === me || Date.now() - slot.savedAt > 6 * 3600000) return;
     if (out.some(r => r.kind === t && r.id === (slot.state.sid || slot.state.id))) return;
-    const r = runFrom(t, slot.state, slot.deviceName || "your other device"); if (r) { r.fresh = Date.now() - slot.savedAt < 15 * 60000; out.push(r); }
+    const r = runFrom(t, slot.state, slot.deviceName || "your other device"); if (open(r)) { r.fresh = Date.now() - slot.savedAt < 15 * 60000; out.push(r); }
   });
   return out;
 }
@@ -707,34 +1029,49 @@ function claimRun(step) { // a step ticked by hand takes the one unclaimed run o
   ids.sort((a, b) => b[0] - a[0]);
   D.consumed[ids[0][1]] = step.id;                                   // the most recent one is the one this tick means
 }
+function linkReview(step, sess) { // which block a finished review was for: the one its page was started with, else the one the list had planned for it
+  let bid = null;
+  if (sess && sess.blockId) { const to = D.consumed[sess.blockId]; if (to && /^b\d+$/.test(to)) bid = to; }
+  if (!bid && step && step.blk) bid = step.blk;
+  if (bid) D.rv[step.id] = bid;
+}
 function absorb() { // sessions and finished runs of today tick their steps, each one once
   const start = dayStart(D.date), end = start + 86400000;
   const inDay = ts => ts >= start && ts < end;
   let changed = false;
-  const consume = (id, type, at) => {
+  const consume = (id, type, at, sess) => {
     if (D.consumed[id] !== undefined) return;
     const cur = D.cur && stepById(D.cur);
     const step = (cur && !isDone(cur.id) && cur.kind === type) ? cur : firstUndone(type);
     if (!step) { D.consumed[id] = "-"; changed = true; return; }
-    D.steps[step.id] = { done: true, at: at || Date.now(), src: "tool", sec: null };
+    const rec = { done: true, at: at || Date.now(), src: "tool", sec: null };
+    if (sess) { const sp = toolSpent(sess); rec.study = sp[0]; rec.brk = sp[1]; rec.sec = sp[0] + sp[1]; }   // the time it really took, as its page measured it
+    D.steps[step.id] = rec;
     D.consumed[id] = step.id; changed = true;
+    if (type === "review") linkReview(step, sess);
     if (D.timer && D.timer.stepId === step.id) clearTimer(false);
-    const nxt = nextUndoneAfter(step); D.cur = nxt ? nxt.id : null;
+    if (type === "review" || type === "block") rebuild();              // the plan of the reviews follows
+    const nxt = nextUndoneAfter(stepById(step.id) || step); D.cur = nxt ? nxt.id : null;
     markStarted();
   };
-  P.loadSessions().forEach(s => {
-    const t = new Date(s.date).getTime();
-    if (!inDay(t) || !["block", "review", "ccs"].includes(s.type)) return;
-    const used = s.type === "block" ? (s.blockSec || 0) : (s.timeUsedSec || 0) + (s.reviewSec || 0);
-    consume(s.id, s.type, t + used * 1000);
+  P.loadSessions().forEach(x => {
+    const t = new Date(x.date).getTime();
+    if (!inDay(t) || !["block", "review", "ccs"].includes(x.type)) return;
+    const sp = toolSpent(x), to = D.consumed[x.id];
+    if (to === undefined) { consume(x.id, x.type, t + (sp[0] + sp[1]) * 1000, x); return; }
+    const rec = to !== "-" ? D.steps[to] : null;                       // ticked from its run before the page saved it, or saved again since: the measured time follows the session
+    if (rec && rec.done && rec.src === "tool" && (rec.study !== sp[0] || rec.brk !== sp[1])) {
+      rec.study = sp[0]; rec.brk = sp[1]; rec.sec = sp[0] + sp[1]; changed = true;
+      if (x.type === "review" && !D.rv[to]) { const st = stepById(to); if (st) { linkReview(st, x); rebuild(); } }
+    }
   });
   const b = P.readJSON("step3pacer.run.v1", null); if (b && b.phase === "done" && b.sid && inDay(b.startAt)) consume(b.sid, "block", b.startAt + (b.endEl || 0));
   const r = P.readJSON("step3pacer.review.run.v1", null); if (r && r.phase === "done" && r.id && inDay(r.startAt)) consume(r.id, "review", Date.now());
   const c = P.readJSON("step3pacer.ccs.run.v1", null); if (c && c.phase === "done" && c.id && inDay(c.startAt) && (c.saved || (c.rev && c.rev.endAt))) consume(c.id, "ccs", Date.now());
-  // a block, review or case running right now means the breaks and meals before its step are over
+  // a block, review or case running right now: the breaks and meals right before its step are over, and the card follows it
   toolRuns().filter(r => !r.where || r.fresh).forEach(r => {
-    if (D.consumed["brk:" + r.id] !== undefined) return;             // the breaks before this run were handled once already
-    D.consumed["brk:" + r.id] = "-";
+    if (D.consumed["brk:" + r.id] !== undefined) return;             // this run was handled once already
+    D.consumed["brk:" + r.id] = "-"; changed = true;
     const cur = D.cur && stepById(D.cur);
     const target = (cur && !isDone(cur.id) && cur.kind === r.kind) ? cur : firstUndone(r.kind); if (!target) return;
     const i = STEPS.indexOf(target);
@@ -742,18 +1079,28 @@ function absorb() { // sessions and finished runs of today tick their steps, eac
     for (let j = from; j < i; j++) {
       const st = STEPS[j];
       if (isDone(st.id) || D.manual[st.id]) continue;
-      if (D.timer && D.timer.stepId === st.id && cd()) continue;                  // that break is still running here
-      D.steps[st.id] = { done: true, at: Date.now(), src: "break", sec: null }; changed = true;
-      if (D.timer && D.timer.stepId === st.id) clearTimer(false);
+      const T = D.timer, mine = !!(T && T.stepId === st.id);
+      if (mine && cd()) continue;                                      // that break is still running here
+      const rec = { done: true, at: Date.now(), src: "break", sec: null }, endAt = r.startAt && r.startAt <= Date.now() ? r.startAt : Date.now();
+      let used = -1;
+      if (mine && T.startAt) used = Math.round((endAt - T.startAt) / 1000);                                  // it ran on the card: from its start to the start of the task
+      else if (i - from === 1 && j > 0) { const pr = D.steps[STEPS[j - 1].id]; if (pr && pr.done && pr.at && (pr.src === "tool" || pr.src === "timer")) used = Math.round((endAt - pr.at) / 1000); }   // it never ran here: the gap between the task before it and this one
+      if (used >= 0 && used <= 3 * 3600) { rec.study = 0; rec.brk = mine ? Math.min(used, (T.sec || 0) + 3600) : used; rec.sec = rec.brk; rec.at = endAt; }
+      D.steps[st.id] = rec;
+      if (mine) clearTimer(false);
     }
-    if (changed && (!D.cur || isDone(D.cur))) D.cur = target.id;
+    if (!D.timer || (D.timer.shared && !P.breakGet())) D.cur = target.id;
     markStarted();
   });
   if (changed) {
     if (allDone()) { D.finishedAt = D.finishedAt || Date.now(); }
-    else { // a task finished elsewhere → its break is the shared one, adopt it
-      const nxt = firstUndone(), bk = P.breakGet();
-      if (bk && nxt && nxt.parts.length === 1 && nxt.parts[0].brk && !D.timer) { D.timer = sharedMarker(nxt.id, bk); D.cur = nxt.id; }
+    else { // a task finished in its own page → the break that page started is the shared one: the step on the card takes it, at the step's own length
+      const nxt = current(), bk = P.breakGet();
+      if (bk && nxt && nxt.parts.length === 1 && nxt.parts[0].brk && !D.timer) {
+        const sec = nxt.parts[0].sec;
+        if (bk.sec !== sec) { bk.sec = sec; bk.endAt = bk.startAt + sec * 1000; bk.label = nxt.t; if (Date.now() < bk.endAt) bk.chimed = false; P.writeJSON(P.KEYS.brk, bk); }
+        D.timer = sharedMarker(nxt.id, bk); D.cur = nxt.id;
+      }
     }
     persist();
   }
@@ -761,16 +1108,26 @@ function absorb() { // sessions and finished runs of today tick their steps, eac
 }
 
 /* ---------- tick ---------- */
+function stepsSig(l) { return JSON.stringify(l.map(x => [x.id, x.total, x.t, x.parts.length ? x.parts[0].sec : 0])); }
 function tick() {
   if (rollover()) { render(); return; }
   const now = Date.now();
   if (now - lastAbsorb > 2000) { lastAbsorb = now; absorb(); }
-  if (now - lastRebuild > 5000) { lastRebuild = now; const fresh = buildSteps(D.date, D.tpl); if (JSON.stringify(fresh.map(x => [x.id, x.total, x.t])) !== JSON.stringify(STEPS.map(x => [x.id, x.total, x.t]))) STEPS = fresh; }
-  const c = cd(), T = D.timer;
+  if (now - lastRebuild > 5000) { lastRebuild = now; const fresh = buildSteps(D.date, D.tpl); if (stepsSig(fresh) !== stepsSig(STEPS)) { STEPS = fresh; builtFor = ""; nowSig = ""; writeHandoff(); } }
+  let T = D.timer;
+  if (T && !stepById(T.stepId)) { D.timer = T = null; P.releaseWake(); P.bg.runEnd(); persist(); }        // its step is no longer on today's list
+  const c = cd();
+  if (T && !T.shared && !c) { D.timer = T = null; P.releaseWake(); P.bg.runEnd(); persist(); }            // nothing left to count on it
   if (c && c.kind === "break" && T && (T.endAt !== c.b.endAt || T.sec !== c.b.sec)) { T.startAt = c.b.startAt; T.endAt = c.b.endAt; T.sec = c.b.sec; T.label = c.b.label || T.label; persist(); }
-  if (T && T.shared && !c) {                                        // the shared break ended elsewhere (skipped or dismissed): the step is over
+  if (c && c.kind === "break" && T && !brkSeen(T)) markBrkSeen(T);
+  if (T && T.shared && !c) {                                        // the shared break ended elsewhere (skipped, dismissed, or a task was started): the step is over, with the time it really took
     const step = stepById(T.stepId); D.timer = null; P.bg.runEnd();
-    if (step && !isDone(step.id) && !D.manual[step.id]) { D.steps[step.id] = { done: true, at: now, src: "break", sec: null }; D.cur = null; }
+    if (step && !isDone(step.id) && !D.manual[step.id]) {
+      const endAt = breakEndedAt(T, now), rec = { done: true, at: endAt, src: "break", sec: null }, used = T.startAt ? Math.round((endAt - T.startAt) / 1000) : -1;
+      if (used >= 0) { rec.study = 0; rec.brk = Math.min(used, (T.sec || 0) + 3600); rec.sec = rec.brk; }
+      D.steps[step.id] = rec;
+      if (!D.cur || D.cur === step.id) { const nxt = nextUndoneAfter(step); D.cur = nxt ? nxt.id : null; }
+    }
     persist();
   } else if (c && c.kind !== "wait" && !c.paused) {
     if (c.sec >= 300 && !c.warned && c.left <= 60 && c.left > 0) { setWarned(c); P.sfx("dayWarn"); P.vibrate([100]); persist(); }
@@ -789,6 +1146,7 @@ function onPartEnd(c, quiet) {
   setChimed(c);
   if (c.last) { if (!quiet) { P.sfx("day"); P.vibrate([300, 100, 300, 100, 300, 100, 700]); } persist(); return; }
   const T = D.timer, step = c.step, nxt = step.parts[c.part + 1];
+  bank(c);
   if (!quiet) { P.sfx("dayPart"); P.vibrate([200, 80, 200]); }
   if (nxt && nxt.auto) {                                             // the stand after a chunk starts by itself, at the moment the chunk ended
     const endedAt = Math.min(Date.now(), c.startAt + (c.pausedTotal || 0) + c.sec * 1000);
@@ -811,6 +1169,7 @@ function events() {
 
 /* ---------- render ---------- */
 const KIND_NAMES = { block: "Block", brk: "Break", meal: "Meal", bio: "Biostats", ccs: "CCS", review: "Review", close: "Arrive · close", exam: "Exam day", off: "Day off" };
+function mins(sec) { return fmt(sec).replace(/:00$/, ""); }
 function buildList() {
   const sig = D.date + "|" + D.tpl + "|" + STEPS.map(s => s.id + ":" + s.total + ":" + s.t).join(",");
   if (sig === builtFor) return;
@@ -820,56 +1179,101 @@ function buildList() {
     const li = document.createElement("li");
     li.className = "st tint " + s.kind; li.dataset.kind = s.kind; li.dataset.id = s.id; li.tabIndex = 0; li.setAttribute("role", "button");
     li.innerHTML = '<button type="button" class="box" aria-label="Tick ' + esc(s.t) + '"></button><span class="n">' + s.n + '</span><div class="txt"><div class="t">' + esc(s.t) + '</div><div class="w">' + esc(s.w) + '</div></div><div><div class="d">' + (s.parts.length ? durText(s) : "tick") + '</div><div class="at"></div></div>';
-    li.querySelector(".box").addEventListener("click", e => { e.stopPropagation(); toggleStep(s); });
-    li.addEventListener("click", e => { selectStep(s); if (e.detail > 0) li.blur(); });
-    li.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); toggleStep(s); } });
+    li.querySelector(".box").addEventListener("click", e => { e.stopPropagation(); toggleStep(stepById(s.id)); });
+    li.addEventListener("click", e => { selectStep(stepById(s.id)); if (e.detail > 0) li.blur(); });
+    li.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); toggleStep(stepById(s.id)); } });
     ol.appendChild(li);
   });
   const kinds = []; STEPS.forEach(s => { if (!kinds.includes(s.kind)) kinds.push(s.kind); });
   $("legend").innerHTML = kinds.map(k => '<span data-kind="' + k + '"><i></i>' + KIND_NAMES[k] + "</span>").join("");
 }
 function durText(s) {
-  if (s.kind === "review" && s.parts.length === 5) return fmt(s.parts[0].sec * 3).replace(/:00$/, "") + " + 2×" + fmt(s.parts[1].sec).replace(/:00$/, "");
-  if (s.kind === "ccs" && s.parts.length === 2) return fmt(s.parts[0].sec) + " + " + fmt(s.parts[1].sec).replace(/:00$/, "");
-  const t = fmt(s.total); return s.total % 60 === 0 && s.total >= 600 ? t.replace(/:00$/, "") + " min" : t;
+  if (s.tool === "review") { const st = s.parts.filter(p => p.brk); return mins(s.study) + (st.length ? " + " + (st.length > 1 ? st.length + "×" : "") + mins(st[0].sec) : " min"); }
+  if (s.kind === "ccs" && s.parts.length === 2) return fmt(s.parts[0].sec) + " + " + mins(s.parts[1].sec);
+  const t = fmt(s.total); return s.total % 60 === 0 && s.total >= 600 ? mins(s.total) + " min" : t;
+}
+function cardStep(c, runs) { // the step on the Now card: the one whose timer runs here; else the one a Block / Review / CCS page is running; else the current step
+  if (c) return c.step;
+  const cur = current();
+  runs = runs || toolRuns();
+  if (cur && runs.some(r => r.kind === cur.kind)) return cur;
+  for (const r of runs) { const t = firstUndone(r.kind); if (t) return t; }
+  return cur;
+}
+function examDates() { const cal = calendar(); return Object.keys(cal).filter(k => cal[k].tpl === "exam").sort(); }
+function countdownText() { // the line that says how far the exam is, counted in days of this calendar
+  const ex = examDates(), today = D.date; if (!ex.length) return "";
+  const i = ex.indexOf(today); if (i >= 0) return "Exam Day " + (i + 1) + " today";
+  const next = ex.find(k => k > today); if (!next) return "The exam is done";
+  const n = Math.round((dayStart(next) - dayStart(today)) / 86400000), num = ex.indexOf(next) + 1;
+  return n === 1 ? "Exam Day " + num + " is tomorrow" : n + " days to Exam Day " + num;
 }
 function render() {
   buildList();
-  const now = Date.now(), c = cd(), cur = current(), runs = toolRuns();
-  const cal = calFor(D.date), n = dayNumber(D.date);
+  const now = Date.now(), c = cd(), runs = toolRuns(), step = cardStep(c, runs);
+  const cal = calFor(D.date), cdn = countdownText();
   const tplName = { tonight: "tonight's list", rehearsal: "rehearsal day", between: "between exam days", interface: "interface day", minimum: "minimum day", exam: "exam day", off: "day off" }[D.tpl];
-  $("tagline").textContent = dayLabel(D.date) + (n >= 1 && n <= S.nDays ? " · Day " + n + " of " + S.nDays : n === 0 ? " · tomorrow is Day 1" : "") + (tplName ? " · " + tplName : "");
+  const tail = D.tpl === "exam" ? (cdn || tplName) : [cdn, tplName].filter(Boolean).join(" · ");
+  $("tagline").textContent = dayLabel(D.date) + (tail ? " · " + tail : "");
   $("planStart").textContent = S.planStart || "8:00 AM"; $("planEnd").textContent = S.planEnd || "~10:00 PM";
-  renderProjection(now, c, runs);
-  renderNow(now, c, cur, runs);
-  renderTotals(now);
-  renderList(now, c, cur, runs);
+  renderProjection(now, c, runs, step);
+  renderNow(now, c, step, runs);
+  renderTotals(now, c, runs);
+  renderList(now, c, step, runs);
   renderTen();
   $("seqMeta").textContent = STEPS.filter(s => isDone(s.id)).length + " of " + STEPS.length + " ticked" + (cal.note ? " · " + cal.note : "");
 }
-function renderProjection(now, c, runs) {
+function renderProjection(now, c, runs, step) {
   const el = $("proj");
   if (!STEPS.some(s => s.parts.length)) { el.textContent = calFor(D.date).note || ""; el.className = "proj"; return; }
   if (allDone()) { el.innerHTML = "Day ticked · started <b>" + esc(clockOf(D.startedAt || now)) + "</b> · done <b>" + esc(clockOf(D.finishedAt || now)) + "</b>"; el.className = "proj done"; return; }
-  let rem = remainingPlanned();
-  const cur = current(), run = cur && !c ? runs.find(r => r.kind === cur.kind) : null;
-  if (run) { // the current step runs in its own page: its time left replaces the plan's, the parts after it stay
-    rem -= cur.total;
+  let rem = remainingPlanned(step);
+  const run = step && !c ? runs.find(r => r.kind === step.kind) : null;
+  if (run) { // the step runs in its own page: its time left replaces the plan's, the parts after it stay
+    rem -= step.total;
     rem += Math.max(0, run.left);
-    if (cur.kind === "ccs" && run.sub === "case") rem += S.feedbackSec;
-    if (cur.kind === "review" && run.sub !== "stand") rem += 2 * reviewCfg().stand;
+    if (step.kind === "ccs" && run.sub === "case") rem += S.feedbackSec;
+    if (step.tool === "review" && run.sub !== "stand") rem += step.brk;
   }
-  const endAt = now + rem * 1000;
-  const late = endAt > dayStart(D.date) + (22.5 - ROLL_HOUR) * 3600000;
-  el.innerHTML = (D.startedAt ? "Started <b>" + esc(clockOf(D.startedAt)) + "</b> · " : "") + "on this pace, done at <b>" + esc(clockOf(endAt)) + "</b> · " + esc(fmtH(rem)) + " to go";
-  el.className = "proj" + (late ? " late" : "");
+  const endAt = now + Math.max(0, rem) * 1000;
+  el.innerHTML = (D.startedAt ? "Started <b>" + esc(clockOf(D.startedAt)) + "</b> · " : "") + "steps left: <b>" + esc(fmtH(Math.max(0, rem))) + "</b> → done at <b>" + esc(clockOf(endAt)) + "</b>";   // plain arithmetic: now + the lengths of the steps from the card to the end of the list
+  el.className = "proj";
 }
-function btn(label, cls, id) { return '<button type="button" class="' + (cls || "") + '" data-act="' + id + '">' + label + "</button>"; }
+function btn(label, cls, id, extra) { return '<button type="button" class="' + (cls || "") + '" data-act="' + id + '"' + (extra || "") + ">" + label + "</button>"; }
+function adjBtn(sec) { return btn((sec < 0 ? "−" : "+") + fmt(Math.abs(sec)), "", "adj", ' data-sec="' + sec + '"'); }
+function rows(list) { return list.filter(r => r && r.length).map(r => '<div class="row' + (r.length >= 4 ? " tight" : "") + '" style="--n:' + r.length + '">' + r.join("") + "</div>").join(""); }
+function lenRow(step) { // the length buttons that fit the step: the two case clocks, the review lengths, the two breaks, or five minutes less and more
+  if (!step || !step.parts.length) return [];
+  const cur = lenOf(step), pre = (label, v) => btn(label + (cur === v ? " ✓" : ""), "len" + (cur === v ? " on" : ""), "len", ' data-sec="' + v + '"');
+  if (step.tool === "ccs" && step.parts.length === 2) return [pre(fmt(S.caseSec), S.caseSec), pre(fmt(S.caseSec * 2), S.caseSec * 2)];
+  if (step.tool === "review") return [1800, 2700, 3600, 5400].map(v => pre(v / 60 + " min", v));
+  const pm = [adjBtn(-300), adjBtn(300)];
+  if (step.kind === "brk" && S.shortSec !== breakSec()) return [pre(fmt(S.shortSec), S.shortSec), pre(fmt(breakSec()), breakSec())].concat(pm);
+  return pm;
+}
 const TOOL_PAGE = { block: ["Block", "./"], review: ["Review", "./review.html"], ccs: ["CCS", "./ccs.html"] };
-let nowSig = "", stripSig = "";
-function renderNow(now, c, cur, runs) {
+let nowSig = "", stripSig = "", scoreSig = "";
+function renderScores(step, mode) { // on a review card: the scores of today's blocks, typed once; the reviews then line up lowest first
+  const el = $("nowScores");
+  const nB = STEPS.filter(s => s.kind === "block" && /^b\d+$/.test(s.id)).length;
+  if (!(step && step.tool === "review" && D.tpl === "study" && nB && (mode === "idle" || mode === "wait"))) { if (!el.hidden) el.hidden = true; return; }
+  const sig = D.date + "|" + nB;
+  if (scoreSig !== sig || !el.firstChild) {
+    scoreSig = sig;
+    let h = '<span class="lbl">Today’s scores (correct answers) — the reviews line up lowest first</span><div class="srow">';
+    for (let i = 1; i <= nB; i++) h += "<label>B" + i + '<input type="number" inputmode="numeric" min="0" max="60" data-b="b' + i + '" aria-label="Block ' + i + ', correct answers"></label>';
+    el.innerHTML = h + "</div>";
+    el.querySelectorAll("input").forEach(inp => {
+      inp.addEventListener("change", () => setScore(inp.dataset.b, inp.value));
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });
+    });
+  }
+  el.hidden = false;
+  const sc = {}; dayScores.forEach(b => { sc[b.id] = b.correct; });
+  el.querySelectorAll("input").forEach(inp => { if (document.activeElement === inp) return; const v = sc[inp.dataset.b] != null ? String(sc[inp.dataset.b]) : ""; if (inp.value !== v) inp.value = v; });
+}
+function renderNow(now, c, step, runs) {
   const box = $("now");
-  const step = c ? c.step : cur;
   const big = $("nowBig"), stage = $("nowStage"), cue = $("nowCue"), parts = $("nowParts"), mirror = $("nowMirror");
   if (!step) { // every step ticked
     const sig = "done|" + D.date;
@@ -882,13 +1286,14 @@ function renderNow(now, c, cur, runs) {
       $("nowBtns").innerHTML = ""; $("nowSub").innerHTML = ""; $("nowLinks").innerHTML = "";
       $("mirrorStrip").hidden = true;
     }
+    renderScores(null, "");
     box.dataset.tone = "idle";
     big.textContent = D.startedAt && D.finishedAt ? fmtH((D.finishedAt - D.startedAt) / 1000) : "✓";
     return;
   }
   const run = runs.find(r => r.kind === step.kind) || null;
   const others = runs.filter(r => r !== run);
-  // the thin line about a run of another kind (e.g. a review running while the current step is a case)
+  // the thin line about a run of another kind (e.g. a review running while the step on the card is a case)
   const strip = $("mirrorStrip");
   if (others.length) {
     const r = others[0], ss = r.kind + "|" + r.id + "|" + (r.where || "") + "|" + r.href;
@@ -899,51 +1304,72 @@ function renderNow(now, c, cur, runs) {
   const mode = c ? (c.kind === "wait" ? "wait" : "run") : run ? "mirror" : "idle";
   const idx = STEPS.indexOf(step), after = STEPS[idx + 1];
   const over = !!(c && c.kind !== "wait" && c.over), paused = !!(c && c.paused);
-  const sig = [D.date, step.id, mode, c ? c.part : "", c ? c.kind : "", over, paused, skipArmed ? 1 : 0, S.sound ? 1 : 0, step.parts.length ? step.parts[0].sec : 0, run ? run.href + run.paused + run.sub + (run.where || "") : ""].join("|");
+  const prev = mode === "idle" ? undoneNeighbor(step, -1) : null, next = mode === "idle" ? undoneNeighbor(step, 1) : null;
+  const sw = (mode === "idle" || (mode === "run" && c.kind === "break")) ? mealSwap(step) : null;
+  const bi = step.blkInfo || null;
+  const sig = [D.date, step.id, step.t, idx, mode, c ? c.part : "", c ? c.kind : "", c && c.kind !== "wait" ? c.sec : "", over, paused, skipArmed ? 1 : 0, partArmed ? 1 : 0, S.sound ? 1 : 0, lenOf(step), step.total, prev ? prev.id : "", next ? next.id : "", sw ? sw.label : "", bi ? bi.n + ":" + bi.correct : "", run ? run.href + run.paused + run.sub + (run.where || "") : ""].join("|");
   if (nowSig !== sig) {
     nowSig = sig;
     box.dataset.kind = step.kind;
     $("nowTitle").innerHTML = '<span class="n">' + step.n + "</span>" + esc(step.t);
     $("nowWhy").textContent = step.w;
     const caseEl = $("nowCase");
-    if (step.kind === "ccs" && step.caseNum) { caseEl.hidden = false; caseEl.innerHTML = '<span class="casenum">Case number <b>' + esc(step.caseNum) + "</b></span>"; } else caseEl.hidden = true;
+    if (step.kind === "ccs" && step.caseNum) { caseEl.hidden = false; caseEl.innerHTML = '<span class="casenum">Case number <b>' + esc(step.caseNum) + "</b></span>"; }
+    else if (step.tool === "review" && bi) { caseEl.hidden = false; caseEl.innerHTML = '<span class="casenum">Review block <b>' + bi.n + "</b>" + (bi.correct != null ? " · " + bi.correct + "/" + bi.nQ : "") + "</span>"; }
+    else caseEl.hidden = true;
     const tp = step.tool ? TOOL_PAGE[step.tool] : null;
     $("nowLinks").innerHTML = (tp && mode !== "mirror" ? '<a href="' + tp[1] + '">Open the ' + tp[0] + " page ↗</a>" : "") +
       (step.kind === "bio" ? '<a class="plain" href="https://claude.ai/artifact/1UrfVMa6zbxTSL6HjHd7sL" target="_blank" rel="noopener">Biostats cheat sheet</a>' : "") +
       (step.kind === "ccs" ? '<a class="plain" href="https://claude.ai/artifact/Cwf9KyimSGTQvzEjEBr3HG" target="_blank" rel="noopener">CCS cheat sheet</a>' : "");
     const btns = $("nowBtns"), sub = $("nowSub");
+    const skipB = btn(skipArmed ? "Skip — sure?" : "Skip", skipArmed ? "armed" : "", "skip"), soundB = btn(S.sound ? "Sound on" : "Sound off", "", "sound"), stopB = btn("Stop", "", "stop");
+    const swapRow = sw ? [btn(esc(sw.label) + " ⇄", "", "swap")] : [];
     if (mode === "mirror") {
       $("nowPill").textContent = "Running"; $("nowWho").textContent = run.where ? "on your " + run.where : "in the " + run.page + " page";
       mirror.hidden = false; mirror.className = "mirror";
       mirror.innerHTML = '<div class="mrow"><span>' + esc(run.label) + " · " + esc(run.sub) + (run.paused ? " · paused" : "") + '</span><b class="ml"></b></div><p class="note">This step ticks itself when the ' + run.page + " page saves it. The time left comes from that page.</p>";
-      cue.textContent = run.kind === "block" ? "Tap in the Block page as you submit each question." : run.kind === "review" ? "Timer B lives in the Review page." : "The case clock lives in the CCS page.";
+      cue.textContent = run.kind === "block" ? "Tap in the Block page as you submit each question." : run.kind === "review" ? "Timer B lives in the Review page." : "The case clock lives in the CCS page — 12:30 / 25:00 switch under its clock.";
       btns.innerHTML = (run.where ? "" : '<a class="go" href="' + run.href + '" style="display:grid;place-items:center;text-decoration:none;border-radius:12px;font-weight:700;font-size:18px;min-height:72px;background:var(--kc);color:#fff">Go to the ' + run.page + " page</a>") + btn("Tick done ✓", "done" + (run.where ? " solo" : ""), "done");
       sub.innerHTML = "";
     } else if (mode === "idle") {
       mirror.hidden = true;
       $("nowPill").textContent = idx === 0 ? "First" : "Next"; $("nowWho").textContent = step.parts.length ? durText(step) : "tick when done";
-      stage.innerHTML = step.parts.length > 1 ? "<span>" + step.parts.map(p => esc(p.l) + " " + fmt(p.sec).replace(/:00$/, "")).join(" · ") + "</span>" : (after ? "<span>then · " + after.n + " " + esc(after.t) + "</span>" : "");
+      stage.innerHTML = step.parts.length > 1 ? "<span>" + step.parts.map(p => esc(p.l) + " " + mins(p.sec)).join(" · ") + "</span>" : (after ? "<span>then · " + after.n + " " + esc(after.t) + "</span>" : "");
       cue.textContent = step.parts.length ? (step.tool ? "Start here, or run it in the " + TOOL_PAGE[step.tool][0] + " page — the step ticks itself." : "Press Start when you begin.") : "Tap Done when it is done.";
       btns.innerHTML = (step.parts.length ? btn("Start · " + fmt(step.parts[0].sec), "go", "start") : "") + btn("Done ✓", "done" + (step.parts.length ? "" : " solo"), "done");
-      const lenBtns = step.kind === "ccs" && step.parts.length === 2 ? btn("12:30" + (step.parts[0].sec < S.caseSec * 2 ? " ✓" : ""), "len" + (step.parts[0].sec < S.caseSec * 2 ? " on" : ""), "len12") + btn("25:00" + (step.parts[0].sec >= S.caseSec * 2 ? " ✓" : ""), "len" + (step.parts[0].sec >= S.caseSec * 2 ? " on" : ""), "len25") : "";
-      sub.innerHTML = lenBtns + (idx > 0 ? btn("↑ Previous", "", "prev") : "") + (after ? btn("Next ↓", "", "next") : "") + btn(skipArmed ? "Skip — sure?" : "Skip", skipArmed ? "armed" : "", "skip") + btn(S.sound ? "Sound on" : "Sound off", "", "sound");
+      sub.innerHTML = rows([
+        lenRow(step),
+        swapRow,
+        [prev ? btn("↑ Previous", "", "prev") : "", next ? btn("Next ↓", "", "next") : "", prev ? btn("Move ▲", "", "mvup") : "", next ? btn("Move ▼", "", "mvdn") : ""].filter(Boolean),
+        [skipB, soundB]
+      ]);
     } else if (mode === "wait") {
       mirror.hidden = true;
       $("nowPill").textContent = c.label + " over"; $("nowWho").textContent = "part " + (c.part + 1) + " of " + step.parts.length + " done";
       stage.innerHTML = "<span>next · " + esc(c.next ? c.next.l : "") + "</span><span>" + esc(step.parts.slice(c.part + 2).map(p => p.l).join(" · ")) + "</span>";
       cue.textContent = c.next && c.next.l === "Feedback" ? "Open the feedback. One missed order, the misspelled words." : "Back at the desk? Start " + (c.next ? c.next.l : "the next part") + ".";
       btns.innerHTML = btn("Start " + esc(c.next ? c.next.l : "") + " · " + fmt(c.next ? c.next.sec : 0), "go", "part") + btn("Done ✓ · end the step", "done", "done");
-      sub.innerHTML = btn(skipArmed ? "Skip — sure?" : "Skip", skipArmed ? "armed" : "", "skip") + btn("Stop", "", "stop") + btn(S.sound ? "Sound on" : "Sound off", "", "sound");
+      sub.innerHTML = rows([
+        step.tool === "ccs" && c.part === 0 && step.parts.length === 2 ? lenRow(step) : [],   // the case was the other length: switch, and its clock runs on from where it really is
+        [skipB, stopB, soundB]
+      ]);
     } else { // run
       mirror.hidden = true;
-      $("nowPill").textContent = paused ? "Paused" : over ? "Time" : c.kind === "break" ? "Break" : "Running";
-      $("nowWho").textContent = c.kind === "break" ? "the break shows on every page" : step.parts.length > 1 ? c.label + " · part " + (c.part + 1) + " of " + step.parts.length : c.label;
-      cue.textContent = over ? (c.last ? "Tick it. The next step is waiting." : c.label + " is over.") : c.kind === "break" ? "Out of the chair. No screen." : step.kind === "block" ? "Easy ones first. 2:00 left → fill every blank." : step.kind === "review" ? (c.label === "Stand" ? "Stand. Walk. Water. No phone." : "Wrong first, 5+3. Right ones 60 s.") : step.kind === "ccs" ? (c.label === "Feedback" ? "One missed order + the misspelled words." : "Location → stabilize → orders → advance the clock → reassess → close line.") : step.kind === "meal" ? "Away from the desk." : step.kind === "bio" ? "Draw the 2×2 first." : "";
+      const isBrk = c.kind === "break", nextB = !c.last && c.next ? [btn(partArmed ? "Sure? ▸" : esc(c.next.l) + " ▸", partArmed ? "armed" : "", "part")] : [];
+      $("nowPill").textContent = paused ? "Paused" : over ? "Time" : isBrk ? "Break" : "Running";
+      $("nowWho").textContent = isBrk ? "the break shows on every page" : step.parts.length > 1 ? c.label + " · part " + (c.part + 1) + " of " + step.parts.length : c.label;
+      cue.textContent = over ? (c.last ? "Tick it. The next step is waiting." : c.label + " is over.") : isBrk ? (step.kind === "meal" ? "Away from the desk." : "Out of the chair. No screen.") : step.kind === "block" ? "Easy ones first. 2:00 left → fill every blank." : step.kind === "review" ? (c.label === "Stand" ? "Stand. Walk. Water. No phone." : "Wrong first, 5+3. Right ones 60 s.") : step.kind === "ccs" ? (c.label === "Feedback" ? "One missed order + the misspelled words." : "Location → stabilize → orders → advance the clock → reassess → close line.") : step.kind === "bio" ? "Draw the 2×2 first." : "";
       btns.innerHTML = btn(over ? "Done ✓ · next step" : "Done ✓", "done" + (over ? " solo" : ""), "done") + (over ? "" : btn("+5:00", "", "ext"));
-      sub.innerHTML = (c.kind === "own" ? btn(paused ? "Resume" : "Pause", "", "pause") : btn("+5:00", "", "ext")) + btn(skipArmed ? "Skip — sure?" : "Skip", skipArmed ? "armed" : "", "skip") + btn("Stop", "", "stop") + btn(S.sound ? "Sound on" : "Sound off", "", "sound");
+      const caseRun = !isBrk && step.tool === "ccs" && c.part === 0 && step.parts.length === 2;
+      sub.innerHTML = rows([
+        caseRun ? lenRow(step).concat(nextB) : over ? [adjBtn(60), adjBtn(300)] : [adjBtn(-300), adjBtn(-60), adjBtn(60)].concat(nextB),
+        swapRow,
+        (isBrk ? [] : [btn(paused ? "Resume" : "Pause", "", "pause")]).concat([skipB, stopB, soundB])
+      ]);
     }
     wire();
   }
+  renderScores(step, mode);
   // the parts bar
   if (step.parts.length > 1) {
     parts.innerHTML = step.parts.map((p, i) => { const done = c && (c.part > i || (c.kind === "wait" && c.part >= i)); const curP = c && c.part === i && c.kind !== "wait"; const w = curP ? Math.min(100, c.el / c.sec * 100) : done ? 100 : 0; return '<i class="' + (p.brk ? "brk " : "") + (done ? "done " : "") + (curP ? "cur" : "") + '" style="flex:' + p.sec + '"><b style="width:' + w + '%"></b></i>'; }).join("");
@@ -970,36 +1396,40 @@ function renderNow(now, c, cur, runs) {
 function wire() {
   $("now").querySelectorAll("[data-act]").forEach(b => {
     b.onclick = e => {
-      const a = b.dataset.act, c = cd(), s = c ? c.step : current();
+      const a = b.dataset.act, c = cd(), s = cardStep(c);
       if (a === "start") startStep(s, 0);
-      else if (a === "part") startNextPart();
+      else if (a === "part") nextPartTap();
       else if (a === "done") finishStep(s, c ? "timer" : "tap");
-      else if (a === "ext") extend(300);
+      else if (a === "ext") adjust(300);
+      else if (a === "adj") adjust(+b.dataset.sec);
+      else if (a === "len") setLen(s, +b.dataset.sec);
       else if (a === "pause") pauseResume();
       else if (a === "skip") skipStep();
       else if (a === "stop") stopTimerOnly();
-      else if (a === "len12" || a === "len25") { if (s && s.kind === "ccs" && !D.timer) { D.caseLen[s.id] = a === "len25" ? S.caseSec * 2 : S.caseSec; STEPS = buildSteps(D.date, D.tpl); builtFor = ""; persist(); render(); } }
+      else if (a === "swap") doMealSwap();
+      else if (a === "mvup") moveStep(s, -1);
+      else if (a === "mvdn") moveStep(s, 1);
       else if (a === "sound") { S.sound = !S.sound; P.setSound(S.sound); saveSettings(); if (S.sound) { P.audioInit(); P.sfx("start"); } render(); }
-      else if (a === "prev") { const i = STEPS.indexOf(s); for (let j = i - 1; j >= 0; j--) if (!isDone(STEPS[j].id)) { D.cur = STEPS[j].id; persist(); render(); return; } }
-      else if (a === "next") { const i = STEPS.indexOf(s); for (let j = i + 1; j < STEPS.length; j++) if (!isDone(STEPS[j].id)) { D.cur = STEPS[j].id; persist(); render(); return; } }
+      else if (a === "prev" || a === "next") { const o = s && undoneNeighbor(s, a === "prev" ? -1 : 1); if (o) { D.cur = o.id; persist(); render(); } }
       if (e.detail > 0) b.blur();
     };
   });
 }
-function renderTotals(now) {
+function renderTotals(now, c, runs) { // measured time: what ran on a timer or in its page counts as it really took; a hand tick counts the plan; a skip counts nothing
   const done = STEPS.filter(s => isDone(s.id));
-  const study = done.reduce((a, s) => a + s.study, 0), brk = done.reduce((a, s) => a + s.brk, 0);
-  const c = cd(); let liveStudy = 0, liveBrk = 0;
-  if (c && c.kind !== "wait") { const sofar = Math.min(c.el, c.sec); if (c.step.parts[c.part] && c.step.parts[c.part].brk) liveBrk = sofar; else liveStudy = sofar; for (let i = 0; i < c.part; i++) { const p = c.step.parts[i]; if (p.brk) liveBrk += p.sec; else liveStudy += p.sec; } }
+  let study = 0, brk = 0;
+  done.forEach(s => { const sp = spentRec(s, D.steps[s.id]); study += sp[0]; brk += sp[1]; });
+  if (c) { const sp = spentNow(c); study += sp[0]; brk += sp[1]; }
+  else runs.forEach(r => { if ((r.where && !r.fresh) || D.consumed[r.id] !== undefined || !r.spent) return; study += r.spent[0]; brk += r.spent[1]; });   // a block, review or case running in its page right now
   const dayEl = D.startedAt ? ((allDone() && D.finishedAt ? D.finishedAt : now) - D.startedAt) / 1000 : 0;
   $("tots").innerHTML =
-    '<div class="tot" data-k="study"><span class="l">Study</span><span class="v">' + esc(fmtH(study + liveStudy)) + '</span><span class="d">blocks · reviews · cases</span></div>' +
-    '<div class="tot" data-k="brk"><span class="l">Breaks</span><span class="v">' + esc(fmtH(brk + liveBrk)) + '</span><span class="d">breaks · meals · stands</span></div>' +
+    '<div class="tot" data-k="study"><span class="l">Study</span><span class="v">' + esc(fmtH(study)) + '</span><span class="d">blocks · reviews · cases</span></div>' +
+    '<div class="tot" data-k="brk"><span class="l">Breaks</span><span class="v">' + esc(fmtH(brk)) + '</span><span class="d">breaks · meals · stands</span></div>' +
     '<div class="tot" data-k="done"><span class="l">Ticked</span><span class="v">' + done.length + " / " + STEPS.length + '</span><span class="d">' + esc(STEPS.length - done.length ? (STEPS.length - done.length) + " to go" : "all of it") + '</span></div>' +
     '<div class="tot" data-k="day"><span class="l">Day</span><span class="v">' + esc(D.startedAt ? fmtH(dayEl) : "—") + '</span><span class="d">' + esc(D.startedAt ? "since " + clockOf(D.startedAt) : "not started") + "</span></div>";
 }
 function renderList(now, c, cur, runs) {
-  const run = cur ? runs.find(r => r.kind === cur.kind) : null;
+  const run = cur && !c ? runs.find(r => r.kind === cur.kind) : null;
   Array.from($("steps").children).forEach(li => {
     const s = stepById(li.dataset.id); if (!s) return;
     const done = isDone(s.id), isCur = cur && cur.id === s.id && !done, running = c && c.step.id === s.id;
@@ -1011,27 +1441,50 @@ function renderList(now, c, cur, runs) {
     else if (isCur && run) d.textContent = fmt(Math.max(0, Math.ceil(run.left)));
     else d.textContent = s.parts.length ? durText(s) : "tick";
     const rec = D.steps[s.id];
-    at.textContent = done && rec ? clockOf(rec.at) + (rec.src === "tool" ? " · from the page" : rec.src === "skip" ? " · skipped" : rec.src === "timer" || rec.src === "break" ? "" : " · by hand") : "";
+    at.textContent = done && rec ? (rec.at ? clockOf(rec.at) : "") + (rec.src === "tool" ? " · from the page" : rec.src === "skip" ? " · skipped" : rec.src === "timer" || rec.src === "break" ? "" : " · by hand") : "";
   });
 }
-function renderTen() {
-  const sig = D.date + "|" + D.tpl + "|" + STEPS.filter(s => isDone(s.id)).length + "|" + STEPS.length + "|" + S.dayOne + "|" + S.nDays;
+function workByDay() { // what each day really held, from what the Block, Review and CCS pages saved (a day runs 4:00 AM → 4:00 AM)
+  const now = Date.now(); if (now - workCache.at < 15000) return workCache.map;
+  const map = {};
+  P.loadSessions().forEach(x => { if (x.type !== "block" && x.type !== "review" && x.type !== "ccs") return; const t = new Date(x.date).getTime(); if (!(t > 0)) return; const k = keyOf(t), m = map[k] || (map[k] = { block: 0, review: 0, ccs: 0 }); m[x.type]++; });
+  workCache = { at: now, map: map }; return map;
+}
+function planLabel(tpl) { return tpl === "study" ? S.nBlocks + "B " + S.nCases + "C" : tpl === "tonight" ? "2B 2C" : tpl === "rehearsal" ? "6B" : tpl === "between" ? "1B 3C" : tpl === "interface" ? "sample" : tpl === "minimum" ? "light" : tpl === "off" ? "off" : ""; }
+function renderTen() { // the days from Day 1 to the last exam day, in weeks: past days show the work done, coming days the plan, exam days in red
+  const work = workByDay(), today = D.date, cdn = countdownText(), doneNow = {};
+  STEPS.forEach(s => { const r = D.steps[s.id]; if (r && r.done && r.src !== "skip") doneNow[s.kind] = (doneNow[s.kind] || 0) + 1; });
+  const sig = [today, D.tpl, JSON.stringify(doneNow), S.dayOne, S.nDays, S.nBlocks, S.nCases, S.cal, JSON.stringify(work), cdn].join("|");
   if (sig === tenSig) return; tenSig = sig;
-  const h = history(), byDate = {}; h.forEach(r => { byDate[r.date] = r; });
-  const cal = calendar(), today = D.date, cells = [];
-  for (let i = 0; i < S.nDays; i++) {
-    const k = addDays(S.dayOne, i), rec = k === today ? { done: STEPS.filter(s => isDone(s.id)).length, total: STEPS.length, tpl: D.tpl } : byDate[k];
-    const tpl = rec ? rec.tpl : (cal[k] ? cal[k].tpl : "study");
-    const future = k > today, d = parseKey(k);
-    let cls = future ? "future" : rec ? (rec.total && rec.done >= rec.total ? "all" : rec.done ? "part" : "") : "";
-    if (tpl === "off") cls += " off";
-    if (k === today) cls += " today";
-    cells.push('<div class="' + cls.trim() + '"><span class="dl">' + d.toLocaleDateString(undefined, { weekday: "short" }) + " " + d.getDate() + '</span><span class="dv">' + (tpl === "off" ? "off" : rec ? rec.done + "/" + rec.total : "·") + "</span></div>");
+  const byDate = {}; history().forEach(r => { byDate[r.date] = r; });
+  const cal = calendar(), ex = examDates(), first = S.dayOne;
+  let last = ex.length ? ex[ex.length - 1] : addDays(first, S.nDays - 1); if (last < first) last = first;
+  const html = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => '<span class="wd">' + d + "</span>");
+  let k = addDays(first, -parseKey(first).getDay()), n = 0, monthShown = false;
+  while ((k <= last || parseKey(k).getDay() !== 0) && n < 84) {
+    const d = parseKey(k);
+    if (k < first || k > last) html.push('<div class="c blank"></div>');
+    else {
+      const rec = byDate[k], tpl = k === today ? D.tpl : (rec && rec.tpl) || (cal[k] ? cal[k].tpl : "study");
+      let cls = "c", l1 = "", l2 = "";
+      if (tpl === "exam" || (cal[k] && cal[k].tpl === "exam")) { cls += " exam"; l1 = ("Exam " + (ex.indexOf(k) + 1 || "")).trim(); }
+      else if (k <= today) {
+        const w = work[k] || {}, t = k === today ? doneNow : (rec && rec.kinds) || {};
+        const nb = Math.max(w.block || 0, t.block || 0), nc = Math.max(w.ccs || 0, t.ccs || 0), nr = Math.max(w.review || 0, t.review || 0);
+        if (nb || nc || nr) { cls += " did"; l1 = [nb ? nb + "B" : "", nc ? nc + "C" : ""].filter(Boolean).join(" "); l2 = nr ? nr + "R" : ""; if (!l1) { l1 = l2; l2 = ""; } }
+        else if (tpl === "off") { cls += " off"; l1 = "off"; }
+        else if (rec && rec.done) { cls += " did"; l1 = rec.done + " ✓"; }
+        else l1 = k === today ? planLabel(tpl) : "—";
+      } else { cls += " future" + (tpl === "off" ? " off" : ""); l1 = planLabel(tpl); }
+      if (k === today) cls += " today";
+      const mon = (!monthShown || d.getDate() === 1) ? "<small>" + esc(d.toLocaleDateString(undefined, { month: "short" })) + "</small>" : ""; monthShown = true;
+      html.push('<div class="' + cls + '" title="' + esc(dayLabel(k, true)) + '"><span class="dn">' + mon + d.getDate() + '</span><span class="dv">' + esc(l1) + "</span>" + (l2 ? '<span class="dv">' + esc(l2) + "</span>" : "") + "</div>");
+    }
+    k = addDays(k, 1); n++;
   }
-  $("ten").innerHTML = cells.join("");
-  $("tenTitle").textContent = S.nDays === 10 ? "The ten days" : "The " + S.nDays + " days";
-  const past = h.filter(r => r.date >= S.dayOne && r.date < today && r.tpl !== "off");
-  $("tenMeta").textContent = past.length ? past.filter(r => r.total && r.done >= r.total).length + " of " + past.length + " past days fully ticked" : dayLabel(S.dayOne) + " → " + dayLabel(addDays(S.dayOne, S.nDays - 1));
+  $("ten").innerHTML = html.join("");
+  $("tenTitle").textContent = ex.length ? "To the exam" : "The plan";
+  $("tenMeta").textContent = cdn || (dayLabel(first) + " → " + dayLabel(last));
 }
 
 /* ---------- settings ---------- */
@@ -1039,31 +1492,42 @@ function settingsMsg(t) { $("settingsMsg").textContent = t; }
 const DUR_FIELDS = [["arriveSec", "Arrive"], ["shortSec", "Short break"], ["mealSec", "Lunch · dinner"], ["bioSec", "Biostats contact"], ["caseSec", "CCS case"], ["feedbackSec", "CCS feedback"], ["closeSec", "Close the day"], ["sampleSec", "Official sample block"], ["notesSec", "Notes read (Nov 16)"], ["packSec", "Pack (Nov 17)"]];
 function fillSettings() {
   $("fDayOne").value = S.dayOne; $("fDays").value = S.nDays; $("fPlanStart").value = S.planStart; $("fPlanEnd").value = S.planEnd; $("fTpl").value = S.tpl; $("fRemind").checked = !!S.remind; $("fTheme").value = P.getTheme();
+  $("fBlocks").value = S.nBlocks; $("fCases").value = S.nCases; $("fLunch").value = S.lunchAfter; $("fReview").value = String(S.reviewSec); $("fBio").checked = !!S.bio;
   $("fCal").value = S.cal;
   const rv = reviewCfg();
   $("durs").innerHTML = DUR_FIELDS.map(([k, l]) => '<label>' + l + '<input type="text" inputmode="numeric" data-dur="' + k + '" value="' + fmt(S[k]) + '"></label>').join("") +
     '<label>Block<span class="ro">' + fmt(blockSec()) + ' · Block page</span></label><label>Break after a task<span class="ro">' + fmt(breakSec()) + ' · Breaks below</span></label><label>Review chunk · stand<span class="ro">' + fmt(rv.chunk) + " · " + fmt(rv.stand) + ' · Review page</span></label>';
 }
-function applySettings() {
+function shapeOf() { return [S.nBlocks, S.nCases, S.lunchAfter, S.bio ? 1 : 0].join("|"); }
+function applySettings() { // saved at any moment, also while a timer runs: today's ticks stay with their steps
   const dayOne = $("fDayOne").value, nDays = parseInt($("fDays").value, 10);
   if (!parseKey(dayOne) || !nDays || nDays < 1 || nDays > 60) { settingsMsg("Check Day 1 and the number of days."); return; }
+  const nB = parseInt($("fBlocks").value, 10), nC = parseInt($("fCases").value, 10), rvSec = +$("fReview").value;
+  if (!(nB >= 1 && nB <= 9) || !(nC >= 0 && nC <= 4)) { settingsMsg("Blocks in a row: 1 to 9. CCS cases: 0 to 4."); return; }
   const durs = {};
   for (const [k] of DUR_FIELDS) { const v = parseMS($("durs").querySelector('[data-dur="' + k + '"]').value); if (v == null || v < 60 || v > 4 * 3600) { settingsMsg("Durations as mm:ss, 1:00 to 240:00."); return; } durs[k] = v; }
-  const tpl = TPLS.includes($("fTpl").value) ? $("fTpl").value : "auto";
-  S = Object.assign({}, S, durs, { dayOne: dayOne, nDays: nDays, planStart: $("fPlanStart").value.trim() || "8:00 AM", planEnd: $("fPlanEnd").value.trim() || "~10:00 PM", tpl: tpl, remind: $("fRemind").checked, cal: $("fCal").value, v: 1 });
+  const tpl = TPLS.includes($("fTpl").value) ? $("fTpl").value : "auto", shape = shapeOf();
+  S = Object.assign({}, S, durs, { dayOne: dayOne, nDays: nDays, planStart: $("fPlanStart").value.trim() || "8:00 AM", planEnd: $("fPlanEnd").value.trim() || "~10:00 PM", tpl: tpl, remind: $("fRemind").checked, cal: $("fCal").value,
+    nBlocks: nB, nCases: nC, lunchAfter: $("fLunch").value === "blocks" ? "blocks" : "cases", reviewSec: [-1, 0, 1800, 2700, 3600, 5400].includes(rvSec) ? rvSec : -1, bio: $("fBio").checked, v: 1 });
   saveSettings();
+  let msg = "Saved.";
+  if (shape !== shapeOf() && D.order.length) { D.order = []; msg = "Saved. Today's list follows the new order; steps you had moved by hand are back in their places."; }
   const want = tplFor(D.date);
   if (want !== D.tpl) {
-    if (anyDone() || D.timer) { settingsMsg("Saved. Today keeps its current list — \"Start today over\" switches it to " + want + "."); }
-    else { D.tpl = want; }
-  } else settingsMsg("Saved.");
-  STEPS = buildSteps(D.date, D.tpl); builtFor = ""; persist(); fillSettings(); render();
+    const T = D.timer;
+    if (T && !buildSteps(D.date, want).some(x => x.id === T.stepId)) msg = "Saved. Today keeps its list while this step runs — the " + want + " list does not have it. Finish or stop it, then save again.";
+    else { D.tpl = want; D.order = []; msg = "Saved. Today's list is now the " + want + " one; the ticks of the steps both lists share stay."; }
+  }
+  rebuild();
+  if (D.timer && !stepById(D.timer.stepId)) { D.timer = null; P.releaseWake(); P.bg.runEnd(); msg += " The step that was running is no longer on today's list, so its timer on this card is closed."; }
+  settingsMsg(msg);
+  persist(); fillSettings(); render();
 }
 
 /* ---------- wiring ---------- */
 function init() {
   P.applyTheme(); P.renderNav("day");
-  loadSettings(); loadDay(); fillSettings();
+  loadSettings(); loadDay(); writeHandoff(); fillSettings();
   $("btnApply").addEventListener("click", applySettings);
   $("btnCalReset").addEventListener("click", () => { $("fCal").value = CAL_DEFAULT; settingsMsg("Calendar reset to the plan — press Save settings."); });
   $("btnNewDay").addEventListener("click", newDay);
@@ -1071,12 +1535,12 @@ function init() {
   document.addEventListener("keydown", e => {
     const t = e.target, tag = t && t.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || tag === "SUMMARY" || (t && t.classList && t.classList.contains("st"))) return;
-    const c = cd(), s = c ? c.step : current();
+    const c = cd(), s = cardStep(c);
     if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); if (!s) return; if (!c) startStep(s, 0); else if (c.kind === "wait") startNextPart(); else finishStep(s, "timer"); }
     else if (e.key === "d" || e.key === "D") { if (s) finishStep(s, c ? "timer" : "tap"); }
     else if (e.key === "n" || e.key === "N") { if (c && c.kind === "wait") startNextPart(); }
     else if (e.key === "p" || e.key === "P") pauseResume();
-    else if (e.key === "e" || e.key === "E") extend(300);
+    else if (e.key === "e" || e.key === "E") { if (c && c.kind !== "wait") extend(300); }
   });
   P.bg.bind({
     type: "day",
@@ -1100,8 +1564,7 @@ function init() {
     active: () => anyDone() || !!D.timer,
     apply: state => {
       if (!state || state.date !== keyOf(Date.now())) return;
-      D = Object.assign(freshDay(state.date), state); D.steps = D.steps || {}; D.consumed = D.consumed || {}; D.manual = D.manual || {}; D.caseLen = D.caseLen || {};
-      STEPS = buildSteps(D.date, D.tpl); builtFor = ""; P.writeJSON(LS_D, D);
+      adopt(state); rebuild(); P.writeJSON(LS_D, D);
       const c = cd(); if (c && c.kind !== "wait" && !c.paused) { P.keepAwake(); P.bg.runStart(c.step.t); }
       render();
     }
@@ -1111,7 +1574,7 @@ function init() {
   setInterval(tick, 250);
   render();
   /* a small hook for the automated checks: read the state, move a running timer in time */
-  window.__day = { state: () => D, steps: () => STEPS, patchTimer: patch => { if (D.timer) { Object.assign(D.timer, patch); persist(); tick(); } } };
+  window.__day = { state: () => D, steps: () => STEPS, settings: () => S, patchTimer: patch => { if (D.timer) { Object.assign(D.timer, patch); persist(); tick(); } } };
 }
 init();
 if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); }); }

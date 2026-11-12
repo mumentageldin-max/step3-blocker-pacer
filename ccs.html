@@ -84,6 +84,8 @@
 .revbox[data-tone="crit"] .revclock{color:var(--crit)}
 .revbox[data-tone="done"] .revclock{color:var(--good)}
 .revbox .ring{position:relative;width:100%;height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.revctl{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.revctl button{min-height:42px;padding:6px 14px;font-size:14px;font-weight:700}
 .revbox .ring i{position:absolute;inset:0 auto 0 0;width:0;background:var(--good);border-radius:5px}
 .revbox[data-tone="crit"] .ring i{background:var(--crit)}
 /* Pre-case card (setup), protocol lines (live) and the spelling drill (setup). Phase colors: R blue, E red, A green, C amber, T violet. */
@@ -133,6 +135,10 @@
 .drill .hint{margin:0;font-size:15px;letter-spacing:.06em;color:var(--muted);overflow-wrap:anywhere}
 .drill .hint b{color:var(--fg);letter-spacing:.12em}
 .keylist div .m{grid-column:1/-1;font-size:12px;color:var(--crit);font-weight:700}
+.lenquick{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;width:100%}
+.lenquick .lbl{font-size:12px;color:var(--muted);font-weight:700}
+.lenquick button{min-height:40px;padding:6px 18px;font-size:15px;font-weight:700;font-family:var(--font-num);border-radius:999px}
+.lenquick button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .lenswitch{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;width:100%}
 .lenswitch .lbl{font-size:12px;color:var(--muted);font-weight:700}
 .lenswitch button{min-height:34px;padding:4px 10px;font-size:13px;font-family:var(--font-num)}
@@ -202,6 +208,7 @@
       <label>Attempt<select id="sAttempt"><option value="first">First attempt</option><option value="repeat">Repeat</option></select></label>
       <label>Source<select id="sSource"><option value="ccscases">ccscases.com</option><option value="official">Official practice cases</option><option value="other">Other</option></select></label>
     </div>
+    <p class="note" id="sDay" hidden></p>
     <p class="note" id="sPlan"></p>
     <button class="primary" id="btnStart" type="button">Start case</button>
     <div class="row2"><button id="btnReviewOnly" type="button" class="small" style="min-height:46px">Feedback review only — case already run (<span id="revOnlyLen">10:00</span>)</button></div>
@@ -267,6 +274,10 @@
         <span class="meta" id="metaCase"></span>
       </div>
       <div class="clockrow"><div class="clock" id="clock">0:00</div><div class="clockof" id="clockOf">of 12:30</div></div>
+      <div class="lenquick" id="lenquick" aria-label="Case length — switch at any moment, the time used stays">
+        <span class="lbl">Case length</span>
+        <button type="button" data-len="750" aria-pressed="true">12:30</button><button type="button" data-len="1500" aria-pressed="false">25:00</button>
+      </div>
       <div class="phases">
         <div class="strip" id="strip"></div>
         <div class="striplabels" id="striplabels"></div>
@@ -295,7 +306,7 @@
 
   <div class="colR" id="colR" hidden>
     <details class="fold optfold" id="lenFold">
-      <summary>Wrong case length? Switch</summary>
+      <summary>Other case lengths · 10:00 · 20:00</summary>
       <div class="body">
         <div class="lenswitch" id="lenswitch" aria-label="Case length">
           <span class="lbl">Keeps the time used, re-cuts the phases:</span>
@@ -343,7 +354,7 @@
           </div>
           <div class="formrow"><button type="button" id="btnApply">Save settings</button><span class="note" id="settingsMsg"></span></div>
         </fieldset>
-        <p class="note" id="settingsLock" hidden>Settings unlock when the case is over.</p>
+        <p class="note" id="settingsLock" hidden></p>
         <div class="rowhead"><h2>Breaks</h2><span class="meta">Shared by all pacer pages</span></div>
         <div id="brkSettings"></div>
         <p class="note">After a case: the break starts when the feedback review timer ends (or when you save the case, if you did not run that timer).</p>
@@ -366,6 +377,10 @@
       <div class="ring"><i id="revFill"></i></div>
       <p class="phaseText" id="revText">Open the feedback. Read it top to bottom once: every order you missed, in the order the case wanted them. The one that matters most goes in the box below. No retry now.</p>
       <div class="row2"><button class="primary good" id="btnRevStart" type="button" style="min-height:56px;font-size:17px">Start review · 10:00</button></div>
+      <div class="revctl" id="revCtl" hidden>
+        <button type="button" data-rev="-60">−1:00</button><button type="button" data-rev="60">+1:00</button><button type="button" data-rev="300">+5:00</button>
+        <button type="button" id="btnRevEnd">Feedback read ✓ · end the timer</button>
+      </div>
     </section>
     <p class="note">ccscases.com keeps the score and the feedback. Here, only what it cannot know:</p>
     <div class="form">
@@ -922,7 +937,36 @@ function fresh() {
     startAt: 0, pausedAt: 0, pausedTotal: 0, patient: "", checks: {}, phaseChimed: {}, finalFired: false, endQuiet: false, endEl: 0, endedBy: "", saved: false, caseTimed: true,
     history: [], rev: { startAt: 0, limitSec: 0, endAt: 0, warned: false, rang: false }, updatedAt: 0 };
 }
-function loadSettings() { const p = P.readJSON(LS_S, null); if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p); P.setSound(S.sound); chosenLen = S.lastLen || 750; }
+function loadSettings() { const p = P.readJSON(LS_S, null); if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p); P.setSound(S.sound); chosenLen = 750; }
+/* The Day page writes today's cases — number and length — here. The next case of the day sets the length (and the label),
+   so a 12:30 case after a 25:00 one starts as 12:30. Without a plan the length is 12:30 until you tap another. */
+const LS_CASES = "step3pacer.day.cases.v1";
+let planCache = { at: 0, v: null }, planApplied = "", planLabel = "";
+function dayKey(ts) { const d = new Date(ts - 4 * 3600000), z = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate()); }   // the study day rolls over at 4:00 AM
+function planNext() { // { i, of, num, sec } for the next case of today's plan, or null
+  const now = Date.now(); if (now - planCache.at < 5000) return planCache.v;
+  const k = dayKey(now), p = P.readJSON(LS_CASES, null), list = p && p.days && Array.isArray(p.days[k]) ? p.days[k] : null;
+  let v = null;
+  if (list && list.length) {
+    const done = P.loadSessions().filter(x => x.type === "ccs" && dayKey(new Date(x.date).getTime()) === k).length;
+    if (done < list.length && list[done] && list[done].sec > 0) v = { i: done, of: list.length, num: String(list[done].num || ""), sec: +list[done].sec, key: k + "|" + done + "|" + list[done].sec + "|" + list[done].num };
+    else v = { i: done, of: list.length, num: "", sec: 0, key: k + "|" + done + "|over" };
+  }
+  planCache = { at: now, v: v }; return v;
+}
+function applyPlan() { // in setup: the plan's next case sets the length once; your own tap on a length stays until the plan itself changes
+  const n = planNext(), key = n ? n.key : dayKey(Date.now()) + "|none";
+  const el = $("sDay");
+  if (n && n.sec) { el.hidden = false; el.textContent = "Today's plan: case " + (n.i + 1) + " of " + n.of + (n.num ? " · #" + n.num : "") + " · " + fmt(n.sec) + ". If the case's start screen shows another maximum time, tap that length."; }
+  else if (n) { el.hidden = false; el.textContent = "Today's " + n.of + " planned cases are saved. This one is extra — choose its length."; }
+  else el.hidden = true;
+  if (planApplied === key) return;
+  planApplied = key;
+  if (n && n.sec) {
+    chosenLen = n.sec;
+    const lab = $("sLabel"); if (n.num && (!lab.value.trim() || lab.value === planLabel)) { lab.value = "#" + n.num; planLabel = lab.value; }
+  } else chosenLen = 750;
+}
 function saveSettings() { P.writeJSON(LS_S, S); }
 function persist() { R.updatedAt = Date.now(); P.writeJSON(LS_R, R); P.live.touch(); }
 function loadRun() {
@@ -1006,6 +1050,7 @@ function setLimit(sec) { // the case turned out to be the other length: keep the
   sec = +sec; if (!(sec > 0) || sec === R.limitSec) return;
   if (R.phase === "run") {
     const el = elapsed();
+    if (el >= sec) { P.notice(fmt(sec) + " has already passed on this case (" + fmt(el) + " used). To end it, press Exit case.", "warn", 6000); return; }   // a tap on the shorter length never ends the case
     R.limitSec = sec; S.lastLen = sec; saveSettings();
     const b = phaseBounds(); b.forEach(ph => { if (ph.start > el) delete R.phaseChimed[ph.k]; });
     if (sec - el > S.finalSec) R.finalFired = false;
@@ -1036,6 +1081,17 @@ function startReview() {
   if (R.phase !== "done" || R.rev.startAt) return;
   R.rev = { startAt: Date.now(), limitSec: revLimit(), endAt: 0, warned: false, rang: false };
   P.audioInit(); P.sfx("start"); P.keepAwake(); P.bg.runStart("feedback review running"); persist(); render();
+}
+function revAdjust(d) { // more or less feedback time while its timer runs
+  if (R.phase !== "done" || !R.rev.startAt || R.rev.endAt) return;
+  R.rev.limitSec = Math.max(60, R.rev.limitSec + d);
+  if (R.rev.limitSec - revElapsed() > 60) R.rev.warned = false;
+  persist(); render();
+}
+function revEndNow() { // the feedback is read before the timer is over: the timer stops here and the break after the case starts
+  if (R.phase !== "done" || !R.rev.startAt || R.rev.endAt) return;
+  R.rev.endAt = Date.now(); R.rev.rang = true;
+  P.releaseWake(); P.bg.runEnd(); startTaskBreak(); persist(); render();
 }
 function revElapsed(at) { if (!R.rev.startAt) return 0; return ((R.rev.endAt || at || Date.now()) - R.rev.startAt) / 1000; }
 function finish(by) {
@@ -1139,6 +1195,7 @@ function buildChecks() {
   });
 }
 function renderSetup() {
+  applyPlan();
   document.querySelectorAll("#presets button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.len === chosenLen)));
   const b = (() => { let acc = 0; return PHASES.map(p => { const s = acc; acc += Math.round(chosenLen * p.frac); return p.name + " " + fmt(s) + "–" + fmt(acc); }); })();
   $("sPlan").textContent = fmt(chosenLen) + " of real time, clock " + (S.countdown ? "counting down" : "counting up from 0:00") + ": " + b.join(" · ") + ". Final-orders alert at " + (S.countdown ? fmt(S.finalSec) + " left" : fmt(chosenLen - S.finalSec)) + ".";
@@ -1155,7 +1212,6 @@ function renderProto(ph) {
 function render() {
   const inSetup = R.phase === "setup", live = R.phase === "run", done = R.phase === "done";
   $("setup").hidden = !inSetup; $("colL").hidden = !live; $("colR").hidden = inSetup || done; $("done").hidden = !done;
-  $("settingsFs").disabled = live; $("settingsLock").hidden = !live;
   $("btnSound").textContent = S.sound ? "Sound on" : "Sound off"; $("btnSound").setAttribute("aria-pressed", S.sound ? "true" : "false");
   if (inSetup) { renderSetup(); return; }
   const el = elapsed(), rem = Math.max(0, R.limitSec - el), ph = phaseAt(el), bounds = phaseBounds();
@@ -1166,7 +1222,7 @@ function render() {
     card.dataset.tone = R.pausedAt ? "paused" : rem <= S.finalSec ? "crit" : ph.k === "close" ? "warn" : "normal";
     card.dataset.ph = R.pausedAt ? "paused" : ph.k;
     $("metaCase").textContent = (R.label ? R.label + " · " : "") + R.category + " · " + (R.attempt === "repeat" ? "repeat" : "first attempt") + " · " + fmt(R.limitSec);
-    document.querySelectorAll("#lenswitch button").forEach(b => { b.setAttribute("aria-pressed", String(+b.dataset.len === R.limitSec)); b.disabled = !!R.pausedAt; });
+    document.querySelectorAll("#lenswitch button, #lenquick button").forEach(b => { b.setAttribute("aria-pressed", String(+b.dataset.len === R.limitSec)); });
     $("pill").textContent = R.pausedAt ? "Paused" : ph.name; $("pill").dataset.kind = R.pausedAt ? "idle" : ph.k === "final" ? "crit" : ph.k === "close" ? "warn" : "accent";
     $("phname").textContent = R.pausedAt ? "Paused" : ph.name;
     $("phaseText").textContent = R.pausedAt ? "The real exam has no pause — practice only." : ph.text;
@@ -1199,6 +1255,7 @@ function render() {
 }
 function renderReview() {
   const box = $("revbox"), lim = R.rev.startAt ? R.rev.limitSec : revLimit();
+  $("revCtl").hidden = !(R.rev.startAt && !R.rev.endAt);
   $("revMeta").textContent = fmt(lim) + " for a " + fmt(R.limitSec) + " case";
   if (!R.rev.startAt) {
     box.dataset.tone = "normal"; $("revClock").textContent = fmt(lim); $("revFill").style.width = "0%";
@@ -1243,7 +1300,12 @@ function applySettings() {
   const f = P.parseMS($("fFinal").value), rs = P.parseMS($("fRevShort").value), rl = P.parseMS($("fRevLong").value);
   if (f == null || f < 30 || f > 600) { $("settingsMsg").textContent = "Final-orders alert: 0:30 to 10:00."; return; }
   if (rs == null || rl == null || rs < 60 || rl < 60 || rs > 3600 || rl > 3600) { $("settingsMsg").textContent = "Review timers: 1:00 to 60:00."; return; }
-  S.finalSec = f; S.revShortSec = rs; S.revLongSec = rl; S.countdown = $("fClock").value === "down"; saveSettings(); $("settingsMsg").textContent = "Saved."; renderSetup();
+  S.finalSec = f; S.revShortSec = rs; S.revLongSec = rl; S.countdown = $("fClock").value === "down"; saveSettings();
+  // saved in the middle of a case or of its feedback: the alert and the feedback clock follow the new values at once
+  if (R.phase === "run") { if (R.limitSec - elapsed() > S.finalSec) R.finalFired = false; persist(); $("settingsMsg").textContent = "Saved — this case uses it from now."; }
+  else if (R.phase === "done" && R.rev.startAt && !R.rev.endAt) { R.rev.limitSec = revLimit(); if (R.rev.limitSec - revElapsed() > 60) R.rev.warned = false; persist(); $("settingsMsg").textContent = "Saved — this feedback review uses it from now."; }
+  else $("settingsMsg").textContent = "Saved.";
+  if (R.phase === "setup") renderSetup(); else render();
 }
 
 /* ---------- pre-case card: breath, fold memory ---------- */
@@ -1426,11 +1488,13 @@ function init() {
   $("btnUndo").addEventListener("click", undoTap);
   $("btnResume").addEventListener("click", resumeCase);
   $("btnRevStart").addEventListener("click", startReview);
+  document.querySelectorAll("#revCtl button[data-rev]").forEach(b => b.addEventListener("click", e => { revAdjust(+b.dataset.rev); if (e.detail > 0) b.blur(); }));
+  $("btnRevEnd").addEventListener("click", revEndNow);
   $("btnReviewOnly").addEventListener("click", startReviewOnly);
   ["dScore", "dLabel", "dNote", "dWords"].forEach(id => $(id).addEventListener("input", markDirty));
   $("dLen").addEventListener("change", () => setLimit($("dLen").value));
   $("dWords").addEventListener("input", () => { const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v); });
-  document.querySelectorAll("#lenswitch button").forEach(b => b.addEventListener("click", () => setLimit(b.dataset.len)));
+  document.querySelectorAll("#lenswitch button, #lenquick button").forEach(b => b.addEventListener("click", e => { setLimit(b.dataset.len); if (e.detail > 0) b.blur(); }));
   $("btnWordAdd").addEventListener("click", () => { addWord($("wordIn").value, $("wordNote").value, "", false); $("wordIn").value = ""; $("wordNote").value = ""; $("wordIn").focus(); });
   $("wordIn").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("btnWordAdd").click(); } });
   $("wordNote").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("btnWordAdd").click(); } });

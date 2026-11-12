@@ -252,7 +252,7 @@
             <span class="note" id="settingsMsg"></span>
           </div>
         </fieldset>
-        <p class="note" id="settingsLock" hidden>Settings unlock when the review is finished.</p>
+        <p class="note" id="settingsLock" hidden></p>
         <div class="rowhead"><h2>Breaks</h2><span class="meta">Shared by all pacer pages</span></div>
         <div id="brkSettings"></div>
         <div class="rowhead"><h2>Background &amp; sound</h2><span class="meta">Shared by all pacer pages</span></div>
@@ -598,20 +598,39 @@ function events() {
 }
 
 /* ---------- render ---------- */
-let pickedBlock = null;
+let pickedBlock = null, pickTouched = false;
+function dayKey(ts) { const d = new Date(ts - 4 * 3600000), z = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate()); }   // the study day rolls over at 4:00 AM
+function todaysBlocks() { // today's blocks not reviewed yet — lowest score first, the ones without a score after them; numbered as the Day page numbers them
+  const k = dayKey(Date.now());
+  const all = P.loadSessions().filter(s => s.type === "block" && dayKey(new Date(s.date).getTime()) === k).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const day = P.readJSON("step3pacer.day.v1", null), cons = (day && day.date === k && day.consumed) || {};
+  all.forEach((s, i) => { const m = /^b(\d+)$/.exec(cons[s.id] || ""); s._n = m ? +m[1] : i + 1; });
+  const doneB = {};                                                  // blocks whose review was done on the Day page's own timer are reviewed too
+  if (day && day.date === k && day.rv && day.steps) Object.keys(day.rv).forEach(r => { if (day.steps[r] && day.steps[r].done) doneB[day.rv[r]] = true; });
+  const pct = s => s.correct / (s.nQ || 20);
+  return all.filter(s => !s.reviewId && !doneB[cons[s.id]]).sort((a, b) => (a.correct == null) - (b.correct == null) || (a.correct != null ? pct(a) - pct(b) : 0) || a._n - b._n).slice(0, 9);
+}
+function chooseBlock(id, blocks) {
+  pickedBlock = id || null;
+  if (id) { const s = blocks.find(x => x.id === id); if (s) { $("sLabel").value = s.label || (s._n ? "Block " + s._n : ""); $("sN").value = s.nQ; $("sCorrect").value = s.correct != null ? s.correct : ""; } }
+}
 function renderPicks() {
   const el = $("picks");
-  const cutoff = Date.now() - 2 * 86400000;
-  const blocks = P.loadSessions().filter(s => s.type === "block" && !s.reviewId && new Date(s.date).getTime() > cutoff).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 4);
+  let blocks = todaysBlocks(), today = true;
+  if (!blocks.length) { // nothing from today: the last two days, newest first, as before
+    const cutoff = Date.now() - 2 * 86400000; today = false;
+    blocks = P.loadSessions().filter(s => s.type === "block" && !s.reviewId && new Date(s.date).getTime() > cutoff).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 4);
+  }
   if (!blocks.length) { el.hidden = true; return; }
+  if (today && !pickTouched && !pickedBlock && R.phase === "setup" && blocks[0].correct != null) chooseBlock(blocks[0].id, blocks);   // the lowest score is the one to review first
   el.hidden = false;
-  el.innerHTML = '<span class="note" style="align-self:center">Reviewing:</span>' + blocks.map(b => {
+  el.innerHTML = '<span class="note" style="align-self:center">' + (today ? "Reviewing · lowest score first:" : "Reviewing:") + "</span>" + blocks.map(b => {
     const score = b.correct != null ? " · " + b.correct + "/" + b.nQ : "";
-    return '<button type="button" data-block="' + P.esc(b.id) + '" aria-pressed="' + (pickedBlock === b.id ? "true" : "false") + '">' + P.esc(P.fmtDate(b.date, true)) + (b.label ? " · " + P.esc(b.label) : "") + score + "</button>";
+    const name = today ? "Block " + b._n + (b.label && b.label !== "Block " + b._n ? " · " + P.esc(b.label) : "") : P.esc(P.fmtDate(b.date, true)) + (b.label ? " · " + P.esc(b.label) : "");
+    return '<button type="button" data-block="' + P.esc(b.id) + '" aria-pressed="' + (pickedBlock === b.id ? "true" : "false") + '">' + name + score + "</button>";
   }).join("") + '<button type="button" data-block="" aria-pressed="' + (pickedBlock ? "false" : "true") + '">Other</button>';
   el.querySelectorAll("button[data-block]").forEach(b => b.addEventListener("click", () => {
-    const id = b.dataset.block; pickedBlock = id || null;
-    if (id) { const s = blocks.find(x => x.id === id); if (s) { if (s.label) $("sLabel").value = s.label; $("sN").value = s.nQ; if (s.correct != null) $("sCorrect").value = s.correct; } }
+    pickTouched = true; chooseBlock(b.dataset.block, blocks);
     renderPicks(); renderDerived();
   }));
 }
@@ -635,7 +654,6 @@ function render() {
   $("colR").hidden = done;
   $("progCard").hidden = inSetup;
   $("done").hidden = !done;
-  $("settingsFs").disabled = live; $("settingsLock").hidden = !live;
   $("btnSound").textContent = S.sound ? "Sound on" : "Sound off";
   $("btnSound").setAttribute("aria-pressed", S.sound ? "true" : "false");
   if (inSetup) return;
@@ -831,7 +849,7 @@ function applySettings() {
   const b = P.parseMS($("fB").value), ext = P.parseMS($("fExt").value), eo = parseInt($("fEo").value, 10);
   if (!limit || !chunk || stand == null || !b || ext == null || !eo || chunk > limit || eo < 10) { $("settingsMsg").textContent = "Check the values: times as mm:ss."; return; }
   S = Object.assign({}, S, { limitSec: limit, chunkSec: chunk, standSec: stand, bSec: b, extSec: ext, eoSec: eo, atStop: $("fStop").value === "end" ? "end" : "sweep", order: $("fOrder").value === "any" ? "any" : "wrongFirst", v: 2 });
-  saveSettings(); fillSettings(); renderDerived(); render(); $("settingsMsg").textContent = "Saved.";
+  saveSettings(); fillSettings(); renderDerived(); render(); $("settingsMsg").textContent = (R.phase === "run" || R.phase === "sweep") ? "Saved — this review uses it from now." : "Saved.";
 }
 function fillSettings() {
   $("fLimit").value = fmt(S.limitSec); $("fChunk").value = fmt(S.chunkSec); $("fStand").value = fmt(S.standSec);
@@ -875,7 +893,7 @@ function init() {
     setTimeout(() => { b.textContent = "Copy the line"; }, 2500);
   });
   $("btnStats").addEventListener("click", () => { location.href = "./stats.html"; });
-  $("btnNew").addEventListener("click", () => { R = fresh(); pickedBlock = null; persist(); renderPicks(); renderDerived(); render(); });
+  $("btnNew").addEventListener("click", () => { R = fresh(); pickedBlock = null; pickTouched = false; $("sLabel").value = ""; $("sCorrect").value = ""; persist(); renderPicks(); renderDerived(); render(); });
   $("btnPark15").addEventListener("click", startPark15);
   $("btnParkClear").addEventListener("click", () => { P.saveParking([]); renderParking(); });
   ["btnWrong", "btnCorrect", "btnLucky", "btnExtend", "btnNext", "btnPause", "btnStandNow", "btnResume", "btnEnd", "btnSound", "btnStart", "btnChange", "btnUndo"].forEach(id => blurOnClick($(id)));

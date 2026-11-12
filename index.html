@@ -220,7 +220,7 @@
         <div id="brkSettings"></div>
         <div class="rowhead"><h2>Background &amp; sound</h2><span class="meta">Shared by all pacer pages</span></div>
         <div id="bgSettings"></div>
-        <p class="note" id="settingsLock" hidden>Settings unlock when the block is reset or finished.</p>
+        <p class="note" id="settingsLock" hidden></p>
         <p class="note" id="installNote" hidden>To install: iPad Safari → Share → Add to Home Screen. Galaxy Fold → browser menu → Install app. Mac → Safari File → Add to Dock, or Chrome's install button.</p>
       </div>
     </details>
@@ -386,7 +386,7 @@ function saveBlockSession() {
     checkpoints: list.map((q, i) => { const cp = R.cps[q]; return cp ? { q: q, target: S.targets[i] || 0, rem: Math.round(cp.rem), delta: Math.round(cp.delta) } : null; }).filter(Boolean),
     answered: R.taps.length, flagged: R.flagged, flagSegs: list.filter(q => q < S.nQ && R.cps[q] && R.cps[q].delta < 0).length,
     avgPerQ: Math.round(last.el / 1000 / R.taps.length), qTimes: qTimes,
-    reviewLeft: R.cps[S.nQ] ? Math.round(R.cps[S.nQ].rem) : null, endedEarly: R.endEl < S.blockSec * 1000, endedBy: R.endedBy
+    reviewLeft: R.cps[S.nQ] ? Math.round(R.cps[S.nQ].rem) : null, endedEarly: R.endEl < S.blockSec * 1000, endedBy: R.endedBy, usedSec: Math.round(R.endEl / 1000)
   });
   P.saveSession(s); P.syncQuietly();
 }
@@ -529,7 +529,6 @@ function render() {
   $("btnUndo").disabled = !live || (!R.taps.length && !(inReview && R.reviewLeft < R.flagged));
   const br = $("btnReset");
   br.disabled = R.phase === "idle"; br.textContent = resetArmed ? "Sure?" : "Reset"; br.classList.toggle("armed", !!resetArmed);
-  $("settingsFs").disabled = live; $("settingsLock").hidden = !live;
   renderSummary();
 }
 function renderSummary() {
@@ -570,11 +569,15 @@ function applySettings() {
   const flagSec = parseInt($("fFlag").value, 10), fill = parseMS($("fFill").value);
   const raw = $("fTargets").value.split(/[,\s]+/).filter(Boolean).map(parseMS);
   if (!block || block < 60 || !nQ || nQ < 1 || nQ > 60 || !every || every < 1 || every > nQ || !flagSec || flagSec < 10 || fill == null || fill >= block) { settingsMsg("Check the values: times as mm:ss, counts as whole numbers."); return; }
+  const live = R.phase === "running" || R.phase === "paused";
+  if (live && nQ < R.taps.length) { settingsMsg("This block already has " + R.taps.length + " questions tapped — the number of questions cannot go below that while it runs."); return; }
   const list = checkpointQs(nQ, every);
-  let targets = raw.some(t => t == null) ? null : raw, msg = "Saved.";
+  let targets = raw.some(t => t == null) ? null : raw, msg = live ? "Saved — this block uses it from now." : "Saved.";
   if (!targets || targets.length !== list.length || targets.some(t => t > block)) { targets = evenTargets(block, nQ, every); msg = "Saved. Targets recalculated for " + list.length + " checkpoints."; }
   S = Object.assign({}, S, { blockSec: block, nQ: nQ, every: every, targets: targets, flagSec: flagSec, fillSec: fill, chimeEvery: $("fChime").checked, endMode: $("fEndMode").value || "manual", v: 2 });
-  saveSettings(); buildRail(); render(); settingsMsg(msg);
+  saveSettings();
+  if (live) { if (S.blockSec - elapsedMs() / 1000 > S.fillSec) R.fillFired = false; persistRun(); }   // saved in the middle of a block: the clock and the fill alert follow the new values at once
+  buildRail(); render(); settingsMsg(msg);
 }
 function recalcTargets() {
   const block = parseMS($("fBlock").value), nQ = parseInt($("fN").value, 10), every = parseInt($("fEvery").value, 10);
