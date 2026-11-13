@@ -127,11 +127,11 @@
     <div class="form">
       <label>Block label or system<input type="text" id="sLabel" placeholder="Cardio · Random · Ethics…" autocomplete="off"></label>
       <label>Questions in the block<input type="number" id="sN" min="1" max="60" value="20" inputmode="numeric"></label>
-      <label>Correct (from the results page)<input type="number" id="sCorrect" min="0" max="60" placeholder="13" inputmode="numeric"></label>
+      <label>Score % (UWorld)<input type="text" id="sCorrect" maxlength="6" placeholder="65" inputmode="numeric" pattern="[0-9]*" autocomplete="off"></label>
       <label>Mode<select id="sMode"><option value="full">Full review · 90:00 hard stop</option><option value="eo">EO only · 60 s per question</option></select></label>
       <label class="wide">Order<select id="sOrder"><option value="wrongFirst">Wrong questions first, then the right ones with the time that is left</option><option value="any">Any order — I pick wrong or right as I go</option></select></label>
     </div>
-    <p class="note" id="sDerived">Enter the score and the app knows how many wrong questions get Timer B.</p>
+    <p class="note" id="sDerived">Type the percent and the app knows how many wrong questions get Timer B.</p>
     <button class="primary" id="btnStart" type="button">Start review</button>
   </section>
 
@@ -355,10 +355,8 @@ function remainingAll() { const w = remainingWrong(), c = remainingCorrect(); re
 
 /* ---------- actions ---------- */
 function startReview() {
-  const label = $("sLabel").value.trim(), nQ = parseInt($("sN").value, 10);
-  const cRaw = $("sCorrect").value.trim(), correct = cRaw === "" ? null : parseInt(cRaw, 10);
-  if (!nQ || nQ < 1) { $("sDerived").textContent = "Enter how many questions the block had."; return; }
-  if (correct != null && (isNaN(correct) || correct < 0 || correct > nQ)) { $("sDerived").textContent = "Correct must be between 0 and " + nQ + "."; return; }
+  const label = $("sLabel").value.trim(), nQ = Math.max(1, Math.min(60, parseInt($("sN").value, 10) || 20));
+  const correct = P.countOf(P.parsePct($("sCorrect").value), nQ);   // the percent UWorld shows → the count; no score, or something that is not a percent: the review starts all the same
   R = fresh();
   R.phase = "run"; R.id = P.newId(); R.date = new Date().toISOString();
   R.label = label; R.nQ = nQ; R.correct = correct; R.wrongTotal = correct == null ? null : nQ - correct;
@@ -612,7 +610,7 @@ function todaysBlocks() { // today's blocks not reviewed yet — lowest score fi
 }
 function chooseBlock(id, blocks) {
   pickedBlock = id || null;
-  if (id) { const s = blocks.find(x => x.id === id); if (s) { $("sLabel").value = s.label || (s._n ? "Block " + s._n : ""); $("sN").value = s.nQ; $("sCorrect").value = s.correct != null ? s.correct : ""; } }
+  if (id) { const s = blocks.find(x => x.id === id); if (s) { $("sLabel").value = s.label || (s._n ? "Block " + s._n : ""); $("sN").value = s.nQ; $("sCorrect").value = s.correct != null ? P.pctOf(s.correct, s.nQ) : ""; } }
 }
 function renderPicks() {
   const el = $("picks");
@@ -625,7 +623,7 @@ function renderPicks() {
   if (today && !pickTouched && !pickedBlock && R.phase === "setup" && blocks[0].correct != null) chooseBlock(blocks[0].id, blocks);   // the lowest score is the one to review first
   el.hidden = false;
   el.innerHTML = '<span class="note" style="align-self:center">' + (today ? "Reviewing · lowest score first:" : "Reviewing:") + "</span>" + blocks.map(b => {
-    const score = b.correct != null ? " · " + b.correct + "/" + b.nQ : "";
+    const score = b.correct != null ? " · " + P.pctOf(b.correct, b.nQ) + "%" : "";
     const name = today ? "Block " + b._n + (b.label && b.label !== "Block " + b._n ? " · " + P.esc(b.label) : "") : P.esc(P.fmtDate(b.date, true)) + (b.label ? " · " + P.esc(b.label) : "");
     return '<button type="button" data-block="' + P.esc(b.id) + '" aria-pressed="' + (pickedBlock === b.id ? "true" : "false") + '">' + name + score + "</button>";
   }).join("") + '<button type="button" data-block="" aria-pressed="' + (pickedBlock ? "false" : "true") + '">Other</button>';
@@ -639,10 +637,12 @@ function renderDerived() {
   const el = $("sDerived");
   if (!nQ) { el.textContent = ""; return; }
   if ($("sMode").value === "eo") { el.textContent = nQ + " questions × " + S.eoSec + " s, Educational Objective only. No tags, no hard stop."; return; }
-  if (c === "" || isNaN(parseInt(c, 10))) { el.textContent = "Enter the score and the app knows how many wrong questions get Timer B."; return; }
-  const corr = parseInt(c, 10), wrong = nQ - corr;
+  if (c === "") { el.textContent = "Type the percent and the app knows how many wrong questions get Timer B. No score? Start works without it."; return; }
+  const p = P.parsePct(c);
+  if (p == null) { el.textContent = "The score is the percent from UWorld, 0 to 100. Start works without it too."; return; }
+  const corr = P.countOf(p, nQ), wrong = nQ - corr;
   const need = wrong * S.bSec, budget = S.limitSec;
-  el.textContent = wrong + " wrong → Timer B (" + fmt(S.bSec) + " each = " + fmt(need) + ") · " + corr + " correct → " + S.eoSec + " s each (" + fmt(corr * S.eoSec) + "). Budget " + fmt(budget) + (need + corr * S.eoSec > budget ? " — tight: the +3:00 is not free today." : ".");
+  el.textContent = P.pctOf(corr, nQ) + "% = " + corr + " of " + nQ + " · " + wrong + " wrong → Timer B (" + fmt(S.bSec) + " each = " + fmt(need) + ") · " + corr + " correct → " + S.eoSec + " s each (" + fmt(corr * S.eoSec) + "). Budget " + fmt(budget) + (need + corr * S.eoSec > budget ? " — tight: the +3:00 is not free today." : ".");
 }
 function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
 function render() {
@@ -659,7 +659,7 @@ function render() {
   if (inSetup) return;
 
   const el = elA(now) / 1000, remA = Math.max(0, S.limitSec - el);
-  const meta = (R.label ? R.label + " · " : "") + (R.correct != null ? R.correct + "/" + R.nQ : R.nQ + " Q");
+  const meta = (R.label ? R.label + " · " : "") + (R.correct != null ? pct(R.correct, R.nQ) + "% · " + R.correct + "/" + R.nQ : R.nQ + " Q");
   // Timer A band
   const band = $("band");
   $("metaA").textContent = meta;

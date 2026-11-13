@@ -30,6 +30,16 @@
 .badge small{font-weight:700;font-size:11px;opacity:.85;letter-spacing:.08em;text-transform:uppercase}
 .badge.start{background:var(--good);color:var(--on-good)} .badge.end{background:var(--fg);color:var(--bg)}
 .badge .num{font-size:17px}
+button.badge{border:0;cursor:pointer;font:inherit;font-weight:700;font-size:16px;min-height:44px}
+button.badge .pen{font-size:14px;opacity:.9;margin-left:-2px}
+button.badge:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.startedit{flex-basis:100%;order:9;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;border:2px solid var(--good);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.startedit[hidden]{display:none}
+.startedit label{font-weight:700;font-size:15px}
+.startedit input[type=time]{font:inherit;font-family:var(--font-num);font-size:18px;font-weight:700;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);min-height:44px}
+.startedit button{font:inherit;font-weight:700;font-size:15px;min-height:44px;padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+.startedit button.save{background:var(--good);color:var(--on-good);border-color:var(--good)}
+.startedit .note{flex-basis:100%;margin:0;font-size:13px;color:var(--muted)}
 .plan .proj{flex:1;min-width:180px;font-size:14px;color:var(--muted);font-weight:700;text-align:center;text-wrap:balance}
 .plan .proj b{color:var(--fg);font-family:var(--font-num)}
 .plan .proj.late b{color:var(--warn)} .plan .proj.done b{color:var(--good)}
@@ -85,6 +95,8 @@
 .now .casenum b{font-family:var(--font-num);font-size:26px;line-height:1}
 .scores{display:grid;gap:6px;border:1px dashed var(--kc);border-radius:10px;padding:8px 10px;background:var(--bg)}
 .scores .lbl{font-size:12.5px;color:var(--muted);font-weight:700;line-height:1.3}
+.scores .lbl b{color:var(--kc);font-size:14px}
+.scores .msg{font-size:12.5px;color:var(--warn);font-weight:700;margin:0}
 .scores .srow{display:grid;grid-template-columns:repeat(auto-fit,minmax(36px,1fr));gap:6px}
 .scores label{display:grid;gap:2px;font-size:11px;color:var(--muted);font-weight:700;text-align:center}
 .scores input{font:inherit;font-family:var(--font-num);font-size:16px;font-weight:700;text-align:center;padding:6px 2px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);width:100%;min-width:0;user-select:text;-webkit-user-select:text;-moz-appearance:textfield;appearance:textfield}
@@ -178,9 +190,16 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
   <nav id="pnav" aria-label="Pages"></nav>
 
   <div class="plan full" id="plan">
-    <span class="badge start"><small>Start</small><span class="num" id="planStart">8:00 AM</span></span>
+    <button type="button" class="badge start" id="startBadge" aria-expanded="false" aria-controls="startEdit" title="Change the start time"><small id="startLbl">Start</small><span class="num" id="planStart">8:00 AM</span><span class="pen" aria-hidden="true">✎</span></button>
     <p class="proj" id="proj"></p>
     <span class="badge end"><small>Done</small><span class="num" id="planEnd">~10:00 PM</span></span>
+    <form class="startedit" id="startEdit" hidden>
+      <label for="startIn">I started today at</label>
+      <input type="time" id="startIn" step="60" required>
+      <button type="submit" class="save">Save</button>
+      <button type="button" id="startCancel">Cancel</button>
+      <p class="note" id="startNote">The Day total counts from this time. It stays as you set it, on every device.</p>
+    </form>
   </div>
 
   <div class="colL">
@@ -369,6 +388,8 @@ function tplFor(k) { return S.tpl !== "auto" ? S.tpl : calFor(k).tpl; }
 function blockSec() { const p = P.readJSON("step3pacer.settings.v1", null); return (p && p.blockSec > 0) ? p.blockSec : 2250; }
 function reviewCfg() { const p = P.readJSON("step3pacer.review.settings.v1", null) || {}; return { chunk: p.chunkSec > 0 ? p.chunkSec : 1800, stand: p.standSec > 0 ? p.standSec : 600, limit: p.limitSec > 0 ? p.limitSec : 5400, b: p.bSec > 0 ? p.bSec : 300, eo: p.eoSec > 0 ? p.eoSec : 60 }; }
 function breakSec() { return P.getBreaks().taskSec; }
+function blockQ() { const p = P.readJSON("step3pacer.settings.v1", null); return (p && p.nQ > 0) ? p.nQ : 20; }
+function pctText(b) { return b && b.correct != null ? P.pctOf(b.correct, b.nQ) + "%" : ""; }
 
 /* ---------- the templates ---------- */
 let dayScores = [];               // today's blocks and their scores, as the list was last built
@@ -535,7 +556,7 @@ function buildSteps(k, tpl) {
     const dinnerAfter = Math.ceil(nB / 2);
     for (let i = 1; i <= nB; i++) {
       const pl = plan[i - 1] || null;
-      const t = "Review " + i + (pl ? " · Block " + pl.n + (pl.correct != null ? " · " + pl.correct + "/" + pl.nQ : "") : nB === 1 ? "" : i === 1 ? " · lowest score first" : i === nB ? " · highest score" : " · next lowest");
+      const t = "Review " + i + (pl ? " · Block " + pl.n + (pl.correct != null ? " · " + pctText(pl) : "") : nB === 1 ? "" : i === 1 ? " · lowest score first" : i === nB ? " · highest score" : " · next lowest");
       const w = i === 1 ? "Lowest score first, then upward. Wrong first (5+3) → right ones with the time left (60 s)." : i === nB ? "Hard stop. Ended early? → CCS " + (nC + 1) + (retry ? " · № " + retry : " (a retry)") + " fits here, strict clock." : "Same two timers. One Rule line per miss, in the UWorld note.";
       const st = RV("r" + i, t, w, revDef(pl)); st.blk = pl ? pl.id : null; st.blkInfo = pl;
       list.push(st);
@@ -574,7 +595,7 @@ function loadSettings() {
   P.setSound(S.sound);
 }
 function saveSettings() { P.writeJSON(LS_S, S); }
-function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, len: {}, order: [], rv: {}, scores: {}, v: DAYV, startedAt: 0, finishedAt: 0, updatedAt: 0 }; }
+function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, len: {}, order: [], rv: {}, scores: {}, v: DAYV, startedAt: 0, startSet: 0, finishedAt: 0, updatedAt: 0 }; }
 function persist(touch) { D.updatedAt = Date.now(); P.writeJSON(LS_D, D); if (touch !== false) P.live.touch(); }
 function history() { const h = P.readJSON(LS_H, []); return Array.isArray(h) ? h : []; }
 function spentRec(step, rec) { // [study, break] seconds a ticked step counts for: measured when it ran on a timer or in its page; the plan when it was ticked by hand; nothing when it was skipped before it began
@@ -604,6 +625,9 @@ function normDay() { // every field present, whichever page version or device sa
   if (!Array.isArray(D.order)) D.order = [];
   Object.keys(D.caseLen).forEach(id => { if (!(D.len[id] > 0) && D.caseLen[id] > 0) D.len[id] = D.caseLen[id]; });
   if (!TPLS.includes(D.tpl)) D.tpl = tplFor(D.date);
+  if (!(D.startSet > 0)) D.startSet = 0;
+  const bq = blockQ();                                             // a percent that the page before this one kept as a count (55 "correct" of 20) becomes the count again
+  Object.keys(D.scores).forEach(b => { const v = D.scores[b]; if (v > bq && v <= 100) D.scores[b] = P.countOf(v, bq); });
 }
 function adopt(p) { // today's state, from storage or from another device; true when it came from the page before this one
   const old = p.v !== DAYV;
@@ -731,7 +755,35 @@ function remainingPlanned(from) { // seconds of plan from the step on the card t
 
 /* ---------- actions ---------- */
 function rebuild() { STEPS = buildSteps(D.date, D.tpl); builtFor = ""; nowSig = ""; writeHandoff(); }
-function markStarted() { if (!D.startedAt) D.startedAt = Date.now(); }
+function markStarted(ts) { // the day began with the earliest thing that happened in it; a start time set by hand stays as set
+  if (D.startSet) return;
+  const lo = dayStart(D.date), now = Date.now();
+  const t = ts > 0 && ts >= lo && ts <= now ? ts : now;
+  if (!D.startedAt || t < D.startedAt) D.startedAt = t;
+}
+function healStart() { // the first block, review or case that ticked a step of this sheet began the day, wherever the sheet was opened first
+  if (D.startSet) return false;
+  const lo = dayStart(D.date), hi = lo + 86400000; let t0 = D.startedAt || 0;
+  P.loadSessions().forEach(x => { const to = D.consumed[x.id]; if (!to || to === "-") return; const t = new Date(x.date).getTime(); if (t >= lo && t < hi && (!t0 || t < t0)) t0 = t; });
+  if (t0 && t0 !== D.startedAt) { D.startedAt = t0; return true; }
+  return false;
+}
+function startClock() { // "HH:MM" for the time box: the real start, else the plan's
+  if (D.startedAt) { const d = new Date(D.startedAt); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+  const m = /^\s*(\d{1,2})(?::(\d{2}))?\s*([ap])?/i.exec(S.planStart || "");
+  if (!m) return "08:00";
+  let h = +m[1] % 24; const ap = (m[3] || "").toLowerCase();
+  if (ap === "p" && h < 12) h += 12; if (ap === "a" && h === 12) h = 0;
+  return pad(h) + ":" + pad(m[2] ? +m[2] : 0);
+}
+function setStart(hhmm) { // the start time typed by hand: today's date, or the night after it for an hour before the 4:00 AM turn of the day
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm || ""); if (!m) return false;
+  const h = +m[1], mi = +m[2]; if (h > 23 || mi > 59) return false;
+  const d = parseKey(D.date); if (!d) return false;
+  d.setHours(h, mi, 0, 0); if (h < ROLL_HOUR) d.setDate(d.getDate() + 1);
+  D.startedAt = d.getTime(); D.startSet = Date.now();
+  persist(); render(); return true;
+}
 function sharedMarker(stepId, b) { // the Day timer for a break step: points at the shared break and keeps a copy of it for the other devices
   b = b || P.breakGet() || {};
   const m = { stepId: stepId, shared: true, startAt: b.startAt || Date.now(), endAt: b.endAt || 0, sec: b.sec || 0, label: b.label || "", warned: false, reminded: 0 };
@@ -924,10 +976,13 @@ function doMealSwap() {
   }
   D.cur = sw.other.id; persist(); render();
 }
-function setScore(bid, raw) { // a block's score, typed on the review card: it orders the reviews and goes to the block's saved session
+function setScore(bid, raw) { // a block's score in percent, as UWorld shows it, typed on the review card: it orders the reviews and goes to the block's saved session (kept there as a count)
   raw = String(raw == null ? "" : raw).trim();
-  const v = raw === "" ? null : parseInt(raw, 10);
-  if (v != null && (isNaN(v) || v < 0 || v > 60)) { render(); return; }
+  const blk = dayScores.find(x => x.id === bid), nQ = (blk && blk.nQ) || blockQ();
+  const pct = raw === "" ? null : P.parsePct(raw);
+  if (raw !== "" && pct == null) { scoreMsg = "A score is a percent from 0 to 100 — “" + raw.slice(0, 8) + "” was not kept."; render(); return; }   // the box goes back to what it was
+  scoreMsg = "";
+  const v = pct == null ? null : P.countOf(pct, nQ);
   if (v == null) delete D.scores[bid]; else D.scores[bid] = v;
   const sid = Object.keys(D.consumed).find(k => D.consumed[k] === bid);
   if (sid && v != null) { const x = P.loadSessions().find(q => q.id === sid && q.type === "block"); if (x && x.correct !== v) { x.correct = v; P.saveSession(x); } }
@@ -1039,7 +1094,7 @@ function absorb() { // sessions and finished runs of today tick their steps, eac
   const start = dayStart(D.date), end = start + 86400000;
   const inDay = ts => ts >= start && ts < end;
   let changed = false;
-  const consume = (id, type, at, sess) => {
+  const consume = (id, type, at, sess, began) => {
     if (D.consumed[id] !== undefined) return;
     const cur = D.cur && stepById(D.cur);
     const step = (cur && !isDone(cur.id) && cur.kind === type) ? cur : firstUndone(type);
@@ -1052,7 +1107,7 @@ function absorb() { // sessions and finished runs of today tick their steps, eac
     if (D.timer && D.timer.stepId === step.id) clearTimer(false);
     if (type === "review" || type === "block") rebuild();              // the plan of the reviews follows
     const nxt = nextUndoneAfter(stepById(step.id) || step); D.cur = nxt ? nxt.id : null;
-    markStarted();
+    markStarted(sess ? new Date(sess.date).getTime() : began);
   };
   P.loadSessions().forEach(x => {
     const t = new Date(x.date).getTime();
@@ -1065,9 +1120,9 @@ function absorb() { // sessions and finished runs of today tick their steps, eac
       if (x.type === "review" && !D.rv[to]) { const st = stepById(to); if (st) { linkReview(st, x); rebuild(); } }
     }
   });
-  const b = P.readJSON("step3pacer.run.v1", null); if (b && b.phase === "done" && b.sid && inDay(b.startAt)) consume(b.sid, "block", b.startAt + (b.endEl || 0));
-  const r = P.readJSON("step3pacer.review.run.v1", null); if (r && r.phase === "done" && r.id && inDay(r.startAt)) consume(r.id, "review", Date.now());
-  const c = P.readJSON("step3pacer.ccs.run.v1", null); if (c && c.phase === "done" && c.id && inDay(c.startAt) && (c.saved || (c.rev && c.rev.endAt))) consume(c.id, "ccs", Date.now());
+  const b = P.readJSON("step3pacer.run.v1", null); if (b && b.phase === "done" && b.sid && inDay(b.startAt)) consume(b.sid, "block", b.startAt + (b.endEl || 0), null, b.startAt);
+  const r = P.readJSON("step3pacer.review.run.v1", null); if (r && r.phase === "done" && r.id && inDay(r.startAt)) consume(r.id, "review", Date.now(), null, r.startAt);
+  const c = P.readJSON("step3pacer.ccs.run.v1", null); if (c && c.phase === "done" && c.id && inDay(c.startAt) && (c.saved || (c.rev && c.rev.endAt))) consume(c.id, "ccs", Date.now(), null, c.startAt);
   // a block, review or case running right now: the breaks and meals right before its step are over, and the card follows it
   toolRuns().filter(r => !r.where || r.fresh).forEach(r => {
     if (D.consumed["brk:" + r.id] !== undefined) return;             // this run was handled once already
@@ -1090,8 +1145,9 @@ function absorb() { // sessions and finished runs of today tick their steps, eac
       if (mine) clearTimer(false);
     }
     if (!D.timer || (D.timer.shared && !P.breakGet())) D.cur = target.id;
-    markStarted();
+    markStarted(r.startAt);
   });
+  if (healStart()) changed = true;
   if (changed) {
     if (allDone()) { D.finishedAt = D.finishedAt || Date.now(); }
     else { // a task finished in its own page → the break that page started is the shared one: the step on the card takes it, at the step's own length
@@ -1215,7 +1271,8 @@ function render() {
   const tplName = { tonight: "tonight's list", rehearsal: "rehearsal day", between: "between exam days", interface: "interface day", minimum: "minimum day", exam: "exam day", off: "day off" }[D.tpl];
   const tail = D.tpl === "exam" ? (cdn || tplName) : [cdn, tplName].filter(Boolean).join(" · ");
   $("tagline").textContent = dayLabel(D.date) + (tail ? " · " + tail : "");
-  $("planStart").textContent = S.planStart || "8:00 AM"; $("planEnd").textContent = S.planEnd || "~10:00 PM";
+  $("startLbl").textContent = D.startedAt ? "Started" : "Start";
+  $("planStart").textContent = D.startedAt ? clockOf(D.startedAt) : (S.planStart || "8:00 AM"); $("planEnd").textContent = S.planEnd || "~10:00 PM";
   renderProjection(now, c, runs, step);
   renderNow(now, c, step, runs);
   renderTotals(now, c, runs);
@@ -1236,7 +1293,7 @@ function renderProjection(now, c, runs, step) {
     if (step.tool === "review" && run.sub !== "stand") rem += step.brk;
   }
   const endAt = now + Math.max(0, rem) * 1000;
-  el.innerHTML = (D.startedAt ? "Started <b>" + esc(clockOf(D.startedAt)) + "</b> · " : "") + "steps left: <b>" + esc(fmtH(Math.max(0, rem))) + "</b> → done at <b>" + esc(clockOf(endAt)) + "</b>";   // plain arithmetic: now + the lengths of the steps from the card to the end of the list
+  el.innerHTML = "steps left: <b>" + esc(fmtH(Math.max(0, rem))) + "</b> → done at <b>" + esc(clockOf(endAt)) + "</b>";   // plain arithmetic: now + the lengths of the steps from the card to the end of the list
   el.className = "proj";
 }
 function btn(label, cls, id, extra) { return '<button type="button" class="' + (cls || "") + '" data-act="' + id + '"' + (extra || "") + ">" + label + "</button>"; }
@@ -1252,7 +1309,7 @@ function lenRow(step) { // the length buttons that fit the step: the two case cl
   return pm;
 }
 const TOOL_PAGE = { block: ["Block", "./"], review: ["Review", "./review.html"], ccs: ["CCS", "./ccs.html"] };
-let nowSig = "", stripSig = "", scoreSig = "";
+let nowSig = "", stripSig = "", scoreSig = "", scoreMsg = "";
 function renderScores(step, mode) { // on a review card: the scores of today's blocks, typed once; the reviews then line up lowest first
   const el = $("nowScores");
   const nB = STEPS.filter(s => s.kind === "block" && /^b\d+$/.test(s.id)).length;
@@ -1260,17 +1317,18 @@ function renderScores(step, mode) { // on a review card: the scores of today's b
   const sig = D.date + "|" + nB;
   if (scoreSig !== sig || !el.firstChild) {
     scoreSig = sig;
-    let h = '<span class="lbl">Today’s scores (correct answers) — the reviews line up lowest first</span><div class="srow">';
-    for (let i = 1; i <= nB; i++) h += "<label>B" + i + '<input type="number" inputmode="numeric" min="0" max="60" data-b="b' + i + '" aria-label="Block ' + i + ', correct answers"></label>';
-    el.innerHTML = h + "</div>";
+    let h = '<span class="lbl">Today’s scores in <b>%</b> — as UWorld shows them. The reviews line up lowest first.</span><div class="srow">';
+    for (let i = 1; i <= nB; i++) h += "<label>B" + i + ' %<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="%" data-b="b' + i + '" aria-label="Block ' + i + ', score in percent"></label>';
+    el.innerHTML = h + '</div><p class="msg" hidden></p>';
     el.querySelectorAll("input").forEach(inp => {
       inp.addEventListener("change", () => setScore(inp.dataset.b, inp.value));
       inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });
     });
   }
   el.hidden = false;
-  const sc = {}; dayScores.forEach(b => { sc[b.id] = b.correct; });
+  const sc = {}; dayScores.forEach(b => { sc[b.id] = b.correct != null ? P.pctOf(b.correct, b.nQ) : null; });
   el.querySelectorAll("input").forEach(inp => { if (document.activeElement === inp) return; const v = sc[inp.dataset.b] != null ? String(sc[inp.dataset.b]) : ""; if (inp.value !== v) inp.value = v; });
+  const msg = el.querySelector(".msg"); if (msg) { if (msg.textContent !== scoreMsg) msg.textContent = scoreMsg; msg.hidden = !scoreMsg; }
 }
 function renderNow(now, c, step, runs) {
   const box = $("now");
@@ -1315,7 +1373,7 @@ function renderNow(now, c, step, runs) {
     $("nowWhy").textContent = step.w;
     const caseEl = $("nowCase");
     if (step.kind === "ccs" && step.caseNum) { caseEl.hidden = false; caseEl.innerHTML = '<span class="casenum">Case number <b>' + esc(step.caseNum) + "</b></span>"; }
-    else if (step.tool === "review" && bi) { caseEl.hidden = false; caseEl.innerHTML = '<span class="casenum">Review block <b>' + bi.n + "</b>" + (bi.correct != null ? " · " + bi.correct + "/" + bi.nQ : "") + "</span>"; }
+    else if (step.tool === "review" && bi) { caseEl.hidden = false; caseEl.innerHTML = '<span class="casenum">Review block <b>' + bi.n + "</b>" + (bi.correct != null ? " · " + pctText(bi) + " · " + bi.correct + " of " + bi.nQ : "") + "</span>"; }
     else caseEl.hidden = true;
     const tp = step.tool ? TOOL_PAGE[step.tool] : null;
     $("nowLinks").innerHTML = (tp && mode !== "mirror" ? '<a href="' + tp[1] + '">Open the ' + tp[0] + " page ↗</a>" : "") +
@@ -1531,6 +1589,10 @@ function init() {
   $("btnApply").addEventListener("click", applySettings);
   $("btnCalReset").addEventListener("click", () => { $("fCal").value = CAL_DEFAULT; settingsMsg("Calendar reset to the plan — press Save settings."); });
   $("btnNewDay").addEventListener("click", newDay);
+  const openStart = open => { $("startEdit").hidden = !open; $("startBadge").setAttribute("aria-expanded", open ? "true" : "false"); if (open) { $("startIn").value = startClock(); $("startNote").textContent = "The Day total counts from this time. It stays as you set it, on every device."; try { $("startIn").focus(); } catch (e) {} } };
+  $("startBadge").addEventListener("click", () => openStart($("startEdit").hidden));
+  $("startCancel").addEventListener("click", () => openStart(false));
+  $("startEdit").addEventListener("submit", e => { e.preventDefault(); if (setStart($("startIn").value)) openStart(false); else $("startNote").textContent = "Pick the hour and the minute, then Save."; });
   $("fTheme").addEventListener("change", () => P.setTheme($("fTheme").value));
   document.addEventListener("keydown", e => {
     const t = e.target, tag = t && t.tagName;

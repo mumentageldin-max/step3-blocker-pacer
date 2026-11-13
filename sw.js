@@ -3,7 +3,7 @@
    Holds the pacer's upcoming events while the page is hidden and shows them as notifications (best effort:
    the browser may stop an idle worker, so the page re-checks on return). Bump VERSION whenever a page changes
    so installed copies pick up the update. */
-const VERSION = "pacer-v18";
+const VERSION = "pacer-v19";
 const FONT_CACHE = "pacer-fonts";
 const SHELL = [
   "./",
@@ -39,7 +39,7 @@ const SHELL = [
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(VERSION).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(VERSION).then(cache => cache.addAll(SHELL.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting())   // fresh copies, not the browser's ten-minute-old ones
   );
 });
 

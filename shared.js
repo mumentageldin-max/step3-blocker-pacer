@@ -85,6 +85,28 @@ window.Pacer = (() => {
     return Array.from(map.values()).sort((x, y) => new Date(x.date) - new Date(y.date));
   }
 
+  /* ---------- scores: typed as a percent (what UWorld shows), kept as a count ---------- */
+  function pctOf(correct, nQ) { nQ = nQ > 0 ? nQ : 20; return correct == null || isNaN(correct) ? null : Math.round(correct / nQ * 100); }
+  function countOf(pct, nQ) { nQ = nQ > 0 ? nQ : 20; return pct == null || isNaN(pct) ? null : Math.max(0, Math.min(nQ, Math.round(pct / 100 * nQ))); }
+  function parsePct(raw) { // "65", "65%", " 65 % ", "62.5" → the number; empty, or not a number from 0 to 100 → null
+    const m = /^\s*(\d{1,3}(?:[.,]\d+)?)\s*%?\s*$/.exec(String(raw == null ? "" : raw));
+    if (!m) return null;
+    const v = parseFloat(m[1].replace(",", "."));
+    return v >= 0 && v <= 100 ? v : null;
+  }
+  function repairScores() { // a percent that an earlier version kept as a count ("55 correct of 20"): the count is put back (11 of 20)
+    try {
+      const arr = loadSessions(); let n = 0;
+      arr.forEach(s => {
+        if (s.type !== "block" || s.correct == null) return;
+        const nQ = s.nQ > 0 ? s.nQ : 20;
+        if (s.correct > nQ && s.correct <= 100) { s.correct = countOf(s.correct, nQ); s.updatedAt = Date.now(); n++; }
+      });
+      if (n) saveSessions(arr);
+      return n;
+    } catch (e) { return 0; }
+  }
+
   /* ---------- theme ---------- */
   function getTheme() { const t = readJSON(KEYS.theme, "system"); return (t === "light" || t === "dark") ? t : "system"; }
   function setTheme(t) { writeJSON(KEYS.theme, t); applyTheme(); }
@@ -247,8 +269,9 @@ window.Pacer = (() => {
           try { const parsed = JSON.parse(content); remote = Array.isArray(parsed) ? parsed : (parsed.sessions || []); } catch (e) { remote = []; }
         }
       }
-      const merged = mergeSessions(loadSessions(), remote);
+      let merged = mergeSessions(loadSessions(), remote);
       saveSessions(merged);
+      if (repairScores()) merged = loadSessions();
       const payload = JSON.stringify({ app: "step3-pacer", savedAt: new Date().toISOString(), sessions: merged });
       if (gistId) {
         await gh("/gists/" + gistId, { method: "PATCH", body: JSON.stringify({ files: { [GIST_FILE]: { content: payload } } }) });
@@ -674,11 +697,26 @@ window.Pacer = (() => {
   }
 
   const api = { KEYS, fmt, fmtSigned, parseMS, todayKey, fmtDate, fmtDay, fmtClock, newId, esc, readJSON, writeJSON,
-    loadSessions, saveSessions, saveSession, deleteSession, mergeSessions,
+    loadSessions, saveSessions, saveSession, deleteSession, mergeSessions, pctOf, countOf, parsePct, repairScores,
     getTheme, setTheme, applyTheme, setSound, getVolume, setVolume, audioInit, sfx, sfxLater, vibrate, keepAwake, releaseWake,
     renderNav, notice, getSync, setSync, syncNow, syncQuietly, loadParking, saveParking, standalone,
     device, setDeviceName, isIOS, isAndroid, live, bg, getBg, setBg, notifSupported, notifStatus, notifRequest, notifArm, notifDisarm,
     keepAliveStart, keepAliveStop, keepAliveActive, pipSupported, pipStart, pipStop, pipActive, renderBgSettings,
     getBreaks, setBreaks, breakGet, breakStart, breakStop, breakExtend, breakLeft, renderBreak, renderBreakSettings };
+  repairScores();
+  /* a new version took over this page's files: say so once, with a button — nothing reloads by itself */
+  try {
+    if ("serviceWorker" in navigator) {
+      const had = !!navigator.serviceWorker.controller; let told = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!had || told) return; told = true;
+        const n = notice("The pacer was updated. Reload to use the new version — timers and ticks stay.", "good", 600000);
+        if (!n) return;
+        const b = document.createElement("button"); b.type = "button"; b.textContent = "Reload"; b.className = "reload";
+        b.addEventListener("click", () => location.reload());
+        n.insertBefore(b, n.lastChild);
+      });
+    }
+  } catch (e) {}
   return api;
 })();

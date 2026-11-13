@@ -161,7 +161,7 @@
       <ul class="stats" id="stats"></ul>
       <div class="form">
         <label>System / label<input type="text" id="sumLabel" placeholder="Cardio · Random · Ethics…" autocomplete="off"></label>
-        <label>Correct (from the results page)<input type="number" id="sumCorrect" min="0" max="60" inputmode="numeric" placeholder="13"></label>
+        <label>Score % (UWorld)<input type="text" id="sumCorrect" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="65"></label>
       </div>
       <p class="note" id="savedNote">Saved to Stats. The label and score carry over to the Review pacer.</p>
       <div class="formrow">
@@ -551,7 +551,7 @@ function renderSummary() {
     "<li><b>" + fmt(avg) + "</b> average per question</li>" +
     "<li><b>" + flagSegs + "</b> segment" + (flagSegs === 1 ? "" : "s") + " in flag-at-" + S.flagSec + "</li>" +
     "<li><b>" + fmt(reviewSec) + "</b> left at Q" + S.nQ + " for flagged review</li>";
-  $("sumLabel").value = R.label || ""; $("sumCorrect").value = R.correct != null ? R.correct : "";
+  $("sumLabel").value = R.label || ""; $("sumCorrect").value = R.correct != null ? P.pctOf(R.correct, S.nQ) : "";
   $("btnReopen").hidden = !(R.endedBy !== "clock" && R.endedBy !== "me" && R.taps.length && (Date.now() - R.startAt - R.pausedTotal) < S.blockSec * 1000);
 }
 function summaryText() {
@@ -608,7 +608,7 @@ function init() {
   $("fTheme").addEventListener("change", () => P.setTheme($("fTheme").value));
   document.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => applyPreset(b.dataset.preset)));
   $("sumLabel").addEventListener("change", () => { R.label = $("sumLabel").value.trim(); persistRun(); saveBlockSession(); });
-  $("sumCorrect").addEventListener("change", () => { const v = $("sumCorrect").value.trim(); const n = parseInt(v, 10); R.correct = (v === "" || isNaN(n)) ? null : Math.max(0, Math.min(S.nQ, n)); $("sumCorrect").value = R.correct == null ? "" : R.correct; persistRun(); saveBlockSession(); });
+  $("sumCorrect").addEventListener("change", () => { R.correct = P.countOf(P.parsePct($("sumCorrect").value), S.nQ); $("sumCorrect").value = R.correct == null ? "" : P.pctOf(R.correct, S.nQ); persistRun(); saveBlockSession(); });   // typed as the percent UWorld shows, kept as a count
   $("btnReview").addEventListener("click", () => { location.href = "./review.html"; });
   $("btnReopen").addEventListener("click", reopenBlock);
   $("btnCopy").addEventListener("click", async e => {
