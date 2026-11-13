@@ -289,13 +289,15 @@ window.Pacer = (() => {
   function syncQuietly() { if (getSync().token) syncNow().catch(() => {}); }
 
   /* ---------- live sync: the run in progress, shared through a second file in the same gist ----------
+     A page that binds with merge() (the Day page) is never replaced: the other device's copy is merged into this
+     one on every pull and before every push, and pulled() tells the page that the answer has arrived.
      Slot per page type: { state, deviceId, deviceName, savedAt, done }. The remote slot wins when it is newer
      than the local run and came from another device; a finished run is pushed with done:true so that other
      devices stop reviving it. Nothing here ever blocks the UI: one pull on load / on becoming visible, one every
      60 s while a run is active, one push (debounced 2 s) after a state change. */
   const live = (() => {
     let B = null;                       // the page binding
-    let doc = null, pushTimer = 0, lastPushedStr = "", lastPushAt = 0, lastTouch = 0, lastError = "", pulling = false, pushing = false, pollN = 0;
+    let doc = null, pushTimer = 0, lastPushedStr = "", lastPushAt = 0, lastTouch = 0, lastError = "", pulling = false, pushing = false, pollN = 0, mergePushes = 0;
     const STALE = 6 * 3600 * 1000;
     function on() { return !!getSync().token; }
     function status(text, cls) {
@@ -332,11 +334,16 @@ window.Pacer = (() => {
     async function push() {
       if (!B || !on()) { status(); return; }
       if (pushing) { touch(); return; }
-      const slot = slotFor(), str = JSON.stringify(slot.state) + "|" + slot.done;
+      let slot = slotFor(), str = JSON.stringify(slot.state) + "|" + slot.done;
       if (str === lastPushedStr) return;
       pushing = true;
       try {
         const d = (await fetchDoc()) || {};
+        if (B.merge) {                                                  // a page whose copies are merged: what the other device knows joins this copy before anything is written over it
+          const r = d[B.type];
+          if (r && r.state && r.deviceId !== device().id) { try { B.merge(r.state, r); } catch (e) { console.warn("live: merge before push failed", e); } }
+          slot = slotFor(); str = JSON.stringify(slot.state) + "|" + slot.done;
+        }
         d[B.type] = slot;
         const id = getSync().gistId;
         await gh("/gists/" + id, { method: "PATCH", body: JSON.stringify({ files: { [LIVE_FILE]: { content: JSON.stringify(d) } } }) });
@@ -345,7 +352,7 @@ window.Pacer = (() => {
       finally { pushing = false; status(); }
     }
     function touch() { // state changed: schedule a push
-      lastTouch = Date.now();
+      lastTouch = Date.now(); mergePushes = 0;
       if (!B || !on()) return;
       clearTimeout(pushTimer); pushTimer = setTimeout(push, 2000);
     }
@@ -368,7 +375,13 @@ window.Pacer = (() => {
         const d = await fetchDoc();
         lastError = "";
         const slot = d && d[B.type];
-        if (consider(slot)) {
+        if (B.merge) {                                                  // merged, never replaced: nothing that was ticked or measured on either device is lost
+          if (slot && slot.state && slot.deviceId !== device().id) {
+            const res = B.merge(slot.state, slot) || {};
+            if (res.differs && mergePushes < 6) { mergePushes++; clearTimeout(pushTimer); pushTimer = setTimeout(push, 1500); }   // this device knows something the shared copy does not (at most six times in a row without a change made here)
+            else lastPushedStr = JSON.stringify(B.get()) + "|" + !B.active();
+          }
+        } else if (consider(slot)) {
           lastPushedStr = JSON.stringify(slot.state) + "|" + slot.done;  // no echo push of what we just adopted
           B.apply(slot.state, slot);
           if (!slot.done) {
@@ -377,7 +390,7 @@ window.Pacer = (() => {
           } else notice("The " + B.noun + " was finished on your " + (slot.deviceName || "other device") + ".", "info");
         }
       } catch (e) { lastError = String(e.message || e); }
-      finally { pulling = false; status(); }
+      finally { pulling = false; status(); if (B.pulled) { try { B.pulled(); } catch (e) {} } }
     }
     function bind(b) {
       B = b; B.noun = B.noun || B.type;

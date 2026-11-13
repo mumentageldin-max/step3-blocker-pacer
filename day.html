@@ -595,8 +595,8 @@ function loadSettings() {
   P.setSound(S.sound);
 }
 function saveSettings() { P.writeJSON(LS_S, S); }
-function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, len: {}, order: [], rv: {}, scores: {}, v: DAYV, startedAt: 0, startSet: 0, finishedAt: 0, updatedAt: 0 }; }
-function persist(touch) { D.updatedAt = Date.now(); P.writeJSON(LS_D, D); if (touch !== false) P.live.touch(); }
+function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, len: {}, order: [], rv: {}, scores: {}, st: {}, epoch: 0, v: DAYV, startedAt: 0, startSet: 0, finishedAt: 0, updatedAt: 0 }; }
+function persist(touch) { stampGroups(); D.updatedAt = Date.now(); P.writeJSON(LS_D, D); if (touch !== false) P.live.touch(); }
 function history() { const h = P.readJSON(LS_H, []); return Array.isArray(h) ? h : []; }
 function spentRec(step, rec) { // [study, break] seconds a ticked step counts for: measured when it ran on a timer or in its page; the plan when it was ticked by hand; nothing when it was skipped before it began
   if (!rec || !rec.done) return [0, 0];
@@ -621,7 +621,8 @@ function archive(day) { // keep a finished day for the calendar: what was ticked
   P.writeJSON(LS_H, h.slice(-90));
 }
 function normDay() { // every field present, whichever page version or device saved the day
-  ["steps", "consumed", "manual", "caseLen", "len", "rv", "scores"].forEach(f => { if (!D[f] || typeof D[f] !== "object" || Array.isArray(D[f])) D[f] = {}; });
+  ["steps", "consumed", "manual", "caseLen", "len", "rv", "scores", "st"].forEach(f => { if (!D[f] || typeof D[f] !== "object" || Array.isArray(D[f])) D[f] = {}; });
+  if (!(D.epoch > 0)) D.epoch = 0;
   if (!Array.isArray(D.order)) D.order = [];
   Object.keys(D.caseLen).forEach(id => { if (!(D.len[id] > 0) && D.caseLen[id] > 0) D.len[id] = D.caseLen[id]; });
   if (!TPLS.includes(D.tpl)) D.tpl = tplFor(D.date);
@@ -629,12 +630,13 @@ function normDay() { // every field present, whichever page version or device sa
   const bq = blockQ();                                             // a percent that the page before this one kept as a count (55 "correct" of 20) becomes the count again
   Object.keys(D.scores).forEach(b => { const v = D.scores[b]; if (v > bq && v <= 100) D.scores[b] = P.countOf(v, bq); });
 }
-function adopt(p) { // today's state, from storage or from another device; true when it came from the page before this one
-  const old = p.v !== DAYV;
+function adopt(p) { // today's state from storage; true when it came from the page before this one
+  const old = p.v !== DAYV, legacy = !p.st || typeof p.st !== "object";
   D = Object.assign(freshDay(p.date), p); normDay();
   if (old) { try { fitOldDay(); } catch (e) { console.warn("day: could not fit the earlier list", e); } }
+  if (legacy) legacyStamps();
   D.v = DAYV;
-  return old;
+  return old || legacy;
 }
 function fitOldDay() { // a day begun on the earlier page (4 blocks, the cases between the reviews): its ticks are fitted to the order of today's list, once
   if (D.tpl !== "study") return;
@@ -701,14 +703,15 @@ function loadDay() {
   else { if (p && typeof p === "object" && p.date) { try { D = Object.assign(freshDay(p.date), p); normDay(); archive(D); } catch (e) { console.warn("day: could not archive the earlier day", e); } } D = freshDay(k); }
   if (S.tpl !== "auto" && D.tpl !== S.tpl && !anyDoneRaw(D)) D.tpl = S.tpl;
   STEPS = buildSteps(D.date, D.tpl);
-  if (save) persist(false);
+  takeSnap();                                                       // from here on, a group that changes was changed on this device
+  if (save) P.writeJSON(LS_D, D);
 }
 function anyDoneRaw(day) { return Object.keys(day.steps || {}).some(id => day.steps[id] && day.steps[id].done); }
 function rollover() { // called every tick: a new day (after 4:00 AM) gets a fresh sheet
   const k = keyOf(Date.now());
   if (D.date === k) return false;
   if (D.timer) { clearTimer(false); }
-  archive(D); D = freshDay(k); rebuild();
+  archive(D); D = freshDay(k); rebuild(); takeSnap();
   persist(); return true;
 }
 
@@ -753,6 +756,91 @@ function remainingPlanned(from) { // seconds of plan from the step on the card t
   return sum;
 }
 
+
+/* ---------- one day on several devices: the copies are merged, never replaced ----------
+   Ticks: per step, the last word wins — a tick newer than a hand untick, and of two ticks the later one.
+   Sessions that ticked a step: the union. Timer, card, order, lengths, scores, which block a review is for: each has
+   the moment it last changed on the device where it changed, and the later one wins. The start: a time set by hand,
+   else the earliest. "Today starts over" opens a new sheet (epoch) that ends the one before on every device. */
+const GROUPS = ["timer", "cur", "order", "len", "rv", "scores", "tpl"];
+const ME = P.device().id;
+let snap = {};                    // each group as it was last written here: a group that changed on this device gets this moment as its stamp
+let mergeTold = false, absorbHold = 0;
+function clone(x) { return x == null ? x : JSON.parse(JSON.stringify(x)); }
+function gval(d, g) { const v = d[g]; return v === undefined ? null : v; }
+function gempty(v) { return v == null || v === "" || (Array.isArray(v) ? !v.length : (typeof v === "object" && !Object.keys(v).length)); }
+function gstamp(d, g) { return d.st && d.st[g] > 0 ? d.st[g] : 0; }
+function takeSnap() { GROUPS.forEach(g => { snap[g] = JSON.stringify(gval(D, g)); }); }
+function stampGroups() { const now = Date.now(); if (!D.st || typeof D.st !== "object") D.st = {}; GROUPS.forEach(g => { const s = JSON.stringify(gval(D, g)); if (s !== snap[g]) { D.st[g] = now; snap[g] = s; } }); }
+function sorted(x) { if (Array.isArray(x)) return x.map(sorted); if (x && typeof x === "object") { const o = {}; Object.keys(x).sort().forEach(k => { o[k] = sorted(x[k]); }); return o; } return x; }
+function canonStr(x) { return JSON.stringify(sorted(x === undefined ? null : x)); }
+function canonDay(d) { const o = Object.assign({}, d); delete o.updatedAt; delete o.finishedAt; delete o.v; delete o.caseLen; return canonStr(o); }
+function recQ(r) { return (r.study != null || r.brk != null || r.sec != null) ? 1 : 0; }
+function betterRec(a, b) { // of two ticks of one step: the later one (the last word); at the same moment, the measured one
+  if (!a) return b; if (!b) return a;
+  const ta = a.at || 0, tb = b.at || 0; if (ta !== tb) return ta > tb ? a : b;
+  const qa = recQ(a), qb = recQ(b); if (qa !== qb) return qa > qb ? a : b;
+  return canonStr(a) >= canonStr(b) ? a : b;
+}
+function normOf(p) { // another copy of the day with every field present, as this page keeps it
+  const keep = D, legacy = !p.st || typeof p.st !== "object";
+  D = Object.assign(freshDay(p.date), clone(p)); normDay(); if (legacy) legacyStamps();
+  const out = D; D = keep; return out;
+}
+function legacyStamps() { D.st = {}; GROUPS.forEach(g => { if (!gempty(gval(D, g))) D.st[g] = D.updatedAt || 1; }); }   // a copy from the page before this one: what it holds counts as changed when the copy was last saved; what is empty never wins
+function mergeDay(A, B) {
+  const ea = A.epoch || 0, eb = B.epoch || 0;
+  if (ea !== eb) { if (ea > eb) B = A; else A = B; }               // "Today starts over" on one device: the sheet from before is over everywhere
+  const M = freshDay(A.date); M.epoch = Math.max(ea, eb);
+  const ids = {}; [A.steps, B.steps, A.manual, B.manual].forEach(o => Object.keys(o || {}).forEach(k => { ids[k] = 1; }));
+  Object.keys(ids).sort().forEach(id => {
+    const ra = A.steps[id] && A.steps[id].done ? A.steps[id] : null, rb = B.steps[id] && B.steps[id].done ? B.steps[id] : null;
+    const un = Math.max((A.manual && A.manual[id]) || 0, (B.manual && B.manual[id]) || 0);
+    const r = betterRec(ra && (ra.at || 1) > un ? ra : null, rb && (rb.at || 1) > un ? rb : null);   // a tick older than a hand untick is over
+    if (r) M.steps[id] = clone(r);
+    if (un) M.manual[id] = un;                                      // the untick stays on record, so an older tick from another device cannot come back
+  });
+  const keys = {}; [A.consumed, B.consumed].forEach(o => Object.keys(o || {}).forEach(k => { keys[k] = 1; }));
+  Object.keys(keys).sort().forEach(k => {                           // which block, review or case belongs to which step: a link either copy knows is kept; two different links, the same choice on every device
+    const c = [A.consumed[k], B.consumed[k]].filter(v => v && v !== "-").sort();
+    M.consumed[k] = c.length ? c[0] : "-";
+  });
+  GROUPS.forEach(g => {
+    const va = gval(A, g), vb = gval(B, g), sa = gstamp(A, g), sb = gstamp(B, g);
+    const a = sa !== sb ? sa > sb : gempty(va) !== gempty(vb) ? !gempty(va) : canonStr(va) >= canonStr(vb);
+    M[g] = clone(a ? va : vb);
+    if (Math.max(sa, sb) > 0) M.st[g] = Math.max(sa, sb);
+  });
+  if (!TPLS.includes(M.tpl)) M.tpl = tplFor(M.date);
+  if (!Array.isArray(M.order)) M.order = [];
+  ["len", "rv", "scores"].forEach(f => { if (!M[f] || typeof M[f] !== "object" || Array.isArray(M[f])) M[f] = {}; });
+  const sa = A.startSet || 0, sb = B.startSet || 0;
+  if (sa || sb) { const W = sa !== sb ? (sa > sb ? A : B) : ((A.startedAt || 0) <= (B.startedAt || 0) ? A : B); M.startSet = W.startSet; M.startedAt = W.startedAt || 0; }   // set by hand: the latest setting
+  else { const xs = [A.startedAt, B.startedAt].filter(x => x > 0); M.startedAt = xs.length ? Math.min.apply(null, xs) : 0; M.startSet = 0; }                              // else the earliest
+  M.finishedAt = Math.max(A.finishedAt || 0, B.finishedAt || 0);
+  M.updatedAt = Math.max(A.updatedAt || 0, B.updatedAt || 0);
+  return M;
+}
+function applyMerge(remote, slot) { // the other device's copy of today joins this one
+  const none = { changed: false, differs: false };
+  if (!remote || typeof remote !== "object" || remote.date !== D.date || remote.date !== keyOf(Date.now())) return none;
+  stampGroups();
+  const R = normOf(remote), rcanon = canonDay(R), before = canonDay(D), doneBefore = Object.keys(D.steps).length, oldT = D.timer ? clone(D.timer) : null;
+  const M = mergeDay(D, R), after = canonDay(M);
+  const res = { changed: after !== before, differs: after !== rcanon };
+  if (!res.changed) return res;
+  D = M; normDay();
+  takeSnap();                                                       // what came from the other device is not a change made here
+  if (oldT && oldT.shared && !(D.timer && D.timer.shared && D.timer.startAt === oldT.startAt)) { const bk = P.breakGet(); if (bk && bk.startAt === oldT.startAt) P.breakStop(); }   // the break this device was showing was ended on the other one
+  if (D.timer && D.steps[D.timer.stepId] && D.steps[D.timer.stepId].done) { clearTimer(true); stampGroups(); res.differs = true; }   // its step was ticked on the other device: nothing left to count — a change made here, so it is passed on
+  rebuild(); if (!allDone()) D.finishedAt = 0;
+  P.writeJSON(LS_D, D);
+  const c = cd(); if (c && c.kind !== "wait" && !c.paused) { P.keepAwake(); P.bg.runStart(c.step.t); } else if (oldT && !D.timer) { P.releaseWake(); P.bg.runEnd(); }
+  lastAbsorb = 0; render();
+  if (!mergeTold && (Object.keys(D.steps).length > doneBefore || (!oldT && D.timer))) { mergeTold = true; P.notice("Today's ticks from your " + ((slot && slot.deviceName) || "other device") + " are here.", "good", 6000); }
+  return res;
+}
+
 /* ---------- actions ---------- */
 function rebuild() { STEPS = buildSteps(D.date, D.tpl); builtFor = ""; nowSig = ""; writeHandoff(); }
 function markStarted(ts) { // the day began with the earliest thing that happened in it; a start time set by hand stays as set
@@ -786,7 +874,7 @@ function setStart(hhmm) { // the start time typed by hand: today's date, or the 
 }
 function sharedMarker(stepId, b) { // the Day timer for a break step: points at the shared break and keeps a copy of it for the other devices
   b = b || P.breakGet() || {};
-  const m = { stepId: stepId, shared: true, startAt: b.startAt || Date.now(), endAt: b.endAt || 0, sec: b.sec || 0, label: b.label || "", warned: false, reminded: 0 };
+  const m = { stepId: stepId, shared: true, startAt: b.startAt || Date.now(), endAt: b.endAt || 0, sec: b.sec || 0, label: b.label || "", warned: false, reminded: 0, dev: ME };
   if (b.startAt) markBrkSeen(m);
   return m;
 }
@@ -806,7 +894,7 @@ function startStep(step, part) {
     D.timer = sharedMarker(step.id, b);
   } else {
     P.breakStop();                                                 // a task starts: any break is over
-    D.timer = { stepId: step.id, part: part, startAt: now, pausedAt: 0, pausedTotal: 0, extra: 0, warned: false, chimed: false, reminded: 0, waiting: false, acc: [0, 0], banked: -1, bankAmt: 0 };
+    D.timer = { stepId: step.id, part: part, startAt: now, pausedAt: 0, pausedTotal: 0, extra: 0, warned: false, chimed: false, reminded: 0, waiting: false, acc: [0, 0], banked: -1, bankAmt: 0, dev: ME };
   }
   if (step.tool === "review" && step.blk) D.rv[step.id] = step.blk;   // this review is for that block from here on, whatever the other scores turn out to be
   D.cur = step.id; markStarted();
@@ -985,7 +1073,7 @@ function setScore(bid, raw) { // a block's score in percent, as UWorld shows it,
   const v = pct == null ? null : P.countOf(pct, nQ);
   if (v == null) delete D.scores[bid]; else D.scores[bid] = v;
   const sid = Object.keys(D.consumed).find(k => D.consumed[k] === bid);
-  if (sid && v != null) { const x = P.loadSessions().find(q => q.id === sid && q.type === "block"); if (x && x.correct !== v) { x.correct = v; P.saveSession(x); } }
+  if (sid) { const x = P.loadSessions().find(q => q.id === sid && q.type === "block"); if (x && x.correct !== v && !(x.correct == null && v == null)) { x.correct = v; P.saveSession(x); } }   // an emptied box empties the session's score too
   rebuild(); persist(); render();
 }
 function pauseResume() {
@@ -1011,7 +1099,7 @@ function newDay() {
   if (newDayArmed && Date.now() - newDayArmed < 3500) {
     newDayArmed = 0;
     if (D.timer) clearTimer(true);
-    D = freshDay(keyOf(Date.now())); if (S.tpl !== "auto") D.tpl = S.tpl; rebuild();
+    D = freshDay(keyOf(Date.now())); if (S.tpl !== "auto") D.tpl = S.tpl; D.epoch = Date.now(); rebuild(); takeSnap();   // a new sheet: the one from before is over on every device
     // what the other pages saved earlier today stays theirs: a blank sheet does not re-tick it
     const start = dayStart(D.date), end = start + 86400000;
     P.loadSessions().forEach(x => { const t = new Date(x.date).getTime(); if (t >= start && t < end) D.consumed[x.id] = "-"; });
@@ -1101,6 +1189,7 @@ function absorb() { // sessions and finished runs of today tick their steps, eac
     if (!step) { D.consumed[id] = "-"; changed = true; return; }
     const rec = { done: true, at: at || Date.now(), src: "tool", sec: null };
     if (sess) { const sp = toolSpent(sess); rec.study = sp[0]; rec.brk = sp[1]; rec.sec = sp[0] + sp[1]; }   // the time it really took, as its page measured it
+    if (D.manual[step.id]) { if (!(rec.at > D.manual[step.id])) rec.at = D.manual[step.id] + 1; delete D.manual[step.id]; }   // it had been unticked by hand: this tick is the newer word
     D.steps[step.id] = rec;
     D.consumed[id] = step.id; changed = true;
     if (type === "review") linkReview(step, sess);
@@ -1120,6 +1209,15 @@ function absorb() { // sessions and finished runs of today tick their steps, eac
       if (x.type === "review" && !D.rv[to]) { const st = stepById(to); if (st) { linkReview(st, x); rebuild(); } }
     }
   });
+  // a block's score lives with its session (Block and Review pages) and with the day (so it reaches a device that does not have the session): the newer of the two is copied to the other
+  const sAt = gstamp(D, "scores"); let rescored = false;
+  P.loadSessions().forEach(x => {
+    if (x.type !== "block") return; const to = D.consumed[x.id]; if (!to || to === "-" || !/^b\d+$/.test(to) || !inDay(new Date(x.date).getTime())) return;
+    const own = D.scores[to];
+    if (own != null && own !== x.correct && sAt > (x.updatedAt || 0)) { x.correct = own; P.saveSession(x); }
+    else if (x.correct != null && own !== x.correct && (own == null || (x.updatedAt || 0) > sAt)) { D.scores[to] = x.correct; rescored = true; }
+  });
+  if (rescored) { rebuild(); changed = true; }
   const b = P.readJSON("step3pacer.run.v1", null); if (b && b.phase === "done" && b.sid && inDay(b.startAt)) consume(b.sid, "block", b.startAt + (b.endEl || 0), null, b.startAt);
   const r = P.readJSON("step3pacer.review.run.v1", null); if (r && r.phase === "done" && r.id && inDay(r.startAt)) consume(r.id, "review", Date.now(), null, r.startAt);
   const c = P.readJSON("step3pacer.ccs.run.v1", null); if (c && c.phase === "done" && c.id && inDay(c.startAt) && (c.saved || (c.rev && c.rev.endAt))) consume(c.id, "ccs", Date.now(), null, c.startAt);
@@ -1168,15 +1266,16 @@ function stepsSig(l) { return JSON.stringify(l.map(x => [x.id, x.total, x.t, x.p
 function tick() {
   if (rollover()) { render(); return; }
   const now = Date.now();
-  if (now - lastAbsorb > 2000) { lastAbsorb = now; absorb(); }
+  if (now >= absorbHold && now - lastAbsorb > 2000) { lastAbsorb = now; absorb(); }
   if (now - lastRebuild > 5000) { lastRebuild = now; const fresh = buildSteps(D.date, D.tpl); if (stepsSig(fresh) !== stepsSig(STEPS)) { STEPS = fresh; builtFor = ""; nowSig = ""; writeHandoff(); } }
   let T = D.timer;
-  if (T && !stepById(T.stepId)) { D.timer = T = null; P.releaseWake(); P.bg.runEnd(); persist(); }        // its step is no longer on today's list
+  const foreign = !!(T && T.dev && T.dev !== ME && !stepById(T.stepId));                                   // another device runs a step this device's list does not have: its timer is left alone
+  if (T && !stepById(T.stepId) && !foreign) { D.timer = T = null; P.releaseWake(); P.bg.runEnd(); persist(); }   // its step is no longer on today's list
   const c = cd();
-  if (T && !T.shared && !c) { D.timer = T = null; P.releaseWake(); P.bg.runEnd(); persist(); }            // nothing left to count on it
+  if (T && !T.shared && !c && !foreign) { D.timer = T = null; P.releaseWake(); P.bg.runEnd(); persist(); }       // nothing left to count on it
   if (c && c.kind === "break" && T && (T.endAt !== c.b.endAt || T.sec !== c.b.sec)) { T.startAt = c.b.startAt; T.endAt = c.b.endAt; T.sec = c.b.sec; T.label = c.b.label || T.label; persist(); }
   if (c && c.kind === "break" && T && !brkSeen(T)) markBrkSeen(T);
-  if (T && T.shared && !c) {                                        // the shared break ended elsewhere (skipped, dismissed, or a task was started): the step is over, with the time it really took
+  if (T && T.shared && !c && !foreign) {                            // the shared break ended elsewhere (skipped, dismissed, or a task was started): the step is over, with the time it really took
     const step = stepById(T.stepId); D.timer = null; P.bg.runEnd();
     if (step && !isDone(step.id) && !D.manual[step.id]) {
       const endAt = breakEndedAt(T, now), rec = { done: true, at: endAt, src: "break", sec: null }, used = T.startAt ? Math.round((endAt - T.startAt) / 1000) : -1;
@@ -1613,7 +1712,7 @@ function init() {
     label: () => { const c = cd(); return c ? c.step.t + " · " + c.label : "Day"; },
     after: () => { persist(); render(); }
   });
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { const c = cd(); if (c && c.kind !== "wait" && !c.paused) P.keepAwake(); lastAbsorb = 0; tick(); } });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { const c = cd(); if (c && c.kind !== "wait" && !c.paused) P.keepAwake(); if (P.live.on()) absorbHold = Date.now() + 4000; lastAbsorb = 0; tick(); } });
   window.addEventListener("storage", e => {
     if (!e.key || e.key.indexOf("step3pacer.") !== 0 || e.key === LS_D) return;
     lastAbsorb = 0;
@@ -1624,19 +1723,18 @@ function init() {
   P.live.bind({
     type: "day", noun: "day", statusEl: $("liveStatus"), get: () => D, idOf: s => s && s.date,
     active: () => anyDone() || !!D.timer,
-    apply: state => {
-      if (!state || state.date !== keyOf(Date.now())) return;
-      adopt(state); rebuild(); P.writeJSON(LS_D, D);
-      const c = cd(); if (c && c.kind !== "wait" && !c.paused) { P.keepAwake(); P.bg.runStart(c.step.t); }
-      render();
-    }
+    merge: applyMerge,                                               // the other device's copy joins this one — neither replaces the other
+    pulled: () => { absorbHold = 0; lastAbsorb = 0; },
+    apply: () => {}
   });
+  if (P.live.on()) absorbHold = Date.now() + 6000;                  // the blocks and cases of the day tick their steps after the other device's copy has arrived (or after six seconds without it)
   const c0 = cd(); if (c0 && c0.kind !== "wait" && !c0.paused) P.bg.runStart(c0.step.t);
   $("installNote").hidden = P.standalone();
   setInterval(tick, 250);
   render();
   /* a small hook for the automated checks: read the state, move a running timer in time */
-  window.__day = { state: () => D, steps: () => STEPS, settings: () => S, patchTimer: patch => { if (D.timer) { Object.assign(D.timer, patch); persist(); tick(); } } };
+  window.__day = { state: () => D, steps: () => STEPS, settings: () => S, patchTimer: patch => { if (D.timer) { Object.assign(D.timer, patch); persist(); tick(); } },
+    merge: (a, b) => mergeDay(normOf(a), normOf(b)), canon: canonDay, norm: normOf };
 }
 init();
 if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); }); }
