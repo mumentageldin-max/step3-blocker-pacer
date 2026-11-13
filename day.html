@@ -81,6 +81,7 @@ button.badge:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .now .btns button.done{border-color:var(--fg)}
 .now[data-tone="over"] .btns button.done{background:var(--crit);color:var(--on-crit);border-color:var(--crit)}
 .now .sub{display:grid;gap:8px}
+.now .sub .cap{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:4px 0 -3px}
 .now .sub .row{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:8px}
 .now .sub button{min-height:44px;font-size:14px;padding:8px 4px;white-space:nowrap}
 .now .sub .row.tight button{font-size:13px;padding:8px 2px}
@@ -240,7 +241,7 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
           <li><b>Reviews, lowest score first.</b> On the first review card, type today's scores once (B1 … B6) — or type each score on the Block page's summary. Every review step then names its block, lowest score first, and gets 5:00 per wrong question and 1:00 per right one (Settings → Review per block for a fixed length). The Review page lists the blocks in the same order.</li>
           <li><b>The totals are measured.</b> A step that ran on a timer — here or in its own page — counts the time it really took. A step ticked by hand counts its planned length. A skipped step counts nothing.</li>
           <li><b>The sound.</b> A step's end is a rising four-note melody played twice, with a long vibration where the device allows it (Android; iPad and iPhone do not vibrate from a web app). One minute before the end: two soft notes. If you do not tick within a minute, the melody repeats — once a minute, five times at most (Settings).</li>
-          <li><b>The other pages still work.</b> Run a block in the Block page, a review in the Review page, a case in the CCS page: this card shows it running, and the step ticks itself when it is saved. The 20-minute break after a block, a review or a case is the same break on every page.</li>
+          <li><b>The other pages still work.</b> Run a block in <b>Block</b>, a review in <b>Block review</b>, a case in <b>CCS case</b> (its feedback opens in <b>CCS review</b>): this card shows it running, and the step ticks itself when it is saved. The 20-minute break after a block, a review or a case is the same break on every page.</li>
           <li><b>Tick by hand</b> when you did a step without a timer: tap its box. Tap a row to make it the current step; during a break, that ends the break. Tap a ticked box to untick — a step you untick stays unticked until you tick it; the page never re-ticks it on its own.</li>
           <li><b>Hidden app.</b> Allow notifications (Settings → Background &amp; sound): the end of a step, and the reminders, arrive as notifications when the page is hidden. On iPad, open the pacer from the Home Screen icon. Whatever was missed is caught up the moment you come back.</li>
           <li>The day rolls over at <b>4:00 AM</b>, so a night that runs past midnight stays one day. Days are kept for the calendar at the bottom.</li>
@@ -1136,13 +1137,13 @@ function runFrom(type, st, where) { // a Block / Review / CCS run state → what
   if (type === "review" && (st.phase === "run" || st.phase === "sweep") && now - st.startAt < 8 * 3600000) {
     const c = reviewCfg();
     const used = st.phase === "sweep" ? (st.endEl || 0) / 1000 : Math.max(0, ((st.pauseKind ? st.pausedAt : now) - st.startAt - st.pausedTotal) / 1000), spent = [used, ((st.standsDone || 0) + (st.manualStands || 0)) * c.stand];
-    if (st.phase === "run" && st.pauseKind === "stand") return { kind: "review", id: st.id, startAt: st.startAt, spent: spent, page: "Review", href: "./review.html", label: "Review · stand", left: c.stand - (now - st.standStartAt) / 1000, total: c.stand, sub: "stand", paused: false, where };
+    if (st.phase === "run" && st.pauseKind === "stand") return { kind: "review", id: st.id, startAt: st.startAt, spent: spent, page: "Block review", href: "./review.html", label: "Review · stand", left: c.stand - (now - st.standStartAt) / 1000, total: c.stand, sub: "stand", paused: false, where };
     const el = ((st.pauseKind ? st.pausedAt : now) - st.startAt - st.pausedTotal) / 1000;
-    return { kind: "review", id: st.id, startAt: st.startAt, spent: spent, page: "Review", href: "./review.html", label: "Review" + (st.label ? " · " + st.label : ""), left: st.phase === "sweep" ? 0 : c.limit - el, total: c.limit, sub: st.phase === "sweep" ? "EO sweep" : "chunk " + Math.min(3, Math.floor(el / c.chunk) + 1) + " of 3", paused: !!st.pauseKind && st.pauseKind !== "stand", where };
+    return { kind: "review", id: st.id, startAt: st.startAt, spent: spent, page: "Block review", href: "./review.html", label: "Review" + (st.label ? " · " + st.label : ""), left: st.phase === "sweep" ? 0 : c.limit - el, total: c.limit, sub: st.phase === "sweep" ? "EO sweep" : "chunk " + Math.min(3, Math.floor(el / c.chunk) + 1) + " of 3", paused: !!st.pauseKind && st.pauseKind !== "stand", where };
   }
   if (type === "ccs" && now - st.startAt < 4 * 3600000) {
-    if (st.phase === "run") { const el = ((st.pausedAt || now) - st.startAt - st.pausedTotal) / 1000; return { kind: "ccs", id: st.id, startAt: st.startAt, spent: [Math.max(0, el), 0], page: "CCS", href: "./ccs.html", label: "CCS case" + (st.label ? " · " + st.label : ""), left: st.limitSec - el, total: st.limitSec, sub: "case", paused: !!st.pausedAt, where }; }
-    if (st.phase === "done" && st.rev && st.rev.startAt && !st.rev.endAt) { const el = (now - st.rev.startAt) / 1000; return { kind: "ccs", id: st.id, startAt: st.startAt, spent: [(st.caseTimed === false ? 0 : (st.endEl || 0)) + Math.max(0, el), 0], page: "CCS", href: "./ccs.html", label: "CCS feedback" + (st.label ? " · " + st.label : ""), left: st.rev.limitSec - el, total: st.rev.limitSec, sub: "feedback", paused: false, where }; }
+    if (st.phase === "run") { const el = ((st.pausedAt || now) - st.startAt - st.pausedTotal) / 1000; return { kind: "ccs", id: st.id, startAt: st.startAt, spent: [Math.max(0, el), 0], page: "CCS case", href: "./ccs.html", label: "CCS case" + (st.label ? " · " + st.label : ""), left: st.limitSec - el, total: st.limitSec, sub: "case", paused: !!st.pausedAt, where }; }
+    if (st.phase === "done" && st.rev && st.rev.startAt && !st.rev.endAt) { const el = (now - st.rev.startAt) / 1000; return { kind: "ccs", id: st.id, startAt: st.startAt, spent: [(st.caseTimed === false ? 0 : (st.endEl || 0)) + Math.max(0, el), 0], page: "CCS review", href: "./ccs.html#review", label: "CCS feedback" + (st.label ? " · " + st.label : ""), left: st.rev.limitSec - el, total: st.rev.limitSec, sub: "feedback", paused: false, where }; }
   }
   return null;
 }
@@ -1397,7 +1398,10 @@ function renderProjection(now, c, runs, step) {
 }
 function btn(label, cls, id, extra) { return '<button type="button" class="' + (cls || "") + '" data-act="' + id + '"' + (extra || "") + ">" + label + "</button>"; }
 function adjBtn(sec) { return btn((sec < 0 ? "−" : "+") + fmt(Math.abs(sec)), "", "adj", ' data-sec="' + sec + '"'); }
-function rows(list) { return list.filter(r => r && r.length).map(r => '<div class="row' + (r.length >= 4 ? " tight" : "") + '" style="--n:' + r.length + '">' + r.join("") + "</div>").join(""); }
+function rows(list) { // the small buttons of the card, in named groups: [caption, buttons] or just buttons
+  return list.map(r => (r && r.length === 2 && typeof r[0] === "string" && Array.isArray(r[1])) ? r : ["", r]).filter(r => r[1] && r[1].length)
+    .map(r => (r[0] ? '<p class="cap">' + r[0] + "</p>" : "") + '<div class="row' + (r[1].length >= 4 ? " tight" : "") + '" style="--n:' + r[1].length + '">' + r[1].join("") + "</div>").join("");
+}
 function lenRow(step) { // the length buttons that fit the step: the two case clocks, the review lengths, the two breaks, or five minutes less and more
   if (!step || !step.parts.length) return [];
   const cur = lenOf(step), pre = (label, v) => btn(label + (cur === v ? " ✓" : ""), "len" + (cur === v ? " on" : ""), "len", ' data-sec="' + v + '"');
@@ -1407,7 +1411,7 @@ function lenRow(step) { // the length buttons that fit the step: the two case cl
   if (step.kind === "brk" && S.shortSec !== breakSec()) return [pre(fmt(S.shortSec), S.shortSec), pre(fmt(breakSec()), breakSec())].concat(pm);
   return pm;
 }
-const TOOL_PAGE = { block: ["Block", "./"], review: ["Review", "./review.html"], ccs: ["CCS", "./ccs.html"] };
+const TOOL_PAGE = { block: ["Block", "./"], review: ["Block review", "./review.html"], ccs: ["CCS case", "./ccs.html"] };
 let nowSig = "", stripSig = "", scoreSig = "", scoreMsg = "";
 function renderScores(step, mode) { // on a review card: the scores of today's blocks, typed once; the reviews then line up lowest first
   const el = $("nowScores");
@@ -1485,7 +1489,7 @@ function renderNow(now, c, step, runs) {
       $("nowPill").textContent = "Running"; $("nowWho").textContent = run.where ? "on your " + run.where : "in the " + run.page + " page";
       mirror.hidden = false; mirror.className = "mirror";
       mirror.innerHTML = '<div class="mrow"><span>' + esc(run.label) + " · " + esc(run.sub) + (run.paused ? " · paused" : "") + '</span><b class="ml"></b></div><p class="note">This step ticks itself when the ' + run.page + " page saves it. The time left comes from that page.</p>";
-      cue.textContent = run.kind === "block" ? "Tap in the Block page as you submit each question." : run.kind === "review" ? "Timer B lives in the Review page." : "The case clock lives in the CCS page — 12:30 / 25:00 switch under its clock.";
+      cue.textContent = run.kind === "block" ? "Tap in the Block page as you submit each question." : run.kind === "review" ? "Timer B lives in the Block review page." : run.sub === "feedback" ? "The feedback timer lives in CCS review." : "The case clock lives in CCS case — 12:30 / 25:00 switch under its clock.";
       btns.innerHTML = (run.where ? "" : '<a class="go" href="' + run.href + '" style="display:grid;place-items:center;text-decoration:none;border-radius:12px;font-weight:700;font-size:18px;min-height:72px;background:var(--kc);color:#fff">Go to the ' + run.page + " page</a>") + btn("Tick done ✓", "done" + (run.where ? " solo" : ""), "done");
       sub.innerHTML = "";
     } else if (mode === "idle") {
@@ -1495,10 +1499,10 @@ function renderNow(now, c, step, runs) {
       cue.textContent = step.parts.length ? (step.tool ? "Start here, or run it in the " + TOOL_PAGE[step.tool][0] + " page — the step ticks itself." : "Press Start when you begin.") : "Tap Done when it is done.";
       btns.innerHTML = (step.parts.length ? btn("Start · " + fmt(step.parts[0].sec), "go", "start") : "") + btn("Done ✓", "done" + (step.parts.length ? "" : " solo"), "done");
       sub.innerHTML = rows([
-        lenRow(step),
+        [step.tool === "ccs" && step.parts.length === 2 ? "Case length" : step.tool === "review" ? "Review length" : "Length", lenRow(step)],
         swapRow,
-        [prev ? btn("↑ Previous", "", "prev") : "", next ? btn("Next ↓", "", "next") : "", prev ? btn("Move ▲", "", "mvup") : "", next ? btn("Move ▼", "", "mvdn") : ""].filter(Boolean),
-        [skipB, soundB]
+        ["Another step first", [prev ? btn("↑ Previous", "", "prev") : "", next ? btn("Next ↓", "", "next") : "", prev ? btn("Move ▲", "", "mvup") : "", next ? btn("Move ▼", "", "mvdn") : ""].filter(Boolean)],
+        ["This step", [skipB, soundB]]
       ]);
     } else if (mode === "wait") {
       mirror.hidden = true;
@@ -1519,9 +1523,9 @@ function renderNow(now, c, step, runs) {
       btns.innerHTML = btn(over ? "Done ✓ · next step" : "Done ✓", "done" + (over ? " solo" : ""), "done") + (over ? "" : btn("+5:00", "", "ext"));
       const caseRun = !isBrk && step.tool === "ccs" && c.part === 0 && step.parts.length === 2;
       sub.innerHTML = rows([
-        caseRun ? lenRow(step).concat(nextB) : over ? [adjBtn(60), adjBtn(300)] : [adjBtn(-300), adjBtn(-60), adjBtn(60)].concat(nextB),
+        [caseRun ? "Case length" : "Time", caseRun ? lenRow(step).concat(nextB) : over ? [adjBtn(60), adjBtn(300)] : [adjBtn(-300), adjBtn(-60), adjBtn(60)].concat(nextB)],
         swapRow,
-        (isBrk ? [] : [btn(paused ? "Resume" : "Pause", "", "pause")]).concat([skipB, stopB, soundB])
+        ["This step", (isBrk ? [] : [btn(paused ? "Resume" : "Pause", "", "pause")]).concat([skipB, stopB, soundB])]
       ]);
     }
     wire();

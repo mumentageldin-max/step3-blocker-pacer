@@ -8,6 +8,8 @@
   --k:#2458D6; --m:#0B8A6B; --t:#7A3DB8; --g:#C9661A;
   --font-ui:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
   --font-num:"Martian Mono","SFMono-Regular",Menlo,Consolas,monospace;
+  /* one colour per place: the day ink · block blue · block review violet · CCS case orange · CCS review rose · stats slate */
+  --c-day:#13202C; --c-block:#2458D6; --c-review:#7A3DB8; --c-ccs:#B4570F; --c-ccsr:#B4307E; --c-stats:#4A5B6D; --on-c:#FFFFFF;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
@@ -18,6 +20,7 @@
     --warn:#F2B13F; --warn-bg:#352A12; --on-warn:#221800;
     --crit:#FF6B70; --crit-bg:#3A1A1E; --on-crit:#2A0608;
     --k:#5B87F0; --m:#22A47E; --t:#9D6FE0; --g:#D07E35;
+    --c-day:#E6ECF3; --c-block:#7EA2FF; --c-review:#B08CF0; --c-ccs:#E29450; --c-ccsr:#F07FB8; --c-stats:#A9B7C6; --on-c:#0B1220;
     color-scheme:dark;
   }
 }
@@ -28,8 +31,12 @@
   --warn:#F2B13F; --warn-bg:#352A12; --on-warn:#221800;
   --crit:#FF6B70; --crit-bg:#3A1A1E; --on-crit:#2A0608;
   --k:#5B87F0; --m:#22A47E; --t:#9D6FE0; --g:#D07E35;
+  --c-day:#E6ECF3; --c-block:#7EA2FF; --c-review:#B08CF0; --c-ccs:#E29450; --c-ccsr:#F07FB8; --c-stats:#A9B7C6; --on-c:#0B1220;
   color-scheme:dark;
 }
+body{--page:var(--c-day)}
+body[data-page="block"]{--page:var(--c-block)} body[data-page="review"]{--page:var(--c-review)} body[data-page="ccs"]{--page:var(--c-ccs)}
+body[data-page="ccsr"]{--page:var(--c-ccsr)} body[data-page="stats"]{--page:var(--c-stats)}
 *{box-sizing:border-box}
 html,body{height:100%}
 html{background:var(--bg)}
@@ -41,16 +48,31 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 .colL,.colR{display:contents}
 .top{display:flex;align-items:baseline;justify-content:space-between;gap:6px 14px;flex-wrap:wrap}
 h1{font-size:17px;margin:0;font-weight:700}
+.top h1{font-size:18px;display:flex;align-items:center;gap:9px}
+.top h1::before{content:"";flex:none;width:12px;height:22px;border-radius:4px;background:var(--page)}
 h2{font-size:16px;margin:0;font-weight:700}
 .tag{margin:0;color:var(--muted);font-size:14px}
 .num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
 a{color:var(--accent)}
 
-/* page switcher */
-.pnav{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px}
-.pnav a{flex:1;text-align:center;padding:8px 6px;border-radius:999px;text-decoration:none;color:var(--muted);font-weight:700;font-size:14px;min-width:0;white-space:nowrap}
-.pnav a[aria-current="page"]{background:var(--fg);color:var(--bg)}
+/* page switcher: six places, each in its colour; the one you are in is filled */
+.pnav{display:grid;grid-template-columns:.8fr 1fr 1.25fr 1.1fr 1.2fr .85fr;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:4px}
+.pnav a{--nk:var(--c-day);display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 6px;border-radius:12px;border:2px solid transparent;text-decoration:none;color:var(--fg);font-weight:700;font-size:14px;line-height:1.15;min-width:0;min-height:42px;white-space:nowrap}
+.pnav a i{flex:none;width:10px;height:10px;border-radius:50%;background:var(--nk)}
+.pnav a span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.pnav a[data-k="block"]{--nk:var(--c-block)} .pnav a[data-k="review"]{--nk:var(--c-review)} .pnav a[data-k="ccs"]{--nk:var(--c-ccs)} .pnav a[data-k="ccsr"]{--nk:var(--c-ccsr)} .pnav a[data-k="stats"]{--nk:var(--c-stats)}
+.pnav a:hover{border-color:var(--nk)}
+.pnav a[aria-current="page"]{background:var(--nk);color:var(--on-c);border-color:var(--nk)}
+.pnav a[aria-current="page"] i{background:var(--on-c)}
 .pnav a:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+@media (max-width:699px){
+  /* three columns — the day · the blocks · the cases; the test on top, its review under it */
+  .pnav{grid-template-columns:.72fr 1.14fr 1.14fr;grid-template-rows:auto auto}
+  .pnav a{justify-content:flex-start;padding:8px 8px;font-size:13.5px}
+  .pnav a[data-k="day"]{grid-area:1/1} .pnav a[data-k="block"]{grid-area:1/2} .pnav a[data-k="ccs"]{grid-area:1/3}
+  .pnav a[data-k="stats"]{grid-area:2/1} .pnav a[data-k="review"]{grid-area:2/2} .pnav a[data-k="ccsr"]{grid-area:2/3}
+}
+@media (max-width:379px){ .pnav{grid-template-columns:.66fr 1.17fr 1.17fr} .pnav a{font-size:12.5px;padding:8px 5px;gap:5px} .pnav a i{width:9px;height:9px} }
 
 /* quick links to the cards and sheets that live outside the app */
 .quicklinks{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -83,6 +105,14 @@ a{color:var(--accent)}
 /* buttons */
 button{font:inherit;cursor:pointer;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:12px 10px;font-weight:700;font-size:15px;min-height:48px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 button.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent);min-height:76px;font-size:20px}
+body[data-page="review"] button.primary:not(.good),body[data-page="ccs"] button.primary:not(.good),body[data-page="ccsr"] button.primary:not(.good){background:var(--page);border-color:var(--page);color:var(--on-c)}
+/* the main card of a page carries the page's colour on its top edge */
+.card.setup,.card.done,.clockcard,.card.hero{border-top:6px solid var(--page)}
+/* numbered steps inside a card: 1 · 2 · 3 */
+.stepcap{display:flex;align-items:center;gap:10px;margin:4px 0 0;font-weight:700;font-size:15.5px;line-height:1.25}
+.stepcap b{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--page);color:var(--on-c);font-family:var(--font-num);font-size:14px}
+.stepcap span{min-width:0}
+.stepcap small{display:block;font-weight:400;color:var(--muted);font-size:13px}
 button.secondary{border-color:var(--warn);color:var(--warn);min-height:76px;font-size:18px}
 button.good{background:var(--good);color:var(--on-good);border-color:var(--good)}
 button.small{min-height:40px;padding:8px 12px;font-size:14px}

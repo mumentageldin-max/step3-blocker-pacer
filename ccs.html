@@ -68,9 +68,27 @@
 .checks .at{font-family:var(--font-num);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .checks li.due{border-color:var(--accent)}
 .legend{font-size:12px;color:var(--muted);margin:0}
-.presets button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.presets button[aria-pressed="true"]{background:var(--page);color:var(--on-c);border-color:var(--page)}
 .setup .primary{width:100%}
 .setup .row2{display:flex;gap:8px;flex-wrap:wrap}
+/* the two sections of this page: the case (the clock) and its review (feedback timer, log, spelling) */
+#toolsCard{order:5} #todayCard{order:6}
+.hero .primary{width:100%}
+.hero .row2{display:flex;gap:8px;flex-wrap:wrap}
+.hero .row2 button,.hero .row2 a.btn{min-height:46px;padding:10px 14px}
+a.btn{display:inline-flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font-weight:700;font-size:15px;text-decoration:none;padding:10px 14px;min-height:44px}
+.lenpick{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lenpick .lbl{font-size:13px;color:var(--muted);font-weight:700;flex-basis:100%}
+.lenpick button{min-height:44px;padding:6px 20px;font-size:16px;font-weight:700;font-family:var(--font-num);border-radius:999px}
+.lenpick button[aria-pressed="true"]{background:var(--page);color:var(--on-c);border-color:var(--page)}
+.todaylist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.todaylist li{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-left:5px solid var(--page);border-radius:8px;font-size:14px;background:var(--bg)}
+.todaylist li .n{font-family:var(--font-num);font-weight:700;font-size:16px}
+.todaylist li .s{font-family:var(--font-num);font-weight:700}
+.todaylist li small{grid-column:2/-1;color:var(--muted);font-size:12.5px}
+.aftersave{display:grid;gap:8px;border:2px solid var(--good);border-radius:12px;padding:12px;background:var(--good-bg)}
+.aftersave p{margin:0;font-weight:700;color:var(--good)}
+.aftersave .row2 button.primary{min-height:56px;font-size:17px;flex:1 1 180px}
 .done .row2{display:flex;gap:8px;flex-wrap:wrap}
 .done .row2 button{min-height:44px;padding:10px 14px}
 .done .line{font-family:var(--font-num);font-size:14px;padding:10px 12px;border:1px dashed var(--line);border-radius:8px;background:var(--bg);overflow-x:auto;white-space:nowrap;margin:0}
@@ -161,7 +179,7 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <h1>Step 3 CCS Pacer</h1>
+    <h1 id="pageTitle">Step 3 CCS Case</h1>
     <p class="tag" id="tagline">12:30 or 25:00 of real time · 1.25×</p>
   </header>
   <nav id="pnav" aria-label="Pages"></nav>
@@ -211,8 +229,36 @@
     <p class="note" id="sDay" hidden></p>
     <p class="note" id="sPlan"></p>
     <button class="primary" id="btnStart" type="button">Start case</button>
-    <div class="row2"><button id="btnReviewOnly" type="button" class="small" style="min-height:46px">Feedback review only — case already run (<span id="revOnlyLen">10:00</span>)</button></div>
-    <p class="note">The review timer also appears by itself on the Case log screen after every case you run here.</p>
+    <p class="note">When you exit the case, its review opens by itself in <b>CCS review</b> — the feedback timer, the misspelled words, the score.</p>
+  </section>
+
+  <!-- REVIEW · nothing waiting: start the feedback timer for a case run without the pacer -->
+  <section class="card hero full" id="revHome" hidden>
+    <div class="rowhead"><h2>Review a case</h2><span class="meta">Feedback once · the one missed order · the misspelled words</span></div>
+    <p class="note" id="revHomeNote">A case you run in <b>CCS case</b> opens its review here by itself when you exit it. For a case run without the pacer, start the feedback timer here.</p>
+    <div class="form">
+      <label class="wide">Case number<input type="text" id="rLabel" placeholder="#116" autocomplete="off"></label>
+      <div class="lenpick wide" id="rLen" aria-label="Case length"><span class="lbl">Case length</span><button type="button" data-len="750" aria-pressed="true">12:30</button><button type="button" data-len="1500" aria-pressed="false">25:00</button></div>
+    </div>
+    <button class="primary" id="btnReviewOnly" type="button">Start feedback timer · <span id="revOnlyLen">10:00</span></button>
+  </section>
+
+  <!-- REVIEW · a case is running -->
+  <section class="card hero full" id="revWait" hidden>
+    <div class="rowhead"><h2>A case is running</h2><span class="meta num" id="rwMeta"></span></div>
+    <p class="modeText">Its review opens here by itself when you exit the case.</p>
+    <button class="primary" id="btnToCase" type="button">Back to the case</button>
+  </section>
+
+  <!-- CASE · the case has ended, its review is waiting -->
+  <section class="card hero full" id="caseEnded" hidden>
+    <div class="rowhead"><h2 id="ceTitle">Case ended</h2><span class="meta num" id="ceMeta"></span></div>
+    <p class="modeText" id="ceText">Next: its feedback, once.</p>
+    <button class="primary" id="btnToReview" type="button">Go to its review →</button>
+    <div class="row2"><button id="btnResume2" type="button" hidden>Exited by mistake — back into the case</button><button id="btnNextCase2" type="button" class="primary" hidden>Start the next case →</button></div>
+  </section>
+
+  <div class="full" id="toolsCard">
     <details class="fold" id="keysFold">
       <summary>Spelling keys · look up or drill</summary>
       <div class="body">
@@ -264,7 +310,7 @@
         </div>
       </div>
     </details>
-  </section>
+  </div>
 
   <div class="colL" id="colL" hidden>
     <section class="card clockcard" id="clockcard" data-tone="normal" data-ph="read" aria-live="polite">
@@ -366,11 +412,12 @@
 
   <!-- DONE -->
   <section class="card done full" id="done" hidden>
-    <div class="rowhead"><h2>Case log</h2><span class="meta" id="doneMeta"></span></div>
+    <div class="rowhead"><h2 id="doneTitle">Review this case</h2><span class="meta" id="doneMeta"></span></div>
     <ul class="stats" id="doneStats"></ul>
     <div class="missed" id="doneChecks"></div>
     <div class="row2"><button id="btnResume" type="button" hidden>Exited by mistake — back into the case</button></div>
 
+    <p class="stepcap"><b>1</b><span>Read the feedback once<small>on ccscases.com — the timer keeps it short</small></span></p>
     <section class="revbox" id="revbox">
       <div class="rowhead"><h2>Feedback review</h2><span class="meta" id="revMeta"></span></div>
       <div class="revclock" id="revClock">10:00</div>
@@ -382,7 +429,7 @@
         <button type="button" id="btnRevEnd">Feedback read ✓ · end the timer</button>
       </div>
     </section>
-    <p class="note">ccscases.com keeps the score and the feedback. Here, only what it cannot know:</p>
+    <p class="stepcap"><b>2</b><span>Write down<small>what ccscases cannot keep: the words you misspelled, the score</small></span></p>
     <div class="form">
       <label>Case (name or number)<input type="text" id="dLabel" autocomplete="off" placeholder="#5"></label>
       <label>Case length<select id="dLen"><option value="750">12:30 · short</option><option value="1500">25:00 · long</option><option value="600">10:00 · 1× short</option><option value="1200">20:00 · 1× long</option></select></label>
@@ -390,7 +437,7 @@
       <label>Score from ccscases (%, optional)<input type="number" id="dScore" class="scoreinput" min="0" max="100" inputmode="numeric" placeholder="78"></label>
       <label>Note (optional)<input type="text" id="dNote" autocomplete="off" maxlength="200"></label>
     </div>
-    <p class="note">One line for the notebook:</p>
+    <p class="stepcap"><b>3</b><span>Save<small>the line below is for the notebook</small></span></p>
     <p class="line" id="noteLine"></p>
     <div class="row2">
       <button class="primary" id="btnSave" type="button" style="min-height:56px;font-size:17px">Save case</button>
@@ -398,6 +445,16 @@
       <button id="btnStats" type="button">Open stats</button>
     </div>
     <p class="note" id="savedMsg" hidden></p>
+    <div class="aftersave" id="afterSave" hidden>
+      <p id="afterSaveText">Saved ✓</p>
+      <div class="row2"><button class="primary" id="btnNextCase" type="button">Next case →</button><a class="btn" href="./day.html">Back to the Day page</a></div>
+    </div>
+  </section>
+
+  <!-- REVIEW · the cases of today -->
+  <section class="card full" id="todayCard" hidden>
+    <div class="rowhead"><h2>Today's cases</h2><span class="meta" id="todayMeta"></span></div>
+    <ul class="todaylist" id="todayList"></ul>
   </section>
 </div>
 
@@ -931,6 +988,23 @@ const CHECKS = [
 let S = Object.assign({}, DEFAULTS);
 let R = fresh();
 let chosenLen = 750, abortArmed = 0, endArmed = 0;
+/* Two sections in one page. "case": the pre-case card, the clock. "review": the feedback timer, the log, the spelling tools.
+   The page switcher shows them as two places (CCS case · CCS review); a case that ends opens its review by itself. */
+let view = "case";
+function applyView() { // the page's name, colour and switcher follow the section
+  const rv = view === "review";
+  P.renderNav(rv ? "ccsr" : "ccs");
+  $("pageTitle").textContent = rv ? "Step 3 CCS Review" : "Step 3 CCS Case";
+  $("tagline").textContent = rv ? "Feedback once · one missed order · the misspelled words" : "12:30 or 25:00 of real time · 1.25×";
+  document.title = rv ? "Step 3 CCS Review" : "Step 3 CCS Case";
+}
+function setView(v, quiet) {
+  v = v === "review" ? "review" : "case";
+  const changed = v !== view; view = v;
+  try { const want = v === "review" ? "#review" : ""; if (location.hash !== want) history.replaceState(null, "", location.pathname + location.search + want); } catch (e) {}
+  applyView();
+  if (!quiet) { render(); if (changed) { try { window.scrollTo(0, 0); } catch (e) {} } }
+}
 
 function fresh() {
   return { phase: "setup", id: "", date: "", label: "", category: "", attempt: "first", source: "ccscases", limitSec: 750,
@@ -993,6 +1067,7 @@ function phaseAt(sec) { const b = phaseBounds(); return b.find(p => sec < p.end)
 
 /* ---------- actions ---------- */
 function startCase() {
+  setView("case", true);
   R = fresh();
   R.phase = "run"; R.id = P.newId(); R.date = new Date().toISOString();
   R.label = $("sLabel").value.trim(); R.category = $("sCat").value; R.attempt = $("sAttempt").value; R.source = $("sSource").value;
@@ -1044,6 +1119,7 @@ function resumeCase() { // exited by mistake; real time never stopped
   const el = (Date.now() - R.startAt - R.pausedTotal) / 1000;
   if (el >= R.limitSec) return;
   R.phase = "run"; R.endEl = 0; R.endedBy = ""; R.rev = { startAt: 0, limitSec: 0, endAt: 0, warned: false, rang: false };
+  setView("case", true);
   P.keepAwake(); P.bg.runStart("CCS case running"); persist(); render();
 }
 function setLimit(sec) { // the case turned out to be the other length: keep the elapsed time, re-cut the phases
@@ -1070,8 +1146,9 @@ function revLimit() { return R.limitSec > 750 ? S.revLongSec : S.revShortSec; }
 function startReviewOnly() { // a case run without the pacer: log + feedback timer, no case clock
   R = fresh();
   R.phase = "done"; R.id = P.newId(); R.date = new Date().toISOString();
-  R.label = $("sLabel").value.trim(); R.category = $("sCat").value; R.attempt = $("sAttempt").value; R.source = $("sSource").value;
+  R.label = ($("rLabel").value.trim() || $("sLabel").value.trim()); R.category = $("sCat").value; R.attempt = $("sAttempt").value; R.source = $("sSource").value;
   R.limitSec = chosenLen; R.startAt = Date.now(); R.endEl = 0; R.endedBy = "none"; R.caseTimed = false;
+  setView("review", true);
   S.lastLen = chosenLen; saveSettings();
   P.audioInit();
   persist(); render();
@@ -1101,6 +1178,7 @@ function finish(by) {
   R.endEl = Math.min(R.limitSec, (now - R.startAt - R.pausedTotal) / 1000);
   if (by === "clock") R.endEl = R.limitSec;
   R.endedBy = by; R.phase = "done";
+  setView("review", true);                                          // the case is over: its review opens by itself
   if (!R.endQuiet) P.sfx("end"); R.endQuiet = false;
   P.releaseWake(); P.bg.runEnd();
   persist(); render();
@@ -1133,6 +1211,8 @@ function saveCase() { // the log keeps only what ccscases.com cannot know; score
   if (!R.rev.startAt || R.rev.endAt) startTaskBreak();   // the task is over: case + feedback (a running review timer starts it when it ends)
   persist(); P.live.clear();
   $("savedMsg").hidden = false; $("savedMsg").textContent = "Saved to Stats. Change anything above and press Update to re-save.";
+  $("afterSave").hidden = false; $("afterSaveText").textContent = "Saved ✓ " + (R.label ? "· " + R.label + " " : "") + "— the break is running. Then the next step of the day.";
+  planCache.at = 0; renderToday(true);
   $("btnSave").textContent = "Saved"; $("btnSave").disabled = true;
   $("btnResume").hidden = true;
   $("noteLine").textContent = noteLine(score);
@@ -1200,6 +1280,8 @@ function renderSetup() {
   const b = (() => { let acc = 0; return PHASES.map(p => { const s = acc; acc += Math.round(chosenLen * p.frac); return p.name + " " + fmt(s) + "–" + fmt(acc); }); })();
   $("sPlan").textContent = fmt(chosenLen) + " of real time, clock " + (S.countdown ? "counting down" : "counting up from 0:00") + ": " + b.join(" · ") + ". Final-orders alert at " + (S.countdown ? fmt(S.finalSec) + " left" : fmt(chosenLen - S.finalSec)) + ".";
   $("revOnlyLen").textContent = fmt(chosenLen > 750 ? S.revLongSec : S.revShortSec);
+  document.querySelectorAll("#rLen button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.len === chosenLen)));
+  const rl = $("rLabel"); if (document.activeElement !== rl && !rl.dataset.touched && rl.value !== $("sLabel").value) rl.value = $("sLabel").value;   // the plan's case number shows in both sections
   $("cps").innerHTML = cpsFor(chosenLen).map(c => '<div><b style="color:var(--ph-' + c[0] + ')">' + c[1] + " left</b>" + P.esc(c[2]) + "</div>").join("");
 }
 function renderProto(ph) {
@@ -1210,10 +1292,22 @@ function renderProto(ph) {
   ul.innerHTML = lines.map(l => '<li data-ph="' + l[0] + '"' + (l[1] === "?" ? ' class="hint"' : "") + "><b>" + l[1] + "</b><span>" + l[2] + "</span></li>").join("");
 }
 function render() {
-  const inSetup = R.phase === "setup", live = R.phase === "run", done = R.phase === "done";
-  $("setup").hidden = !inSetup; $("colL").hidden = !live; $("colR").hidden = inSetup || done; $("done").hidden = !done;
+  const inSetup = R.phase === "setup", live = R.phase === "run", done = R.phase === "done", rv = view === "review";
+  $("setup").hidden = !(inSetup && !rv); $("revHome").hidden = !(inSetup && rv);
+  $("colL").hidden = !(live && !rv); $("colR").hidden = !(live && !rv); $("revWait").hidden = !(live && rv);
+  $("done").hidden = !(done && rv); $("caseEnded").hidden = !(done && !rv);
+  $("toolsCard").hidden = !(rv ? !live : inSetup);                  // the spelling tools: before a case, and in the review section
+  renderToday(false);
   $("btnSound").textContent = S.sound ? "Sound on" : "Sound off"; $("btnSound").setAttribute("aria-pressed", S.sound ? "true" : "false");
   if (inSetup) { renderSetup(); return; }
+  if (live && rv) { const e2 = elapsed(); $("rwMeta").textContent = (R.label ? R.label + " · " : "") + fmt(Math.floor(e2)) + " of " + fmt(R.limitSec); }
+  if (done && !rv) {
+    $("ceTitle").textContent = R.saved ? "Case saved" : "Case ended";
+    $("ceMeta").textContent = (R.label ? R.label + " · " : "") + (R.caseTimed === false ? fmt(R.limitSec) + " case" : fmt(R.endEl) + " of " + fmt(R.limitSec) + " used");
+    $("ceText").textContent = R.saved ? "Its review is saved. The next case starts from a clean card." : R.rev.startAt && !R.rev.endAt ? "Its feedback timer is running in CCS review." : "Next: its feedback, once — in CCS review.";
+    $("btnToReview").hidden = !!R.saved; $("btnNextCase2").hidden = !R.saved;
+    $("btnResume2").hidden = R.caseTimed === false || !(R.endedBy !== "clock" && !R.saved && (Date.now() - R.startAt - R.pausedTotal) / 1000 < R.limitSec);
+  }
   const el = elapsed(), rem = Math.max(0, R.limitSec - el), ph = phaseAt(el), bounds = phaseBounds();
   if (live) {
     $("clock").textContent = S.countdown ? fmt(Math.ceil(rem)) : fmt(Math.floor(el));
@@ -1275,7 +1369,24 @@ function renderReview() {
     $("revText").textContent = left <= 60 ? "One minute. Write the one order you missed and the score." : left <= 180 ? "Last three minutes: stop reading, start writing — the one order, the score." : "Reading the feedback: missed orders first, then timing, then the sequence. Not the case again.";
   }
 }
-let doneRendered = false, doneFormFor = "";
+let doneRendered = false, doneFormFor = "", todaySig = "", todayAt = 0;
+function renderToday(force) { // the review section lists the cases saved today: number, length, time used, score, words
+  const card = $("todayCard");
+  if (view !== "review") { if (!card.hidden) card.hidden = true; todayAt = 0; return; }
+  const now = Date.now(); if (!force && now - todayAt < 4000 && todaySig) { return; } todayAt = now;
+  const k = dayKey(now), list = P.loadSessions().filter(x => x.type === "ccs" && dayKey(new Date(x.date).getTime()) === k).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const sig = JSON.stringify(list.map(x => [x.id, x.label, x.limitSec, x.timeUsedSec, x.score, (x.misspelled || []).join(","), x.reviewSec]));
+  card.hidden = !list.length;
+  if (sig === todaySig) return; todaySig = sig;
+  $("todayMeta").textContent = list.length + " saved";
+  $("todayList").innerHTML = list.map((x, i) => '<li><span class="n">' + (i + 1) + "</span><span><b>" + P.esc(x.label || "case") + "</b> · " + fmt(x.limitSec || 750) + (x.caseTimed === false ? "" : " · " + fmt(x.timeUsedSec || 0) + " used") + '</span><span class="s">' + (x.score != null ? x.score + "%" : "") + "</span>" +
+    "<small>" + (x.reviewSec != null ? "feedback " + fmt(x.reviewSec) : "no feedback timer") + ((x.misspelled || []).length ? " · misspelled: " + P.esc(x.misspelled.join(", ")) : "") + "</small></li>").join("");
+}
+function nextCase() { // the saved case is put away: a clean card for the next one
+  if (R.phase === "done" && !R.saved) return;
+  R = fresh(); planCache.at = 0; planApplied = ""; doneRendered = false; $("rLabel").value = ""; delete $("rLabel").dataset.touched;
+  persist(); setView("case");
+}
 function noteLine(score) {
   const d = new Date(R.date), day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const words = $("dWords") ? $("dWords").value.split(/[,;\n]/).map(w => w.trim()).filter(Boolean) : [];
@@ -1290,7 +1401,8 @@ function renderDone() {
   $("doneChecks").innerHTML = "";
   if (doneFormFor !== R.id) { doneFormFor = R.id; $("dLabel").value = R.label; $("dScore").value = ""; $("dNote").value = ""; $("dWords").value = ""; }
   $("dLen").value = String(R.limitSec);
-  $("btnSave").textContent = "Save case"; $("btnSave").disabled = false; $("savedMsg").hidden = true;
+  $("btnSave").textContent = "Save case"; $("btnSave").disabled = false; $("savedMsg").hidden = true; $("afterSave").hidden = true;
+  $("doneTitle").textContent = "Review this case" + (R.label ? " · " + R.label : "");
   $("btnResume").hidden = R.caseTimed === false || !(R.endedBy !== "clock" && !R.saved && (Date.now() - R.startAt - R.pausedTotal) / 1000 < R.limitSec);
   $("noteLine").textContent = noteLine(null);
 }
@@ -1455,8 +1567,22 @@ function checkDrill() {
 /* ---------- wiring ---------- */
 function blurOnClick(btn) { btn.addEventListener("click", e => { if (e.detail > 0) e.currentTarget.blur(); }); }
 function init() {
-  P.applyTheme(); P.renderNav("ccs");
+  P.applyTheme();
   loadSettings(); loadRun(); buildChecks();
+  view = location.hash === "#review" || R.phase === "done" ? "review" : "case";   // a case that has ended is waiting for its review
+  applyView();
+  window.addEventListener("hashchange", () => { const v = location.hash === "#review" ? "review" : "case"; if (v !== view) setView(v); });
+  $("pnav").addEventListener("click", e => {                         // CCS case ↔ CCS review: the same page, no reload
+    const a = e.target.closest ? e.target.closest("a[data-k]") : null; if (!a) return;
+    if (a.dataset.k === "ccs" || a.dataset.k === "ccsr") { e.preventDefault(); setView(a.dataset.k === "ccsr" ? "review" : "case"); }
+  });
+  $("btnToReview").addEventListener("click", () => setView("review"));
+  $("btnToCase").addEventListener("click", () => setView("case"));
+  $("btnResume2").addEventListener("click", resumeCase);
+  $("btnNextCase").addEventListener("click", nextCase);
+  $("btnNextCase2").addEventListener("click", nextCase);
+  document.querySelectorAll("#rLen button").forEach(b => b.addEventListener("click", e => { chosenLen = +b.dataset.len; renderSetup(); if (e.detail > 0) b.blur(); }));
+  $("rLabel").addEventListener("input", () => { $("rLabel").dataset.touched = "1"; });
   $("precaseFold").open = S.precaseOpen !== false;
   $("precaseFold").addEventListener("toggle", () => { S.precaseOpen = $("precaseFold").open; saveSettings(); });
   $("btnBreath").addEventListener("click", breathe);
@@ -1540,7 +1666,7 @@ function init() {
   P.live.bind({
     type: "ccs", noun: "case", statusEl: $("liveStatus"), get: () => R, idOf: s => s && s.id,
     active: () => R.phase === "run" || (R.phase === "done" && !R.saved),
-    apply: state => { R = Object.assign(fresh(), state); endArmed = 0; abortArmed = 0; doneRendered = false; P.writeJSON(LS_R, R); if (R.phase !== "setup") buildStrip(); if (R.phase === "run" && !R.pausedAt) { P.keepAwake(); P.bg.runStart("CCS case running"); } render(); }
+    apply: state => { R = Object.assign(fresh(), state); endArmed = 0; abortArmed = 0; doneRendered = false; P.writeJSON(LS_R, R); if (R.phase === "run") setView("case", true); else if (R.phase === "done") setView("review", true); if (R.phase !== "setup") buildStrip(); if (R.phase === "run" && !R.pausedAt) { P.keepAwake(); P.bg.runStart("CCS case running"); } render(); }
   });
   if (R.phase === "run" && !R.pausedAt) P.bg.runStart("CCS case running");
   if (R.phase !== "setup") buildStrip();

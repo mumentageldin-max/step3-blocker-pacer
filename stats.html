@@ -470,7 +470,7 @@ function renderCcs(list) {
   if (st.scored.length) {
     const points = st.scored.map((c, i) => ({ v: c.score, tip: P.fmtDate(c.date) + " · " + (c.label || c.category) + " · " + c.score + "%" + (c.attempt === "repeat" ? " (repeat)" : ""), xLabel: (i === 0 || i === st.scored.length - 1) ? P.fmtDate(c.date) : null }));
     lineChart(wrap, { points: points, yMin: 0, yMax: 100, ticks: [0, 50, 100], ref: [{ y: 80, label: "80" }], yFmt: v => Math.round(v) + "%", aria: "CCS score per case, as copied from ccscases" });
-  } else wrap.innerHTML = '<p class="empty">No scores copied in. The score field on the case log is optional — ccscases.com keeps them.</p>';
+  } else wrap.innerHTML = '<p class="empty">No scores copied in. The score field in CCS review is optional — ccscases.com keeps them.</p>';
   const by = {};
   st.cases.forEach(c => { const k = c.category || "Other"; by[k] = by[k] || { n: 0, firstSum: 0, firstN: 0, bestSum: 0, bestN: 0 }; by[k].n++; if (c.score != null) { if (c.attempt !== "repeat") { by[k].firstSum += c.score; by[k].firstN++; } by[k].bestSum += c.score; by[k].bestN++; } });
   tbl.innerHTML = '<table class="t"><thead><tr><th>Category</th><th class="n">Cases</th><th class="n">First attempt</th><th class="n">All attempts</th></tr></thead><tbody>' +

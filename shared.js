@@ -202,12 +202,15 @@ window.Pacer = (() => {
   function releaseWake() { try { if (wake) wake.release(); } catch (e) {} wake = null; }
 
   /* ---------- nav ---------- */
+  /* Six places, each with its colour. On a phone they sit in three columns: the day · the blocks · the cases —
+     the test on the top row, its review right under it. */
+  const NAV = [["day", "./day.html", "Day"], ["block", "./", "Block"], ["review", "./review.html", "Block review"], ["ccs", "./ccs.html", "CCS case"], ["ccsr", "./ccs.html#review", "CCS review"], ["stats", "./stats.html", "Stats"]];
   function renderNav(active) {
     const el = document.getElementById("pnav");
     if (!el) return;
-    const items = [["day", "./day.html", "Day"], ["block", "./", "Block"], ["review", "./review.html", "Review"], ["ccs", "./ccs.html", "CCS"], ["stats", "./stats.html", "Stats"]];
     el.className = "pnav";
-    el.innerHTML = items.map(([k, href, label]) => '<a href="' + href + '"' + (k === active ? ' aria-current="page"' : "") + ">" + label + "</a>").join("");
+    el.innerHTML = NAV.map(([k, href, label]) => '<a href="' + href + '" data-k="' + k + '"' + (k === active ? ' aria-current="page"' : "") + "><i aria-hidden=\"true\"></i><span>" + label + "</span></a>").join("");
+    try { document.body.dataset.page = active; } catch (e) {}
   }
 
   /* ---------- notices (one-line banners at the top of the page) ---------- */

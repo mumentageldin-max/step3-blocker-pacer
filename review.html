@@ -80,8 +80,8 @@
 .prog{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
 .prog b{font-family:var(--font-num);color:var(--fg)}
 
-.park form{display:flex;gap:8px}
-.park input{flex:1;min-width:0;font:inherit;font-size:15px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.park form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.park input{width:100%;min-width:0;font:inherit;font-size:15px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
 .park input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
 .park ul,ul.park{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .park li{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:15px;border-bottom:1px solid var(--line2);padding:4px 0}
@@ -90,7 +90,7 @@
 
 .picks{display:flex;gap:8px;flex-wrap:wrap}
 .picks button{min-height:42px;font-size:14px;padding:8px 12px;border-radius:999px;font-weight:700}
-.picks button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.picks button[aria-pressed="true"]{background:var(--page);color:var(--on-c);border-color:var(--page)}
 .setup .primary{width:100%}
 
 .done .fix{border-radius:10px;padding:10px 12px;background:var(--good-bg);color:var(--good);font-weight:700}
@@ -123,7 +123,9 @@
   <!-- SETUP -->
   <section class="card setup full" id="setup">
     <div class="rowhead"><h2>This review</h2><span class="meta">Before you start: Daily Card page 2, scratch paper, pen.</span></div>
+    <p class="stepcap" id="capPick" hidden><b>1</b><span>Pick the block<small>lowest score first, then upward</small></span></p>
     <div class="picks" id="picks" hidden></div>
+    <p class="stepcap"><b id="capScoreN">2</b><span>Check the score<small>the percent UWorld shows — Start works without it too</small></span></p>
     <div class="form">
       <label>Block label or system<input type="text" id="sLabel" placeholder="Cardio · Random · Ethics…" autocomplete="off"></label>
       <label>Questions in the block<input type="number" id="sN" min="1" max="60" value="20" inputmode="numeric"></label>
@@ -132,6 +134,7 @@
       <label class="wide">Order<select id="sOrder"><option value="wrongFirst">Wrong questions first, then the right ones with the time that is left</option><option value="any">Any order — I pick wrong or right as I go</option></select></label>
     </div>
     <p class="note" id="sDerived">Type the percent and the app knows how many wrong questions get Timer B.</p>
+    <p class="stepcap"><b id="capStartN">3</b><span>Start<small>Timer A is the hard stop · wrong questions first</small></span></p>
     <button class="primary" id="btnStart" type="button">Start review</button>
   </section>
 
@@ -619,10 +622,13 @@ function renderPicks() {
     const cutoff = Date.now() - 2 * 86400000; today = false;
     blocks = P.loadSessions().filter(s => s.type === "block" && !s.reviewId && new Date(s.date).getTime() > cutoff).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 4);
   }
-  if (!blocks.length) { el.hidden = true; return; }
+  const cap = $("capPick"), noPicks = !blocks.length;
+  cap.hidden = noPicks; $("capScoreN").textContent = noPicks ? "1" : "2"; $("capStartN").textContent = noPicks ? "2" : "3";
+  cap.querySelector("small").textContent = today ? "lowest score first, then upward" : "the blocks of the last two days";
+  if (noPicks) { el.hidden = true; return; }
   if (today && !pickTouched && !pickedBlock && R.phase === "setup" && blocks[0].correct != null) chooseBlock(blocks[0].id, blocks);   // the lowest score is the one to review first
   el.hidden = false;
-  el.innerHTML = '<span class="note" style="align-self:center">' + (today ? "Reviewing · lowest score first:" : "Reviewing:") + "</span>" + blocks.map(b => {
+  el.innerHTML = blocks.map(b => {
     const score = b.correct != null ? " · " + P.pctOf(b.correct, b.nQ) + "%" : "";
     const name = today ? "Block " + b._n + (b.label && b.label !== "Block " + b._n ? " · " + P.esc(b.label) : "") : P.esc(P.fmtDate(b.date, true)) + (b.label ? " · " + P.esc(b.label) : "");
     return '<button type="button" data-block="' + P.esc(b.id) + '" aria-pressed="' + (pickedBlock === b.id ? "true" : "false") + '">' + name + score + "</button>";
