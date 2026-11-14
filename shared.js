@@ -107,6 +107,58 @@ window.Pacer = (() => {
     } catch (e) { return 0; }
   }
 
+  /* ---------- CCS cases done since the plan began (Oct 13, 2026) ----------
+     The pacer only knows the cases that were run or logged in it; ccscases.com knows all of them. So the count starts
+     from the list ccscases showed on Nov 13 at 5:31 PM (Completed Cases, by completion date): the case number, the day
+     it was last completed, its length (L = 25:00). Numbers only — no titles, no grades. After that moment the pacer adds
+     what it sees: a case saved in CCS review, or a CCS step of the Day page finished on its own timer or ticked by hand.
+     One case counts once, however many times it was repeated — the same way the ccscases list counts. */
+  const CCS_SINCE = "2026-10-13", CCS_BASE_AT = Date.UTC(2026, 10, 14, 0, 31, 0);   // Nov 13, 5:31 PM in Phoenix
+  const CCS_BASE = ("11-13:75,116L 11-12:126,48L 11-11:8,94L 11-10:125,46L 11-09:47,18L 11-08:77,21L 11-07:10L 11-06:122 11-05:113,90L 11-04:28 11-03:115,107L 11-02:40,37,11L,101,1 " +
+    "10-31:112L 10-30:53 10-29:20 10-28:19,14L 10-27:13,93L,15 10-26:9 10-24:39 10-23:35,124 10-22:55 10-21:32,6L 10-13:5L")
+    .split(" ").reduce((a, d) => { const p = d.split(":"); p[1].split(",").forEach(c => a.push(["2026-" + p[0], parseInt(c, 10), /L$/.test(c) ? 1500 : 750])); return a; }, []);
+  function caseNumOf(label) { // "#116", "116", "case 116", "№ 116", "39 retry" → the number; no case number in it → null
+    const s = String(label == null ? "" : label);
+    let m = /#\s*(\d{1,3})(?!\d)/.exec(s); if (m) return +m[1];
+    m = /^\s*(?:ccs\s*)?(?:case\s*)?(?:no\.?\s*|№\s*|number\s*)?(\d{1,3})(?![\d:])/i.exec(s);
+    return m ? +m[1] : null;
+  }
+  function studyDay(ts) { return todayKey(ts - 4 * 3600 * 1000); }   // the pacer's day turns at 4:00 AM
+  function dayCcs(d, sessIds) { // the CCS steps of a Day sheet finished on its own timer or ticked by hand → { number: [when, length] }. A step that a saved case ticked is left to that case's own record.
+    const out = {}; if (!d || !d.steps) return out;
+    const linked = {}; Object.keys(d.consumed || {}).forEach(sid => { const to = d.consumed[sid]; if (to && to !== "-" && (!sessIds || sessIds[sid])) linked[to] = 1; });
+    Object.keys(d.steps).forEach(id => {
+      const r = d.steps[id]; if (!r || !r.done || r.case == null || r.src === "skip" || r.src === "tool" || linked[id]) return;
+      const n = caseNumOf(r.case); if (n == null) return;
+      if (!out[n] || (r.at || 0) > out[n][0]) out[n] = [r.at || 0, r.csec || 0];
+    });
+    return out;
+  }
+  function ccsDone() { // → { n, base, added (new cases since the list), again (cases of the list done again since), cases: [{ num, day, sec, src, again }] newest first, unnumbered }
+    const by = {}; CCS_BASE.forEach(c => { by[c[1]] = { num: c[1], day: c[0], sec: c[2], src: "ccscases", again: false }; });
+    const add = (num, ts, sec, src) => {
+      if (!(ts > CCS_BASE_AT)) return;                               // up to the moment of the list, ccscases is the record
+      const day = studyDay(ts), cur = by[num];
+      if (cur) { if (day > cur.day) { cur.day = day; cur.again = true; if (sec) cur.sec = sec; } }
+      else by[num] = { num: num, day: day, sec: sec || 750, src: src, again: false };
+    };
+    let un = 0; const ids = {};
+    loadSessions().forEach(s => {
+      if (s.type !== "ccs") return; ids[s.id] = 1;
+      const ts = new Date(s.date).getTime(), num = caseNumOf(s.label);
+      if (num == null) { if (ts > CCS_BASE_AT) un++; return; }
+      add(num, ts, s.limitSec, "pacer");
+    });
+    const d = readJSON("step3pacer.day.v1", null);
+    if (d && typeof d === "object") {
+      const log = d.ccsLog && typeof d.ccsLog === "object" ? d.ccsLog : {};
+      Object.keys(log).forEach(k => { const m = log[k]; if (m && typeof m === "object") Object.keys(m).forEach(n => { if (Array.isArray(m[n])) add(+n, m[n][0], m[n][1], "day"); }); });
+      const t = dayCcs(d, ids); Object.keys(t).forEach(n => add(+n, t[n][0], t[n][1], "day"));
+    }
+    const cases = Object.keys(by).map(k => by[k]).sort((a, b) => a.day < b.day ? 1 : a.day > b.day ? -1 : a.num - b.num);
+    return { n: cases.length, base: CCS_BASE.length, added: cases.filter(c => c.src !== "ccscases").length, again: cases.filter(c => c.again).length, cases: cases, unnumbered: un, since: CCS_SINCE, baseAt: CCS_BASE_AT };
+  }
+
   /* ---------- theme ---------- */
   function getTheme() { const t = readJSON(KEYS.theme, "system"); return (t === "light" || t === "dark") ? t : "system"; }
   function setTheme(t) { writeJSON(KEYS.theme, t); applyTheme(); }
@@ -713,7 +765,7 @@ window.Pacer = (() => {
   }
 
   const api = { KEYS, fmt, fmtSigned, parseMS, todayKey, fmtDate, fmtDay, fmtClock, newId, esc, readJSON, writeJSON,
-    loadSessions, saveSessions, saveSession, deleteSession, mergeSessions, pctOf, countOf, parsePct, repairScores,
+    loadSessions, saveSessions, saveSession, deleteSession, mergeSessions, pctOf, countOf, parsePct, repairScores, ccsDone, dayCcs, caseNumOf, studyDay,
     getTheme, setTheme, applyTheme, setSound, getVolume, setVolume, audioInit, sfx, sfxLater, vibrate, keepAwake, releaseWake,
     renderNav, notice, getSync, setSync, syncNow, syncQuietly, loadParking, saveParking, standalone,
     device, setDeviceName, isIOS, isAndroid, live, bg, getBg, setBg, notifSupported, notifStatus, notifRequest, notifArm, notifDisarm,

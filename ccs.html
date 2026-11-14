@@ -72,7 +72,7 @@
 .setup .primary{width:100%}
 .setup .row2{display:flex;gap:8px;flex-wrap:wrap}
 /* the two sections of this page: the case (the clock) and its review (feedback timer, log, spelling) */
-#toolsCard{order:5} #todayCard{order:6}
+#toolsCard{order:9} #todayCard{order:5}
 .hero .primary{width:100%}
 .hero .row2{display:flex;gap:8px;flex-wrap:wrap}
 .hero .row2 button,.hero .row2 a.btn{min-height:46px;padding:10px 14px}
@@ -86,6 +86,42 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;border-radiu
 .todaylist li .n{font-family:var(--font-num);font-weight:700;font-size:16px}
 .todaylist li .s{font-family:var(--font-num);font-weight:700}
 .todaylist li small{grid-column:2/-1;color:var(--muted);font-size:12.5px}
+/* missed orders: added one by one while the feedback is read */
+.missedbox{display:grid;gap:8px;border:2px dashed var(--page);border-radius:12px;padding:10px 12px;min-width:0}
+.missedbox > label{font-weight:700;font-size:14.5px;color:var(--fg);display:block}
+.missedbox > label small{display:block;font-weight:400;color:var(--muted);font-size:12.5px}
+.madd{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.madd input{width:100%;min-width:0;min-height:46px}
+.madd button{min-height:46px;padding:8px 20px;font-weight:700;font-size:16px;background:var(--page);color:var(--on-c);border-color:var(--page)}
+.mchips{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.mchips li{display:inline-flex;align-items:center;gap:6px;max-width:100%;background:var(--surface);border:1px solid var(--page);border-left:5px solid var(--page);border-radius:8px;padding:4px 4px 4px 10px;font-size:15px;font-weight:700;overflow-wrap:anywhere}
+.mchips li button{flex:none;min-height:32px;min-width:32px;padding:0 6px;border-radius:6px;font-size:15px;line-height:1}
+.mchips li.empty{border:0;background:none;color:var(--muted);font-weight:400;font-size:13.5px;padding:0}
+.mmsg{margin:0;font-size:13px;font-weight:700;color:var(--warn)}
+.mprev{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.mprev[hidden]{display:none}
+.mprev .lbl{font-size:12.5px;color:var(--muted);font-weight:700;flex-basis:100%}
+.mprev button{min-height:38px;padding:4px 12px;font-size:14px;border-radius:999px;max-width:100%;overflow-wrap:anywhere;text-align:left}
+.mprev button small{color:var(--muted);font-family:var(--font-num);font-weight:700}
+.mostmissed{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.mostmissed li{display:inline-flex;align-items:baseline;gap:8px;max-width:100%;border:1px solid var(--line);border-left:5px solid var(--page);border-radius:8px;padding:6px 10px;font-size:15px;font-weight:700;background:var(--bg);overflow-wrap:anywhere}
+.mostmissed li small{font-family:var(--font-num);color:var(--page);font-weight:700;font-size:13px;white-space:nowrap}
+/* the cases done since the plan began */
+.bigcount{display:flex;align-items:center;gap:14px;margin:0}
+.bigcount b{font-family:var(--font-num);font-size:52px;line-height:1;color:var(--c-ccs)}
+.bigcount span{font-weight:700;font-size:16px;line-height:1.3}
+.bigcount span small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.sincelist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.sincelist li{display:grid;grid-template-columns:92px 1fr;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line2);font-size:14px}
+.sincelist li .d{color:var(--muted);font-weight:700;font-size:13px}
+.sincelist li .c{display:flex;flex-wrap:wrap;gap:5px}
+.sincelist i{font-style:normal;font-family:var(--font-num);font-weight:700;font-size:14px;min-width:40px;text-align:center;padding:3px 6px;border-radius:6px;background:var(--surface);border:1px solid var(--line)}
+.sincelist i.long{border:2px solid var(--c-ccs)}
+.sincelist i.new{background:var(--c-ccs);color:var(--on-c);border-color:var(--c-ccs)}
+.sincekey{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:8px 0 0}
+.sincekey i{font-style:normal;font-family:var(--font-num);font-weight:700;padding:1px 6px;border-radius:5px;border:1px solid var(--line);margin-right:4px}
+.sincekey i.long{border:2px solid var(--c-ccs)} .sincekey i.new{background:var(--c-ccs);color:var(--on-c);border-color:var(--c-ccs)}
+#missedCard{order:6} #sinceCard{order:7}
 .aftersave{display:grid;gap:8px;border:2px solid var(--good);border-radius:12px;padding:12px;background:var(--good-bg)}
 .aftersave p{margin:0;font-weight:700;color:var(--good)}
 .aftersave .row2 button.primary{min-height:56px;font-size:17px;flex:1 1 180px}
@@ -229,12 +265,12 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;border-radiu
     <p class="note" id="sDay" hidden></p>
     <p class="note" id="sPlan"></p>
     <button class="primary" id="btnStart" type="button">Start case</button>
-    <p class="note">When you exit the case, its review opens by itself in <b>CCS review</b> — the feedback timer, the misspelled words, the score.</p>
+    <p class="note">When you exit the case, its review opens by itself in <b>CCS review</b> — the feedback timer, the missed orders, the misspelled words, the score.</p>
   </section>
 
   <!-- REVIEW · nothing waiting: start the feedback timer for a case run without the pacer -->
   <section class="card hero full" id="revHome" hidden>
-    <div class="rowhead"><h2>Review a case</h2><span class="meta">Feedback once · the one missed order · the misspelled words</span></div>
+    <div class="rowhead"><h2>Review a case</h2><span class="meta">Feedback once · the missed orders · the misspelled words</span></div>
     <p class="note" id="revHomeNote">A case you run in <b>CCS case</b> opens its review here by itself when you exit it. For a case run without the pacer, start the feedback timer here.</p>
     <div class="form">
       <label class="wide">Case number<input type="text" id="rLabel" placeholder="#116" autocomplete="off"></label>
@@ -429,8 +465,19 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;border-radiu
         <button type="button" id="btnRevEnd">Feedback read ✓ · end the timer</button>
       </div>
     </section>
-    <p class="stepcap"><b>2</b><span>Write down<small>what ccscases cannot keep: the words you misspelled, the score</small></span></p>
+    <p class="stepcap"><b>2</b><span>Write down<small>the orders you missed, the words you misspelled, the score</small></span></p>
     <div class="form">
+      <div class="wide missedbox" id="missedBox">
+        <label for="mIn">Missed orders<small>from the feedback — add them one by one while you read. Type 3–4 letters and pick, like in the exam.</small></label>
+        <div class="madd">
+          <input type="text" id="mIn" list="mList" placeholder="e.g. lip… → Lipid panel" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" enterkeyhint="done" aria-describedby="mMsg">
+          <button type="button" id="mAdd">Add</button>
+        </div>
+        <datalist id="mList"></datalist>
+        <p class="mmsg" id="mMsg" hidden></p>
+        <ul class="mchips" id="mChips" aria-label="Missed orders of this case"></ul>
+        <div class="mprev" id="mPrev" hidden></div>
+      </div>
       <label>Case (name or number)<input type="text" id="dLabel" autocomplete="off" placeholder="#5"></label>
       <label>Case length<select id="dLen"><option value="750">12:30 · short</option><option value="1500">25:00 · long</option><option value="600">10:00 · 1× short</option><option value="1200">20:00 · 1× long</option></select></label>
       <label class="wide">Words you misspelled in this case (comma-separated — they go into the drill)<input type="text" id="dWords" placeholder="e.g. colchicine, ampicillin sulbactam" autocomplete="off" maxlength="300"></label>
@@ -455,6 +502,26 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;border-radiu
   <section class="card full" id="todayCard" hidden>
     <div class="rowhead"><h2>Today's cases</h2><span class="meta" id="todayMeta"></span></div>
     <ul class="todaylist" id="todayList"></ul>
+  </section>
+
+  <!-- REVIEW · every order noted as missed, most often first -->
+  <section class="card full" id="missedCard" hidden>
+    <div class="rowhead"><h2>Orders I missed</h2><span class="meta" id="missedMeta"></span></div>
+    <ul class="mostmissed" id="missedAll"></ul>
+    <p class="note">From the cases saved here, most often first. ×2 = missed in two cases.</p>
+  </section>
+
+  <!-- REVIEW · the cases done since the plan began -->
+  <section class="card full" id="sinceCard" hidden>
+    <div class="rowhead"><h2>CCS cases since Oct 13</h2><span class="meta" id="sinceMeta"></span></div>
+    <p class="bigcount"><b id="sinceN">40</b><span>different cases done<small id="sinceSub"></small></span></p>
+    <details class="fold" id="sinceFold"><summary>Show them by day</summary>
+      <div class="body">
+        <ul class="sincelist" id="sinceList"></ul>
+        <p class="sincekey"><span><i>75</i>12:30 case</span><span><i class="long">116</i>25:00 case</span><span><i class="new">34</i>new since the ccscases list</span><span><i>39 ↻</i>done again since the list</span></p>
+        <p class="note" id="sinceNote"></p>
+      </div>
+    </details>
   </section>
 </div>
 
@@ -995,7 +1062,7 @@ function applyView() { // the page's name, colour and switcher follow the sectio
   const rv = view === "review";
   P.renderNav(rv ? "ccsr" : "ccs");
   $("pageTitle").textContent = rv ? "Step 3 CCS Review" : "Step 3 CCS Case";
-  $("tagline").textContent = rv ? "Feedback once · one missed order · the misspelled words" : "12:30 or 25:00 of real time · 1.25×";
+  $("tagline").textContent = rv ? "Feedback once · the missed orders · the misspelled words" : "12:30 or 25:00 of real time · 1.25×";
   document.title = rv ? "Step 3 CCS Review" : "Step 3 CCS Case";
 }
 function setView(v, quiet) {
@@ -1009,7 +1076,7 @@ function setView(v, quiet) {
 function fresh() {
   return { phase: "setup", id: "", date: "", label: "", category: "", attempt: "first", source: "ccscases", limitSec: 750,
     startAt: 0, pausedAt: 0, pausedTotal: 0, patient: "", checks: {}, phaseChimed: {}, finalFired: false, endQuiet: false, endEl: 0, endedBy: "", saved: false, caseTimed: true,
-    history: [], rev: { startAt: 0, limitSec: 0, endAt: 0, warned: false, rang: false }, updatedAt: 0 };
+    history: [], rev: { startAt: 0, limitSec: 0, endAt: 0, warned: false, rang: false }, missed: [], draft: { words: "", score: "", note: "" }, updatedAt: 0 };
 }
 function loadSettings() { const p = P.readJSON(LS_S, null); if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p); P.setSound(S.sound); chosenLen = 750; }
 /* The Day page writes today's cases — number and length — here. The next case of the day sets the length (and the label),
@@ -1202,6 +1269,7 @@ function saveCase() { // the log keeps only what ccscases.com cannot know; score
     limitSec: R.limitSec, timeUsedSec: Math.round(R.endEl), endedBy: R.endedBy,
     score: isNaN(score) ? null : score, note: $("dNote").value.trim(),
     misspelled: $("dWords").value.split(/[,;\n]/).map(w => w.trim()).filter(Boolean),
+    missedOrders: missedNow().slice(),
     caseTimed: R.caseTimed !== false, logVersion: 2,
     reviewSec: R.rev.startAt ? Math.round(revElapsed()) : null, reviewLimitSec: R.rev.startAt ? R.rev.limitSec : null
   };
@@ -1212,7 +1280,7 @@ function saveCase() { // the log keeps only what ccscases.com cannot know; score
   persist(); P.live.clear();
   $("savedMsg").hidden = false; $("savedMsg").textContent = "Saved to Stats. Change anything above and press Update to re-save.";
   $("afterSave").hidden = false; $("afterSaveText").textContent = "Saved ✓ " + (R.label ? "· " + R.label + " " : "") + "— the break is running. Then the next step of the day.";
-  planCache.at = 0; renderToday(true);
+  planCache.at = 0; renderToday(true); renderMissed(); renderLists(true);
   $("btnSave").textContent = "Saved"; $("btnSave").disabled = true;
   $("btnResume").hidden = true;
   $("noteLine").textContent = noteLine(score);
@@ -1297,7 +1365,7 @@ function render() {
   $("colL").hidden = !(live && !rv); $("colR").hidden = !(live && !rv); $("revWait").hidden = !(live && rv);
   $("done").hidden = !(done && rv); $("caseEnded").hidden = !(done && !rv);
   $("toolsCard").hidden = !(rv ? !live : inSetup);                  // the spelling tools: before a case, and in the review section
-  renderToday(false);
+  renderToday(false); renderLists(false);
   $("btnSound").textContent = S.sound ? "Sound on" : "Sound off"; $("btnSound").setAttribute("aria-pressed", S.sound ? "true" : "false");
   if (inSetup) { renderSetup(); return; }
   if (live && rv) { const e2 = elapsed(); $("rwMeta").textContent = (R.label ? R.label + " · " : "") + fmt(Math.floor(e2)) + " of " + fmt(R.limitSec); }
@@ -1366,7 +1434,7 @@ function renderReview() {
   } else {
     box.dataset.tone = left <= 60 ? "crit" : left <= 180 ? "warn" : "normal";
     $("revClock").textContent = fmt(Math.ceil(left));
-    $("revText").textContent = left <= 60 ? "One minute. Write the one order you missed and the score." : left <= 180 ? "Last three minutes: stop reading, start writing — the one order, the score." : "Reading the feedback: missed orders first, then timing, then the sequence. Not the case again.";
+    $("revText").textContent = left <= 60 ? "One minute. Add the missed orders and the score." : left <= 180 ? "Last three minutes: stop reading, start writing — the missed orders, the score." : "Reading the feedback: missed orders first, then timing, then the sequence. Not the case again.";
   }
 }
 let doneRendered = false, doneFormFor = "", todaySig = "", todayAt = 0;
@@ -1375,12 +1443,78 @@ function renderToday(force) { // the review section lists the cases saved today:
   if (view !== "review") { if (!card.hidden) card.hidden = true; todayAt = 0; return; }
   const now = Date.now(); if (!force && now - todayAt < 4000 && todaySig) { return; } todayAt = now;
   const k = dayKey(now), list = P.loadSessions().filter(x => x.type === "ccs" && dayKey(new Date(x.date).getTime()) === k).sort((a, b) => new Date(a.date) - new Date(b.date));
-  const sig = JSON.stringify(list.map(x => [x.id, x.label, x.limitSec, x.timeUsedSec, x.score, (x.misspelled || []).join(","), x.reviewSec]));
+  const sig = JSON.stringify(list.map(x => [x.id, x.label, x.limitSec, x.timeUsedSec, x.score, (x.misspelled || []).join(","), x.reviewSec, (x.missedOrders || []).join(",")]));
   card.hidden = !list.length;
   if (sig === todaySig) return; todaySig = sig;
   $("todayMeta").textContent = list.length + " saved";
   $("todayList").innerHTML = list.map((x, i) => '<li><span class="n">' + (i + 1) + "</span><span><b>" + P.esc(x.label || "case") + "</b> · " + fmt(x.limitSec || 750) + (x.caseTimed === false ? "" : " · " + fmt(x.timeUsedSec || 0) + " used") + '</span><span class="s">' + (x.score != null ? x.score + "%" : "") + "</span>" +
-    "<small>" + (x.reviewSec != null ? "feedback " + fmt(x.reviewSec) : "no feedback timer") + ((x.misspelled || []).length ? " · misspelled: " + P.esc(x.misspelled.join(", ")) : "") + "</small></li>").join("");
+    "<small>" + (x.reviewSec != null ? "feedback " + fmt(x.reviewSec) : "no feedback timer") + ((x.misspelled || []).length ? " · misspelled: " + P.esc(x.misspelled.join(", ")) : "") + ((x.missedOrders || []).length ? " · missed: " + P.esc(x.missedOrders.join(", ")) : "") + "</small></li>").join("");
+}
+/* ---------- missed orders ---------- */
+function normOrder(t) { return String(t == null ? "" : t).trim().replace(/\s+/g, " ").slice(0, 60); }
+function missedNow() { if (!Array.isArray(R.missed)) R.missed = []; return R.missed; }
+function missedAll() { // every order noted as missed in a saved case → [{ name, n (cases), last }], most often first; an older single note counts as one
+  const m = new Map();
+  P.loadSessions().forEach(x => {
+    if (x.type !== "ccs") return;
+    const list = Array.isArray(x.missedOrders) ? x.missedOrders.slice() : []; if (!list.length && x.missedOrder) list.push(x.missedOrder);
+    const seen = {}, t = new Date(x.date).getTime() || 0;
+    list.forEach(o => { const name = normOrder(o), k = name.toLowerCase(); if (!k || seen[k]) return; seen[k] = 1; const cur = m.get(k) || { name: name, n: 0, last: 0 }; cur.n++; if (t >= cur.last) { cur.last = t; cur.name = name; } m.set(k, cur); });
+  });
+  return Array.from(m.values()).sort((a, b) => b.n - a.n || b.last - a.last || (a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1));
+}
+function keepMissed() { // the list belongs to the case: it is kept with the run at once, and with the saved case if it is already saved
+  persist();
+  if (R.saved) { const s = P.loadSessions().find(x => x.id === R.id && x.type === "ccs"); if (s) { s.missedOrders = missedNow().slice(); P.saveSession(s); P.syncQuietly(); renderToday(true); renderLists(true); } }
+  const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v);
+}
+function missedMsg(t) { const el = $("mMsg"); el.textContent = t || ""; el.hidden = !t; }
+function addMissed(text) {
+  const name = normOrder(text); if (R.phase !== "done") return false;
+  if (!name) { missedMsg("Type the order first, then Add."); return false; }
+  const list = missedNow();
+  if (list.some(o => o.toLowerCase() === name.toLowerCase())) { missedMsg("“" + name + "” is already on the list."); return false; }
+  if (list.length >= 30) { missedMsg("Thirty is the limit for one case."); return false; }
+  list.push(name); missedMsg(""); keepMissed(); renderMissed(); return true;
+}
+function removeMissed(i) { const list = missedNow(); if (i >= 0 && i < list.length) { list.splice(i, 1); missedMsg(""); keepMissed(); renderMissed(); } }
+let mListBuilt = false;
+function renderMissed() {
+  const list = missedNow(), ul = $("mChips");
+  ul.innerHTML = list.length ? list.map((o, i) => "<li><span>" + P.esc(o) + '</span><button type="button" data-rm="' + i + '" aria-label="Remove ' + P.esc(o) + '">✕</button></li>').join("") : '<li class="empty">Nothing added yet. No missed order in the feedback? Leave it empty.</li>';
+  ul.querySelectorAll("button[data-rm]").forEach(b => b.addEventListener("click", () => removeMissed(+b.dataset.rm)));
+  const have = {}; list.forEach(o => { have[o.toLowerCase()] = 1; });
+  const prev = missedAll().filter(x => !have[x.name.toLowerCase()]).slice(0, 8), box = $("mPrev");
+  box.hidden = !prev.length;
+  box.innerHTML = prev.length ? '<span class="lbl">Missed before — tap to add:</span>' + prev.map((x, i) => '<button type="button" data-add="' + i + '">+ ' + P.esc(x.name) + (x.n > 1 ? " <small>×" + x.n + "</small>" : "") + "</button>").join("") : "";
+  box.querySelectorAll("button[data-add]").forEach(b => b.addEventListener("click", () => addMissed(prev[+b.dataset.add].name)));
+  if (!mListBuilt) { mListBuilt = true; const seen = {}; $("mList").innerHTML = ORDERS.map(x => x.o).filter(o => { const k = String(o).toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true; }).map(o => '<option value="' + P.esc(o) + '">').join(""); }
+}
+/* ---------- the review section's two lists: every missed order, and the cases done since Oct 13 ---------- */
+let listsAt = 0, listsSig = "";
+function renderLists(force) {
+  const mc = $("missedCard"), sc = $("sinceCard");
+  if (view !== "review" || R.phase === "run") { if (!mc.hidden) mc.hidden = true; if (!sc.hidden) sc.hidden = true; listsAt = 0; return; }
+  const now = Date.now(); if (!force && listsSig && now - listsAt < 5000 && now >= listsAt) return; listsAt = now;
+  const all = missedAll(); let c = null; try { c = P.ccsDone(); } catch (e) {}
+  mc.hidden = !all.length; sc.hidden = !c;
+  const sig = JSON.stringify([all.map(x => [x.name, x.n]), c && c.cases.map(x => [x.num, x.day, x.sec, x.src, x.again]), c && c.unnumbered, c && c.again]);
+  if (sig === listsSig) return; listsSig = sig;
+  if (all.length) {
+    $("missedMeta").textContent = all.length + (all.length === 1 ? " order" : " orders");
+    $("missedAll").innerHTML = all.slice(0, 40).map(x => "<li><span>" + P.esc(x.name) + "</span>" + (x.n > 1 ? "<small>×" + x.n + "</small>" : "") + "</li>").join("");
+  }
+  if (c) {
+    $("sinceN").textContent = c.n;
+    $("sinceMeta").textContent = "one case counts once";
+    $("sinceSub").textContent = "ccscases list of Nov 13, 5:31 PM: " + c.base + (c.added ? " · new since then: " + c.added : "") + (c.again ? " · done again since then: " + c.again : "") + (!c.added && !c.again ? " · nothing saved here since then" : "");
+    const byDay = {}; c.cases.forEach(x => { (byDay[x.day] = byDay[x.day] || []).push(x); });
+    $("sinceList").innerHTML = Object.keys(byDay).sort().reverse().map(day => {
+      const d = new Date(day + "T12:00:00"), lbl = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+      return '<li><span class="d">' + P.esc(lbl) + '</span><span class="c">' + byDay[day].map(x => '<i class="' + (x.src !== "ccscases" ? "new" : x.sec > 1000 ? "long" : "") + '" title="' + (x.sec > 1000 ? "25:00" : "12:30") + (x.again ? " · done again" : "") + '">' + x.num + (x.again ? " ↻" : "") + "</i>").join("") + "</span></li>";
+    }).join("");
+    $("sinceNote").textContent = "The day is the last time the case was done. A repeat does not add to the number." + (c.unnumbered ? " " + c.unnumbered + " case" + (c.unnumbered === 1 ? "" : "s") + " saved here without a case number " + (c.unnumbered === 1 ? "is" : "are") + " not counted — add the number in Stats." : "");
+  }
 }
 function nextCase() { // the saved case is put away: a clean card for the next one
   if (R.phase === "done" && !R.saved) return;
@@ -1390,21 +1524,22 @@ function nextCase() { // the saved case is put away: a clean card for the next o
 function noteLine(score) {
   const d = new Date(R.date), day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const words = $("dWords") ? $("dWords").value.split(/[,;\n]/).map(w => w.trim()).filter(Boolean) : [];
-  return day + " · CCS " + (R.label || "case") + " · " + fmt(R.limitSec) + (R.caseTimed === false ? "" : " · " + fmt(R.endEl) + " used" + (R.endedBy === "clock" ? " (clock)" : "")) + (score != null ? " · " + score + "%" : "") + (words.length ? " · misspelled: " + words.join(", ") : "") + " · feedback: ccscases Report Card";
+  return day + " · CCS " + (R.label || "case") + " · " + fmt(R.limitSec) + (R.caseTimed === false ? "" : " · " + fmt(R.endEl) + " used" + (R.endedBy === "clock" ? " (clock)" : "")) + (score != null ? " · " + score + "%" : "") + (missedNow().length ? " · missed: " + missedNow().join(", ") : "") + (words.length ? " · misspelled: " + words.join(", ") : "") + " · feedback: ccscases Report Card";
 }
 function renderDone() {
   $("doneMeta").textContent = (R.label ? R.label + " · " : "") + R.category + " · " + P.fmtDate(R.date, true);
   $("doneStats").innerHTML = (R.caseTimed === false
     ? "<li>Case run outside the pacer — no case clock for this one.</li>"
     : "<li><b>" + fmt(R.endEl) + "</b> of " + fmt(R.limitSec) + " used — " + (R.endedBy === "clock" ? "the clock ended the case" : "you exited the case") + "</li>") +
-    "<li>Score and feedback: <b>ccscases.com Report Card</b>. Write the misspelled words below while you remember them.</li>";
+    "<li>Score and feedback: <b>ccscases.com Report Card</b>. Add the missed orders and the misspelled words below while you remember them.</li>";
   $("doneChecks").innerHTML = "";
-  if (doneFormFor !== R.id) { doneFormFor = R.id; $("dLabel").value = R.label; $("dScore").value = ""; $("dNote").value = ""; $("dWords").value = ""; }
+  if (doneFormFor !== R.id) { doneFormFor = R.id; const dr = R.draft || {}; $("dLabel").value = R.label; $("dScore").value = dr.score || ""; $("dNote").value = dr.note || ""; $("dWords").value = dr.words || ""; $("mIn").value = ""; missedMsg(""); }
+  renderMissed();
   $("dLen").value = String(R.limitSec);
-  $("btnSave").textContent = "Save case"; $("btnSave").disabled = false; $("savedMsg").hidden = true; $("afterSave").hidden = true;
+  $("btnSave").textContent = R.saved ? "Update case" : "Save case"; $("btnSave").disabled = false; $("savedMsg").hidden = !R.saved; $("afterSave").hidden = !R.saved;
   $("doneTitle").textContent = "Review this case" + (R.label ? " · " + R.label : "");
   $("btnResume").hidden = R.caseTimed === false || !(R.endedBy !== "clock" && !R.saved && (Date.now() - R.startAt - R.pausedTotal) / 1000 < R.limitSec);
-  $("noteLine").textContent = noteLine(null);
+  const sv = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(sv) ? null : sv);
 }
 
 /* ---------- settings ---------- */
@@ -1618,6 +1753,10 @@ function init() {
   $("btnRevEnd").addEventListener("click", revEndNow);
   $("btnReviewOnly").addEventListener("click", startReviewOnly);
   ["dScore", "dLabel", "dNote", "dWords"].forEach(id => $(id).addEventListener("input", markDirty));
+  ["dScore", "dNote", "dWords"].forEach(id => $(id).addEventListener("input", () => { if (R.phase !== "done") return; R.draft = { words: $("dWords").value, score: $("dScore").value, note: $("dNote").value }; persist(); }));   // what is typed is kept with the run: a reload does not lose it
+  $("mAdd").addEventListener("click", () => { if (addMissed($("mIn").value)) $("mIn").value = ""; $("mIn").focus(); });
+  $("mIn").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); if (addMissed($("mIn").value)) $("mIn").value = ""; } });
+  $("mIn").addEventListener("input", () => missedMsg(""));
   $("dLen").addEventListener("change", () => setLimit($("dLen").value));
   $("dWords").addEventListener("input", () => { const v = parseInt($("dScore").value, 10); $("noteLine").textContent = noteLine(isNaN(v) ? null : v); });
   document.querySelectorAll("#lenswitch button, #lenquick button").forEach(b => b.addEventListener("click", e => { setLimit(b.dataset.len); if (e.detail > 0) b.blur(); }));

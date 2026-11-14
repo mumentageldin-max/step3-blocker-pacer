@@ -137,7 +137,7 @@ textarea.imp{font-family:var(--font-num);font-size:12px;min-height:80px;width:10
     <ul class="sessions" id="ccsLog"></ul>
     <div class="chartwrap" id="ccsScores"></div>
     <details class="fold"><summary>By category (scores you copied from ccscases)</summary><div class="body" id="ccsCatTable"></div></details>
-    <details class="fold" id="ccsMissedFold" hidden><summary>Older notes: orders you missed</summary><div class="body"><ul class="sessions" id="ccsMissed"></ul></div></details>
+    <details class="fold" id="ccsMissedFold" hidden><summary>Orders you missed, case by case</summary><div class="body"><ul class="sessions" id="ccsMissed"></ul></div></details>
   </section>
 
   <section class="card">
@@ -443,8 +443,13 @@ function renderScores(list) {
    skipped items, ended-by-clock, phase at exit) are no longer analysed; old sessions keep those fields untouched. */
 const CCS_NOTE = "CCS scores and feedback: see ccscases.com Report Card.";
 function ccsLine(s) { // "case · length · score if entered · misspelled words"
-  return (s.label || s.category || "case") + " · " + fmt(s.limitSec || 750) + (s.score != null ? " · " + s.score + "%" : "") + ((s.misspelled || []).length ? " · misspelled: " + s.misspelled.join(", ") : "");
+  return (s.label || s.category || "case") + " · " + fmt(s.limitSec || 750) + (s.score != null ? " · " + s.score + "%" : "") + (missedOf(s).length ? " · missed: " + missedOf(s).join(", ") : "") + ((s.misspelled || []).length ? " · misspelled: " + s.misspelled.join(", ") : "");
 }
+function missedOf(s) { const l = Array.isArray(s.missedOrders) ? s.missedOrders.filter(Boolean) : []; return l.length ? l : (s.missedOrder ? [s.missedOrder] : []); }   // the list from CCS review; an older single note counts as one
+function sinceKpi() { // the cases done since the plan began: the ccscases list of Nov 13 + what the pacer has seen since
+  try { const c = P.ccsDone(); return { l: "Different cases since Oct 13", v: c.n, d: "ccscases list of Nov 13: " + c.base + (c.added ? " · new since: " + c.added : "") + (c.again ? " · done again: " + c.again : "") }; } catch (e) { return null; }
+}
+function kpiHtml(k) { return '<div class="kpi"><div class="l">' + esc(k.l) + '</div><div class="v">' + esc(k.v) + '</div><div class="d">' + esc(k.d) + "</div></div>"; }
 function ccsStats(list) {
   const cases = list.filter(s => s.type === "ccs");
   const scored = cases.filter(c => c.score != null), first = scored.filter(c => c.attempt !== "repeat");
@@ -454,16 +459,17 @@ function ccsStats(list) {
 function renderCcs(list) {
   const st = ccsStats(list);
   const kp = $("ccsKpis"), wrap = $("ccsScores"), tbl = $("ccsCatTable"), log = $("ccsLog"), ml = $("ccsMissed"), mf = $("ccsMissedFold");
-  if (!st.cases.length) { kp.innerHTML = ""; log.innerHTML = ""; wrap.innerHTML = '<p class="empty">No CCS cases yet. Run one in the CCS pacer and save its log. ' + CCS_NOTE + '</p>'; tbl.innerHTML = ""; ml.innerHTML = ""; mf.hidden = true; return; }
+  const since = sinceKpi();
+  if (!st.cases.length) { kp.innerHTML = since ? kpiHtml(since) : ""; log.innerHTML = ""; wrap.innerHTML = '<p class="empty">No CCS cases yet. Run one in the CCS pacer and save its log. ' + CCS_NOTE + '</p>'; tbl.innerHTML = ""; ml.innerHTML = ""; mf.hidden = true; return; }
   const avgFirst = mean(st.first.map(c => c.score)), last5 = mean(st.scored.slice(-5).map(c => c.score));
   const today = P.todayKey(), allWords = P.loadSessions().filter(x => x.type === "word").length;
-  kp.innerHTML = [
-    { l: "Cases", v: st.cases.length, d: st.cases.filter(c => P.todayKey(c.date) === today).length + " today" },
+  kp.innerHTML = (since ? [since] : []).concat([
+    { l: "Logged in the pacer", v: st.cases.length, d: st.cases.filter(c => P.todayKey(c.date) === today).length + " today · every attempt" },
     { l: "Long cases (25:00)", v: st.cases.filter(c => (c.limitSec || 750) > 1000).length, d: "of " + st.cases.length },
     { l: "Misspelled words", v: st.words.length, d: allWords + " in the drill overall" },
     { l: "First-attempt average", v: avgFirst == null ? "—" : Math.round(avgFirst) + "%", d: st.first.length ? st.first.length + " scored (copied from ccscases)" : "scores live on ccscases.com" },
     { l: "Last 5 scored", v: last5 == null ? "—" : Math.round(last5) + "%", d: "retry below 80%, once" }
-  ].map(k => '<div class="kpi"><div class="l">' + esc(k.l) + '</div><div class="v">' + esc(k.v) + '</div><div class="d">' + esc(k.d) + "</div></div>").join("");
+  ]).map(kpiHtml).join("");
   const recent = st.cases.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 15);
   log.innerHTML = recent.map(c => '<li data-type="ccs"><span class="kind">' + esc(P.fmtDate(c.date)) + '</span><span class="what">' + esc(ccsLine(c)) + "</span><span></span></li>").join("") +
     '<li class="empty">' + esc(CCS_NOTE) + "</li>";
@@ -475,9 +481,9 @@ function renderCcs(list) {
   st.cases.forEach(c => { const k = c.category || "Other"; by[k] = by[k] || { n: 0, firstSum: 0, firstN: 0, bestSum: 0, bestN: 0 }; by[k].n++; if (c.score != null) { if (c.attempt !== "repeat") { by[k].firstSum += c.score; by[k].firstN++; } by[k].bestSum += c.score; by[k].bestN++; } });
   tbl.innerHTML = '<table class="t"><thead><tr><th>Category</th><th class="n">Cases</th><th class="n">First attempt</th><th class="n">All attempts</th></tr></thead><tbody>' +
     Object.keys(by).sort((a, b) => by[b].n - by[a].n).map(k => "<tr><td>" + esc(k) + '</td><td class="n">' + by[k].n + '</td><td class="n ' + (by[k].firstN && by[k].firstSum / by[k].firstN < 70 ? "behind" : "") + '">' + (by[k].firstN ? Math.round(by[k].firstSum / by[k].firstN) + "%" : "—") + '</td><td class="n">' + (by[k].bestN ? Math.round(by[k].bestSum / by[k].bestN) + "%" : "—") + "</td></tr>").join("") + "</tbody></table>";
-  const notes = st.cases.filter(c => c.missedOrder).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 25);
+  const notes = st.cases.filter(c => missedOf(c).length).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 40);
   mf.hidden = !notes.length;
-  ml.innerHTML = notes.map(c => '<li data-type="ccs"><span class="kind">' + esc(c.category || "ccs") + '</span><span class="what"><b>' + esc(c.missedOrder) + "</b> · " + esc(c.label || "") + " · " + esc(P.fmtDate(c.date)) + "</span><span></span></li>").join("");
+  ml.innerHTML = notes.map(c => '<li data-type="ccs"><span class="kind">' + esc(P.fmtDate(c.date)) + '</span><span class="what"><b>' + esc(missedOf(c).join(", ")) + "</b> · " + esc(c.label || c.category || "case") + "</span><span></span></li>").join("");
 }
 function ccsInsights(list, add) {
   const st = ccsStats(list);
@@ -562,7 +568,7 @@ function openEdit(id) {
     html = f(["Case (name or number)", "label", "text", s.label]) + sel("Category", "category", ["Internal Medicine", "Emergency Medicine", "Pediatrics", "OB/GYN", "Neurology", "Psychiatry", "Surgery", "Other"].map(c => [c, c]), s.category) +
       sel("Attempt", "attempt", [["first", "First attempt"], ["repeat", "Repeat"]], s.attempt) + f(["Score (%)", "score", "number", s.score]) +
       sel("Case length", "limitSec", lens, s.limitSec) + f(["Time used (mm:ss)", "timeUsedSec", "text", fmt(s.timeUsedSec || 0)]) +
-      (s.missedOrder ? f(["The one order you missed (older note)", "missedOrder", "text", s.missedOrder]) : "") + f(["Misspelled words (comma-separated)", "misspelled", "text", (s.misspelled || []).join(", ")]) + f(["Note", "note", "text", s.note]);
+      f(["Missed orders (comma-separated)", "missedOrders", "text", missedOf(s).join(", ")]) + f(["Misspelled words (comma-separated)", "misspelled", "text", (s.misspelled || []).join(", ")]) + f(["Note", "note", "text", s.note]);
   } else if (s.type === "block") {
     html = f(["Block name", "label", "text", s.label]) + f(["Correct (of " + (s.nQ || 20) + ")", "correct", "number", s.correct]);
   } else {
@@ -582,7 +588,8 @@ function openEdit(id) {
       const lim = parseInt(get("limitSec"), 10); if (lim > 0) s.limitSec = lim;
       const used = P.parseMS(get("timeUsedSec")); if (used != null) s.timeUsedSec = Math.min(used, s.limitSec);
       s.endedBy = s.caseTimed === false ? "none" : (s.timeUsedSec >= s.limitSec ? "clock" : "me");
-      if (get("missedOrder") !== undefined) s.missedOrder = get("missedOrder").trim(); s.note = get("note").trim();
+      if (get("missedOrders") !== undefined) { s.missedOrders = get("missedOrders").split(/[,;\n]/).map(w => w.trim().replace(/\s+/g, " ")).filter(Boolean).slice(0, 30); if (s.missedOrder) delete s.missedOrder; }   // the older single note is now the first item of the list
+      s.note = get("note").trim();
       s.misspelled = get("misspelled").split(/[,;\n]/).map(w => w.trim()).filter(Boolean);
       s.misspelled.forEach(w => addWord(w, s.label || s.category || "case"));
     } else {
