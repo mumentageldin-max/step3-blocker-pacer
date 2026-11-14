@@ -86,6 +86,8 @@ button.badge:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .ccsdone b{font-size:28px;color:var(--c-ccs);line-height:1}
 .ccsdone small{display:block;font-weight:400;color:var(--muted);font-size:12.5px}
 .ccsdone:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.ccsdone.uw{border-color:var(--c-block)} .ccsdone.uw b{color:var(--c-block)}
+.donerow{display:grid;gap:10px;margin-top:10px;grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr))} .donerow .ccsdone{margin-top:0}
 .now .sub .cap{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:4px 0 -3px}
 .now .sub .row{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:8px}
 .now .sub button{min-height:44px;font-size:14px;padding:8px 4px;white-space:nowrap}
@@ -233,7 +235,10 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
       <div class="rowhead"><h2 id="tenTitle">To the exam</h2><span class="meta" id="tenMeta"></span></div>
       <div class="cal7" id="ten"></div>
       <p class="note" id="tenNote" style="margin:8px 0 0">Past days: what you did — B blocks · C CCS cases · R reviews. Coming days: the plan.</p>
-      <a class="ccsdone" id="tenCcs" href="./ccs.html#review" hidden><b class="num" id="tenCcsN">40</b><span>different CCS cases done since Oct 13 <small id="tenCcsSub"></small></span></a>
+      <div class="donerow">
+        <a class="ccsdone uw" id="tenUw" href="./stats.html#uw" hidden><b class="num" id="tenUwN">63</b><span>UWorld blocks done since Oct 14 <small id="tenUwSub"></small></span></a>
+        <a class="ccsdone" id="tenCcs" href="./ccs.html#review" hidden><b class="num" id="tenCcsN">40</b><span>different CCS cases done since Oct 13 <small id="tenCcsSub"></small></span></a>
+      </div>
     </section>
 
     <details class="fold" id="rulesFold">
@@ -614,7 +619,7 @@ function loadSettings() {
   P.setSound(S.sound);
 }
 function saveSettings() { P.writeJSON(LS_S, S); }
-function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, len: {}, order: [], rv: {}, scores: {}, st: {}, ccsLog: {}, epoch: 0, fit: 23, v: DAYV, startedAt: 0, startSet: 0, finishedAt: 0, updatedAt: 0 }; }
+function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, len: {}, order: [], rv: {}, scores: {}, st: {}, ccsLog: {}, uwLog: {}, epoch: 0, fit: 23, v: DAYV, startedAt: 0, startSet: 0, finishedAt: 0, updatedAt: 0 }; }
 function persist(touch) { stampGroups(); D.updatedAt = Date.now(); P.writeJSON(LS_D, D); if (touch !== false) P.live.touch(); }
 function history() { const h = P.readJSON(LS_H, []); return Array.isArray(h) ? h : []; }
 function spentRec(step, rec) { // [study, break] seconds a ticked step counts for: measured when it ran on a timer or in its page; the plan when it was ticked by hand; nothing when it was skipped before it began
@@ -640,7 +645,7 @@ function archive(day) { // keep a finished day for the calendar: what was ticked
   P.writeJSON(LS_H, h.slice(-90));
 }
 function normDay() { // every field present, whichever page version or device saved the day
-  ["steps", "consumed", "manual", "caseLen", "len", "rv", "scores", "st", "ccsLog"].forEach(f => { if (!D[f] || typeof D[f] !== "object" || Array.isArray(D[f])) D[f] = {}; });
+  ["steps", "consumed", "manual", "caseLen", "len", "rv", "scores", "st", "ccsLog", "uwLog"].forEach(f => { if (!D[f] || typeof D[f] !== "object" || Array.isArray(D[f])) D[f] = {}; });
   if (!(D.epoch > 0)) D.epoch = 0;
   if (!Array.isArray(D.order)) D.order = [];
   Object.keys(D.caseLen).forEach(id => { if (!(D.len[id] > 0) && D.caseLen[id] > 0) D.len[id] = D.caseLen[id]; });
@@ -730,7 +735,7 @@ function loadDay() {
   const p = P.readJSON(LS_D, null);
   let save = true;
   if (p && typeof p === "object" && p.date === k) save = adopt(p);
-  else { let log = {}; if (p && typeof p === "object" && p.date) { try { D = Object.assign(freshDay(p.date), p); normDay(); log = carryCcs(D, true); archive(D); } catch (e) { console.warn("day: could not archive the earlier day", e); } } D = freshDay(k); D.ccsLog = log; }
+  else { let log = {}, ulog = {}; if (p && typeof p === "object" && p.date) { try { D = Object.assign(freshDay(p.date), p); normDay(); log = carryCcs(D, true); ulog = carryUw(D, true); archive(D); } catch (e) { console.warn("day: could not archive the earlier day", e); } } D = freshDay(k); D.ccsLog = log; D.uwLog = ulog; }
   if (S.tpl !== "auto" && D.tpl !== S.tpl && !anyDoneRaw(D)) D.tpl = S.tpl;
   STEPS = buildSteps(D.date, D.tpl);
   takeSnap();                                                       // from here on, a group that changes was changed on this device
@@ -751,13 +756,28 @@ function carryCcs(prev, withToday) { // the sheet that is put away hands its log
   const days = Object.keys(log).sort(); while (days.length > 120) delete log[days.shift()];
   return log;
 }
+function unionUw(a, b) { // two logs of UWorld blocks done on the Day page (day → step → [when, saved block]) → one; the later record of a step wins
+  const out = {};
+  [a, b].forEach(L => Object.keys(L || {}).sort().forEach(day => {
+    const src = L[day]; if (!src || typeof src !== "object" || Array.isArray(src)) return;
+    Object.keys(src).sort().forEach(id => { const v = src[id]; if (!Array.isArray(v)) return; const n = [v[0] || 0, String(v[1] || "")], o = (out[day] || {})[id];
+      if (!o || n[0] > o[0] || (n[0] === o[0] && n[1] > o[1])) { out[day] = out[day] || {}; out[day][id] = n; } });
+  }));
+  return out;
+}
+function carryUw(prev, withToday) { // the sheet that is put away hands its log of blocks to the next one; its own block steps join it
+  let log = unionUw((prev && prev.uwLog) || {}, {});
+  if (withToday && prev && prev.date) { try { const t = P.dayBlocks(prev); if (Object.keys(t).length) { const add = {}; add[prev.date] = t; log = unionUw(log, add); } } catch (e) {} }
+  const days = Object.keys(log).sort(); while (days.length > 120) delete log[days.shift()];
+  return log;
+}
 function anyDoneRaw(day) { return Object.keys(day.steps || {}).some(id => day.steps[id] && day.steps[id].done); }
 function rollover() { // called every tick: a new day (after 4:00 AM) gets a fresh sheet
   const k = keyOf(Date.now());
   if (D.date === k) return false;
   if (D.timer) { clearTimer(false); }
-  const log = carryCcs(D, true);
-  archive(D); D = freshDay(k); D.ccsLog = log; rebuild(); takeSnap();
+  const log = carryCcs(D, true), ulog = carryUw(D, true);
+  archive(D); D = freshDay(k); D.ccsLog = log; D.uwLog = ulog; rebuild(); takeSnap();
   persist(); return true;
 }
 
@@ -835,7 +855,7 @@ function normOf(p) { // another copy of the day with every field present, as thi
 }
 function legacyStamps() { D.st = {}; GROUPS.forEach(g => { if (!gempty(gval(D, g))) D.st[g] = D.updatedAt || 1; }); }   // a copy from the page before this one: what it holds counts as changed when the copy was last saved; what is empty never wins
 function mergeDay(A, B) {
-  const log = unionCcs(A.ccsLog, B.ccsLog);                        // the cases of earlier days: kept from both, whichever sheet is the current one
+  const log = unionCcs(A.ccsLog, B.ccsLog), ulog = unionUw(A.uwLog, B.uwLog);   // the cases and the blocks of earlier days: kept from both, whichever sheet is the current one
   const ea = A.epoch || 0, eb = B.epoch || 0;
   if (ea !== eb) { if (ea > eb) B = A; else A = B; }               // "Today starts over" on one device: the sheet from before is over everywhere
   const M = freshDay(A.date); M.epoch = Math.max(ea, eb);
@@ -866,7 +886,7 @@ function mergeDay(A, B) {
   else { const xs = [A.startedAt, B.startedAt].filter(x => x > 0); M.startedAt = xs.length ? Math.min.apply(null, xs) : 0; M.startSet = 0; }                              // else the earliest
   M.finishedAt = Math.max(A.finishedAt || 0, B.finishedAt || 0);
   M.updatedAt = Math.max(A.updatedAt || 0, B.updatedAt || 0);
-  M.ccsLog = log;
+  M.ccsLog = log; M.uwLog = ulog;
   return M;
 }
 function applyMerge(remote, slot) { // the other device's copy of today joins this one
@@ -1149,8 +1169,8 @@ function newDay() {
   if (newDayArmed && Date.now() - newDayArmed < 3500) {
     newDayArmed = 0;
     if (D.timer) clearTimer(true);
-    const log = carryCcs(D, false);                                // the earlier days' cases stay on record; today's sheet starts blank
-    D = freshDay(keyOf(Date.now())); D.ccsLog = log; if (S.tpl !== "auto") D.tpl = S.tpl; D.epoch = Date.now(); rebuild(); takeSnap();   // a new sheet: the one from before is over on every device
+    const log = carryCcs(D, false), ulog = carryUw(D, false);      // the earlier days' cases and blocks stay on record; today's sheet starts blank
+    D = freshDay(keyOf(Date.now())); D.ccsLog = log; D.uwLog = ulog; if (S.tpl !== "auto") D.tpl = S.tpl; D.epoch = Date.now(); rebuild(); takeSnap();   // a new sheet: the one from before is over on every device
     // what the other pages saved earlier today stays theirs: a blank sheet does not re-tick it
     const start = dayStart(D.date), end = start + 86400000;
     P.loadSessions().forEach(x => { const t = new Date(x.date).getTime(); if (t >= start && t < end) D.consumed[x.id] = "-"; });
@@ -1448,7 +1468,12 @@ function renderProjection(now, c, runs, step) {
 }
 function btn(label, cls, id, extra) { return '<button type="button" class="' + (cls || "") + '" data-act="' + id + '"' + (extra || "") + ">" + label + "</button>"; }
 function adjBtn(sec) { return btn((sec < 0 ? "−" : "+") + fmt(Math.abs(sec)), "", "adj", ' data-sec="' + sec + '"'); }
-function dayNote(note) { return S.bio ? (note || "") : String(note || "").replace(/\s*Biostats contact:[^.]*\.?/i, "").trim(); }
+function dayNote(note) { // the calendar's line for the day, kept true to the day's list: no Biostats contact when that step is off; the fast pass named when it replaces the long review of the rehearsal
+  let n = String(note || "");
+  if (!S.bio) n = n.replace(/\s*Biostats contact:[^.]*\.?/i, "").trim();
+  if (S.triage) n = n.replace("Then wrong questions only, EO + Rule line.", "Then the fast pass through all six blocks.");
+  return n;
+}
 function rows(list) { // the small buttons of the card, in named groups: [caption, buttons] or just buttons
   return list.map(r => (r && r.length === 2 && typeof r[0] === "string" && Array.isArray(r[1])) ? r : ["", r]).filter(r => r[1] && r[1].length)
     .map(r => (r[0] ? '<p class="cap">' + r[0] + "</p>" : "") + '<div class="row' + (r[1].length >= 4 ? " tight" : "") + '" style="--n:' + r[1].length + '">' + r[1].join("") + "</div>").join("");
@@ -1685,8 +1710,16 @@ function renderCcsDone() { // "40 different CCS cases done since Oct 13": the cc
   $("tenCcs").hidden = false; $("tenCcsN").textContent = c.n;
   $("tenCcsSub").textContent = "ccscases list of Nov 13: " + c.base + (c.added ? " · new since then: " + c.added : "") + (c.again ? " · done again: " + c.again : "") + " · the list is in CCS review";
 }
+let uwShown = { at: 0, sig: "" };
+function renderUwDone() { // "63 UWorld blocks done since Oct 14": the UWorld list of Nov 13 + the blocks the pacer has seen since (looked up every five seconds)
+  const now = Date.now(); if (now - uwShown.at < 5000 && now >= uwShown.at) return; uwShown.at = now;
+  let u; try { u = P.uwDone(); } catch (e) { return; }
+  const sig = u.n + "|" + u.added; if (sig === uwShown.sig) return; uwShown.sig = sig;
+  $("tenUw").hidden = false; $("tenUwN").textContent = u.n;
+  $("tenUwSub").textContent = "UWorld list of Nov 13: " + u.base + (u.added ? " · since then: " + u.added : "") + " · the list is in Stats";
+}
 function renderTen() { // the days from Day 1 to the last exam day, in weeks: past days show the work done, coming days the plan, exam days in red
-  renderCcsDone();
+  renderUwDone(); renderCcsDone();
   const work = workByDay(), today = D.date, cdn = countdownText(), doneNow = {};
   STEPS.forEach(s => { const r = D.steps[s.id]; if (r && r.done && r.src !== "skip") doneNow[s.kind] = (doneNow[s.kind] || 0) + 1; });
   const sig = [today, D.tpl, JSON.stringify(doneNow), S.dayOne, S.nDays, S.nBlocks, S.nCases, S.cal, JSON.stringify(work), cdn].join("|");
@@ -1812,7 +1845,7 @@ function init() {
   render();
   /* a small hook for the automated checks: read the state, move a running timer in time */
   window.__day = { state: () => D, steps: () => STEPS, settings: () => S, patchTimer: patch => { if (D.timer) { Object.assign(D.timer, patch); persist(); tick(); } },
-    merge: (a, b) => mergeDay(normOf(a), normOf(b)), canon: canonDay, norm: normOf, ccsRefresh: () => { ccsShown.at = 0; renderCcsDone(); } };
+    merge: (a, b) => mergeDay(normOf(a), normOf(b)), canon: canonDay, norm: normOf, ccsRefresh: () => { ccsShown.at = 0; uwShown.at = 0; renderUwDone(); renderCcsDone(); } };
 }
 init();
 if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); }); }

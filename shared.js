@@ -159,6 +159,54 @@ window.Pacer = (() => {
     return { n: cases.length, base: CCS_BASE.length, added: cases.filter(c => c.src !== "ccscases").length, again: cases.filter(c => c.again).length, cases: cases, unnumbered: un, since: CCS_SINCE, baseAt: CCS_BASE_AT };
   }
 
+  /* ---------- UWorld blocks done since the plan began (Oct 14, 2026) ----------
+     UWorld knows every block; the pacer only the ones that were run or ticked in it. So the count starts from the list
+     UWorld showed on Nov 13 at 6:09 PM (Previous Tests): the test number, the day UWorld created the test, what it was
+     on. Numbers, days and subjects only — no scores. A block is a finished 20-question test: test 45 (4 questions) and
+     test 46 (never taken) are not in the list. From the next study day on (Nov 14) the pacer adds what it sees: a block
+     saved on the Block page, or a block step of the Day page that ended on its own timer or was ticked by hand. */
+  const UW_SINCE = "2026-10-14", UW_BASE_DAY = "2026-11-13";
+  const UW_KINDS = { R: "Random", Bio: "Biostatistics", Eth: "Ethics", CV: "Cardiovascular", Pul: "Pulmonary", GI: "GI", Ren: "Renal", End: "Endocrine", ID: "Infectious diseases", Hem: "Heme/Onc", Neu: "Nervous system", Psy: "Psychiatry", Ob: "Ob/Gyn", Ped: "Pediatrics" };
+  const UW_BASE = ("11-13:65-70R 11-12:59-64R 11-11:53-58R 11-10:47-52R 11-08:41-44R 11-07:36Bio,37-39R,40Bio 11-05:34-35Ped 11-04:32-33Ob 11-03:30-31Psy 11-02:27Hem,28-29Neu 11-01:26Hem " +
+    "10-30:22-23ID 10-29:19End,21End 10-28:15-16Ren 10-27:13-14GI 10-26:11-12GI 10-24:9-10Pul 10-23:7-8CV 10-22:5-6CV 10-21:3-4Eth 10-20:2Bio 10-14:1Bio")
+    .split(" ").reduce((a, d) => { const p = d.split(":"); p[1].split(",").forEach(g => { const m = /^(\d+)(?:-(\d+))?([A-Za-z]+)$/.exec(g); for (let n = +m[1]; n <= +(m[2] || m[1]); n++) a.push(["2026-" + p[0], n, m[3]]); }); return a; }, []);   // → [day, test number, kind]
+  function dayBlocks(d) { // the UWorld block steps (b1, b2 …) of a Day sheet that are done and were not skipped → { step: [when, the id of the block saved for it on the Block page, or ""] }
+    const out = {}; if (!d || !d.steps) return out;
+    const sess = {}; Object.keys(d.consumed || {}).sort().forEach(sid => { const to = d.consumed[sid]; if (to && to !== "-" && !sess[to]) sess[to] = sid; });
+    Object.keys(d.steps).forEach(id => {
+      const r = d.steps[id]; if (!/^b\d+$/.test(id) || !r || !r.done || r.src === "skip" || r.src === "fit") return;
+      out[id] = [r.at || 0, sess[id] || ""];
+    });
+    return out;
+  }
+  function uwDone() { // → { n, base, added (blocks the pacer has seen since the list), sys, rnd, days: [{ day, n, seen, groups: [{ kind, name, nums }] }] newest first }
+    const days = {}, at = k => days[k] || (days[k] = { day: k, n: 0, seen: 0, groups: [] });
+    UW_BASE.forEach(b => { const d = at(b[0]); d.n++; let g = d.groups.filter(x => x.kind === b[2])[0]; if (!g) d.groups.push(g = { kind: b[2], name: UW_KINDS[b[2]] || b[2], nums: [] }); g.nums.push(b[1]); });
+    const ids = {}, per = {};
+    loadSessions().forEach(s => {
+      if (s.type !== "block") return; ids[s.id] = 1;
+      if ((s.nQ > 0 ? s.nQ : 20) < 10) return;                       // a 4-question test is not a block
+      const ts = new Date(s.date).getTime(); if (!(ts > 0)) return;
+      const k = studyDay(ts); per[k] = (per[k] || 0) + 1;
+    });
+    const steps = {}, put = (day, m) => {                            // day → { step: 1 }: a block step counts once, whether today's sheet or the log of the earlier days knows it
+      if (!m || typeof m !== "object" || Array.isArray(m)) return;
+      Object.keys(m).forEach(id => { const v = m[id], sid = Array.isArray(v) ? v[1] : ""; if (!/^b\d+$/.test(id) || (sid && ids[sid])) return; (steps[day] = steps[day] || {})[id] = 1; });   // a step that a saved block ticked is that block: counted above
+    };
+    const d = readJSON("step3pacer.day.v1", null);
+    if (d && typeof d === "object") {
+      const log = d.uwLog && typeof d.uwLog === "object" && !Array.isArray(d.uwLog) ? d.uwLog : {};
+      Object.keys(log).forEach(k => put(k, log[k]));
+      if (d.date) put(d.date, dayBlocks(d));
+    }
+    Object.keys(steps).forEach(k => { per[k] = (per[k] || 0) + Object.keys(steps[k]).length; });
+    let added = 0;
+    Object.keys(per).forEach(k => { if (!(k > UW_BASE_DAY)) return; const x = at(k); x.n += per[k]; x.seen += per[k]; added += per[k]; });   // up to the day of the list, UWorld is the record
+    const rnd = UW_BASE.filter(b => b[2] === "R").length;
+    return { n: UW_BASE.length + added, base: UW_BASE.length, added: added, sys: UW_BASE.length - rnd, rnd: rnd, since: UW_SINCE, baseDay: UW_BASE_DAY,
+      days: Object.keys(days).map(k => days[k]).sort((a, b) => a.day < b.day ? 1 : a.day > b.day ? -1 : 0) };
+  }
+
   /* ---------- theme ---------- */
   function getTheme() { const t = readJSON(KEYS.theme, "system"); return (t === "light" || t === "dark") ? t : "system"; }
   function setTheme(t) { writeJSON(KEYS.theme, t); applyTheme(); }
@@ -765,7 +813,7 @@ window.Pacer = (() => {
   }
 
   const api = { KEYS, fmt, fmtSigned, parseMS, todayKey, fmtDate, fmtDay, fmtClock, newId, esc, readJSON, writeJSON,
-    loadSessions, saveSessions, saveSession, deleteSession, mergeSessions, pctOf, countOf, parsePct, repairScores, ccsDone, dayCcs, caseNumOf, studyDay,
+    loadSessions, saveSessions, saveSession, deleteSession, mergeSessions, pctOf, countOf, parsePct, repairScores, ccsDone, dayCcs, caseNumOf, studyDay, uwDone, dayBlocks,
     getTheme, setTheme, applyTheme, setSound, getVolume, setVolume, audioInit, sfx, sfxLater, vibrate, keepAwake, releaseWake,
     renderNav, notice, getSync, setSync, syncNow, syncQuietly, loadParking, saveParking, standalone,
     device, setDeviceName, isIOS, isAndroid, live, bg, getBg, setBg, notifSupported, notifStatus, notifRequest, notifArm, notifDisarm,

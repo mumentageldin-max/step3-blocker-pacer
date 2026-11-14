@@ -27,6 +27,21 @@
 .kpi .v{font-size:26px;font-weight:700;line-height:1.1}
 .kpi .d{font-size:12px;color:var(--muted)}
 .kpi .d.up{color:var(--good)} .kpi .d.down{color:var(--warn)}
+#uw{border-left:6px solid var(--c-block);scroll-margin-top:12px}
+.bigcount{display:flex;align-items:center;gap:14px;margin:0}
+.bigcount b{font-family:var(--font-num);font-size:52px;line-height:1;color:var(--c-block)}
+.bigcount span{font-weight:700;font-size:16px;line-height:1.3;min-width:0}
+.bigcount span small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.uwlist{list-style:none;margin:0;padding:0}
+.uwlist li{display:grid;grid-template-columns:92px 26px minmax(0,1fr);gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line2);font-size:14px}
+.uwlist li:last-child{border-bottom:0}
+.uwlist .d{color:var(--muted);font-weight:700;font-size:13px}
+.uwlist .n{font-family:var(--font-num);font-weight:700;font-size:16px;text-align:right}
+.uwlist .c{display:flex;flex-wrap:wrap;gap:3px 14px;min-width:0}
+.uwlist .g em{font-style:normal;font-weight:700}
+.uwlist .g i{font-style:normal;font-family:var(--font-num);font-size:12.5px;color:var(--muted);white-space:nowrap}
+.uwlist .g.rnd em{color:var(--c-block)}
+.uwlist .g.new em{background:var(--c-block);color:var(--on-c);border-radius:6px;padding:1px 7px}
 .insights{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .insights li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--line2);font-size:15px;line-height:1.35}
 .insights .k{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--line);color:var(--fg);white-space:nowrap;margin-top:2px}
@@ -100,6 +115,17 @@ textarea.imp{font-family:var(--font-num);font-size:12px;min-height:80px;width:10
   </div>
 
   <div class="kpis" id="kpis"></div>
+
+  <section class="card" id="uw">
+    <div class="rowhead"><h2>UWorld blocks since Oct 14</h2><span class="meta">A block = a finished 20-question test</span></div>
+    <p class="bigcount"><b id="uwN">63</b><span>blocks done<small id="uwSub"></small></span></p>
+    <details class="fold" id="uwFold"><summary>Show them by day</summary>
+      <div class="body">
+        <ul class="uwlist" id="uwList"></ul>
+        <p class="note" id="uwNote"></p>
+      </div>
+    </details>
+  </section>
 
   <section class="card">
     <div class="rowhead"><h2>What to fix next</h2><span class="meta">Rules from your Daily Card, applied to your own numbers</span></div>
@@ -446,6 +472,28 @@ function ccsLine(s) { // "case · length · score if entered · misspelled words
   return (s.label || s.category || "case") + " · " + fmt(s.limitSec || 750) + (s.score != null ? " · " + s.score + "%" : "") + (missedOf(s).length ? " · missed: " + missedOf(s).join(", ") : "") + ((s.misspelled || []).length ? " · misspelled: " + s.misspelled.join(", ") : "");
 }
 function missedOf(s) { const l = Array.isArray(s.missedOrders) ? s.missedOrders.filter(Boolean) : []; return l.length ? l : (s.missedOrder ? [s.missedOrder] : []); }   // the list from CCS review; an older single note counts as one
+function runsOf(nums) { // [36, 40] → "36, 40" · [65 … 70] → "65–70"
+  const a = nums.slice().sort((x, y) => x - y), out = []; let i = 0;
+  while (i < a.length) { let j = i; while (j + 1 < a.length && a[j + 1] === a[j] + 1) j++; out.push(j > i ? a[i] + "–" + a[j] : String(a[i])); i = j + 1; }
+  return out.join(", ");
+}
+function renderUw() { // every UWorld block since the plan began: the UWorld list of Nov 13 + what the pacer has seen since. Not tied to the Range buttons.
+  let u; try { u = P.uwDone(); } catch (e) { return; }
+  $("uwN").textContent = u.n;
+  $("uwSub").textContent = u.sys + " by system or subject · " + u.rnd + " random" + (u.added ? " · " + u.added + " more since the UWorld list of Nov 13" : "");
+  $("uwList").innerHTML = u.days.map(d => {
+    const dt = new Date(d.day + "T12:00:00"), lbl = dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    const gs = d.groups.map(g => '<span class="g' + (g.kind === "R" ? " rnd" : "") + '"><em>' + esc(g.name) + "</em> <i>" + esc(runsOf(g.nums)) + "</i></span>");
+    if (d.seen) gs.push('<span class="g new"><em>seen by the pacer</em></span>');
+    return '<li><span class="d">' + esc(lbl) + '</span><b class="n">' + d.n + '</b><span class="c">' + gs.join("") + "</span></li>";
+  }).join("");
+  $("uwNote").textContent = "The day is the day UWorld created the test; the small numbers are UWorld's test numbers. Not counted: test 45 (4 questions) and test 46 (not taken). From Nov 14 on, the pacer adds a block when it is saved on the Block page, or when its step on the Day page ends on its timer or is ticked by hand. UWorld stays the record: a new screenshot of Previous Tests to Claude corrects this list.";
+}
+function showUw() { // the Day page's count links here: the list opens
+  if (location.hash !== "#uw") return;
+  $("uwFold").open = true;
+  setTimeout(() => { try { $("uw").scrollIntoView({ block: "start" }); } catch (e) {} }, 80);
+}
 function sinceKpi() { // the cases done since the plan began: the ccscases list of Nov 13 + what the pacer has seen since
   try { const c = P.ccsDone(); return { l: "Different cases since Oct 13", v: c.n, d: "ccscases list of Nov 13: " + c.base + (c.added ? " · new since: " + c.added : "") + (c.again ? " · done again: " + c.again : "") }; } catch (e) { return null; }
 }
@@ -530,6 +578,7 @@ function weeklyReport() {
   const blocks = list.filter(s => s.type === "block"), reviews = list.filter(s => s.type === "review"), ccs = list.filter(s => s.type === "ccs");
   const scores = blockScoreRows(list).map(r => r.score), ccsFirst = ccs.filter(c => c.score != null && c.attempt !== "repeat").map(c => c.score);
   lines.push("", "Totals: " + blocks.length + " blocks, " + reviews.length + " reviews, " + ccs.length + " CCS cases" + (scores.length ? ", average block score " + Math.round(mean(scores)) + "%" : "") + (ccsFirst.length ? ", CCS first-attempt average " + Math.round(mean(ccsFirst)) + "% (copied from ccscases)" : ""));
+  try { const u = P.uwDone(), c = P.ccsDone(); lines.push("Since the plan began: " + u.n + " UWorld blocks (UWorld list of Nov 13: " + u.base + (u.added ? " + " + u.added + " seen by the pacer since" : "") + ") · " + c.n + " different CCS cases (ccscases list of Nov 13: " + c.base + (c.added ? " + " + c.added + " new since" : "") + ")"); } catch (e) {}
   if (ccs.length) lines.push(CCS_NOTE);
   const tags = { K: 0, M: 0, T: 0, G: 0 }; reviews.forEach(r => { if (r.tags) ["K", "M", "T", "G"].forEach(l => tags[l] += r.tags[l] || 0); });
   lines.push("Letters: K" + tags.K + " M" + tags.M + " T" + tags.T + " G" + tags.G);
@@ -623,6 +672,7 @@ function refresh() {
   document.querySelectorAll("#filters button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.range === +range)));
   const tagsInfo = renderKpis(list, prevList);
   renderInsights(list, tagsInfo);
+  renderUw();
   renderPacing(list); renderLetters(list); renderScores(list); renderReviewTime(list); renderCcs(list);
   $("report").textContent = weeklyReport();
   $("dataMeta").textContent = ALL.length + " session" + (ALL.length === 1 ? "" : "s") + " on this device";
@@ -664,6 +714,7 @@ function init() {
   P.renderBreakSettings($("brkSettings"));
   P.renderBreak($("breakBand"));
   refresh();
+  showUw(); window.addEventListener("hashchange", showUw);
   if (P.getSync().token) P.syncNow().then(() => refresh()).catch(() => {});
 }
 function alertNote(msg) { $("dataMeta").textContent = msg; }
