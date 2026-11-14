@@ -20,7 +20,7 @@
 /* The day page: one "Now" card that runs the current step's timer, the sequence as a tickable list, totals, the calendar to the exam.
    Colors follow the printed sheet: block blue, review violet, CCS orange, biostats teal, break green, meal grey, arrive/close ink. */
 :root{--kc:var(--fg)}
-[data-kind="block"]{--kc:var(--accent)} [data-kind="review"]{--kc:var(--t)} [data-kind="ccs"]{--kc:var(--g)} [data-kind="bio"]{--kc:var(--m)}
+[data-kind="block"]{--kc:var(--accent)} [data-kind="review"]{--kc:var(--t)} [data-kind="ccs"]{--kc:var(--g)} [data-kind="bio"]{--kc:var(--m)} [data-kind="triage"]{--kc:var(--m)}
 [data-kind="brk"]{--kc:var(--good)} [data-kind="meal"]{--kc:var(--muted)} [data-kind="close"]{--kc:var(--fg)} [data-kind="exam"]{--kc:var(--crit)} [data-kind="off"]{--kc:var(--good)}
 .tint{background:color-mix(in srgb,var(--kc) 9%,var(--surface))}
 
@@ -241,10 +241,11 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
       <div class="body">
         <ol class="rules">
           <li><b>One card, one step.</b> The Now card always shows the next step of the day. <b>Start</b> runs its timer; <b>Done</b> ticks it and moves to the next. A break or a meal starts by itself when the step before it ends on its timer.</li>
-          <li><b>Your order.</b> The blocks in a row with the same break between them, then the CCS cases — each with its feedback right after — then lunch, then the reviews. On a break card, <b>Lunch now · break later ⇄</b> trades the two in one tap; on the lunch card, <b>Lunch later · break now ⇄</b> does the reverse (dinner the same way). <b>Move ▲ / Move ▼</b> moves any step earlier or later for today. Settings → The study day sets the number of blocks and cases and where lunch usually sits.</li>
+          <li><b>Your order.</b> The blocks in a row with the same break between them, then the CCS cases — each with its feedback right after — then lunch, then the <b>fast pass</b>, then the reviews. On a break card, <b>Lunch now · break later ⇄</b> trades the two in one tap; on the lunch card, <b>Lunch later · break now ⇄</b> does the reverse (dinner the same way). <b>Move ▲ / Move ▼</b> moves any step earlier or later for today. Settings → The study day sets the number of blocks and cases and where lunch usually sits.</li>
           <li><b>Every length can change, at any moment.</b> Before Start: <b>12:30 / 25:00</b> on a case, <b>30 · 45 · 60 · 90 min</b> on a review, <b>−5:00 / +5:00</b> on the rest. While it runs: <b>−5:00 · −1:00 · +1:00 · +5:00</b>; <b>12:30 / 25:00</b> in the middle of a case (the time already used stays); <b>Feedback ▸</b> or <b>Stand ▸</b> ends a part early (two taps, like Skip). Settings can be saved while a timer runs.</li>
           <li><b>Steps with parts</b> — a CCS case is its clock, then 10:00 of feedback; a review is 30-minute chunks with a 10-minute stand between them. The stand starts by itself; the next chunk and the feedback wait for your tap.</li>
-          <li><b>Reviews, lowest score first.</b> On the first review card, type today's scores once (B1 … B6) — or type each score on the Block page's summary. Every review step then names its block, lowest score first, and gets 5:00 per wrong question and 1:00 per right one (Settings → Review per block for a fixed length). The Review page lists the blocks in the same order.</li>
+          <li><b>The fast pass.</b> One step for all the blocks of the morning, 10:00 each (8 · 10 · 12 before Start). It sorts, it does not study: a right answer → next; a lucky guess → the Educational Objective only; a wrong answer → the Educational Objective and the paragraph of the answer you picked. The big button is <b>Block 2 ▸</b>, one tap, when a block is done early; at 10:00 the next block starts by itself. What you mark there is what gets the 8 minutes in the reviews.</li>
+          <li><b>Reviews, lowest score first.</b> On the fast-pass card (before Start) or on the first review card, type today's scores once (B1 … B6) — or type each score on the Block page's summary. Every review step then names its block, lowest score first, and gets 5:00 per wrong question and 1:00 per right one (Settings → Review per block for a fixed length). The Review page lists the blocks in the same order.</li>
           <li><b>The totals are measured.</b> A step that ran on a timer — here or in its own page — counts the time it really took. A step ticked by hand counts its planned length. A skipped step counts nothing.</li>
           <li><b>The sound.</b> A step's end is a rising four-note melody played twice, with a long vibration where the device allows it (Android; iPad and iPhone do not vibrate from a web app). One minute before the end: two soft notes. If you do not tick within a minute, the melody repeats — once a minute, five times at most (Settings).</li>
           <li><b>The other pages still work.</b> Run a block in <b>Block</b>, a review in <b>Block review</b>, a case in <b>CCS case</b> (its feedback opens in <b>CCS review</b>): this card shows it running, and the step ticks itself when it is saved. The 20-minute break after a block, a review or a case is the same break on every page.</li>
@@ -266,6 +267,7 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
           <label>Lunch<select id="fLunch"><option value="cases">After the CCS cases</option><option value="blocks">After the blocks, before the cases</option></select></label>
           <label>Review per block<select id="fReview"><option value="-1">By the score · 5 min per wrong, 1 per right</option><option value="1800">30 min</option><option value="2700">45 min</option><option value="3600">60 min</option><option value="5400">90 min</option><option value="0">As the Review page (Timer A)</option></select></label>
         </div>
+        <label class="check wide"><input type="checkbox" id="fTri"> Fast pass through all the blocks before the reviews (the minutes per block are in the durations below)</label>
         <label class="check wide"><input type="checkbox" id="fBio"> Biostats contact step (4 questions) before the reviews</label>
         <div class="rowhead"><h2>The calendar</h2><span class="meta">From Day 1 to the last exam day</span></div>
         <div class="form">
@@ -351,8 +353,8 @@ const CAL_DEFAULT = CAL_V16
   .replace("| 32, 6, 9 |", "| 32, 6L, 9 |");
 const TPLS = ["study", "tonight", "rehearsal", "between", "interface", "minimum", "exam", "off"];
 const DEFAULTS = { arriveSec: 300, shortSec: 600, mealSec: 1800, bioSec: 600, caseSec: 750, feedbackSec: 600, closeSec: 600, sampleSec: 3600, notesSec: 2400, packSec: 900,
-  nBlocks: 6, nCases: 2, lunchAfter: "cases", bio: true, reviewSec: -1,   // the study day: blocks in a row → cases → lunch → reviews. reviewSec: -1 by the block's score, 0 the Review page's Timer A, else seconds
-  remind: true, sound: true, dayOne: "2026-11-08", nDays: 10, planStart: "8:00 AM", planEnd: "~10:00 PM", tpl: "auto", cal: CAL_DEFAULT, v: 1 };
+  nBlocks: 6, nCases: 2, lunchAfter: "cases", bio: false, triage: true, triSec: 600, reviewSec: -1,   // the study day: blocks in a row → cases → lunch → reviews. reviewSec: -1 by the block's score, 0 the Review page's Timer A, else seconds
+  remind: true, sound: true, dayOne: "2026-11-08", nDays: 10, planStart: "8:00 AM", planEnd: "~10:00 PM", tpl: "auto", cal: CAL_DEFAULT, v: 2 };
 const DAYV = 18;                   // version of a day's saved state; a day begun on an older page is fitted to the new list once
 const OLD_STUDY_IDS = ["arrive", "b1", "b2", "b3", "b4", "br1", "br2", "br3", "br4", "br5", "br6", "br7", "lunch", "bio", "c1", "c2", "dinner", "r1", "r2", "r3", "r4", "close"];
 const LS_CASES = "step3pacer.day.cases.v1";   // today's cases (number, length) for the CCS page
@@ -456,6 +458,12 @@ function buildSteps(k, tpl) {
   const longSec = S.caseSec * 2;                                   // 12:30 → 25:00 under the accommodation
   const CC = (id, t, w, n) => { const sec = L(id, n && cal.long[n] ? longSec : S.caseSec); return { id, kind: "ccs", t: t + (sec !== S.caseSec ? " · " + fmt(sec) : ""), w, tool: "ccs", caseNum: n || "", parts: [{ l: "Case", sec: sec }, { l: "Feedback", sec: S.feedbackSec }] }; };
   const BIO = (id, t, w) => ({ id, kind: "bio", t, w, parts: [{ l: "Biostats", sec: L(id, S.bioSec) }] });
+  const TRI = (id, nB) => {                                        // the fast pass: every block of the morning, the same few minutes each, one after the other — it sorts the questions before the reviews
+    const per = Math.max(120, L(id, S.triSec)), parts = [];
+    for (let i = 1; i <= nB; i++) parts.push({ l: "Block " + i, sec: per, auto: i > 1 });
+    return { id, kind: "triage", t: "Fast pass · " + (nB > 1 ? "all " + nB + " blocks" : "the block") + " · " + fmt(per) + " each", per: per, parts: parts,
+      w: "Right → next. Lucky guess → the Educational Objective only. Wrong → the Educational Objective + the paragraph of the answer you picked. Mark what deserves the 8 minutes." };
+  };
   const CL = (id, t, w, sec) => ({ id, kind: "close", t, w, parts: [{ l: t, sec: L(id, sec) }] });
   const TICK = (id, kind, t, w) => ({ id, kind, t, w, parts: [] });
   let list;
@@ -487,7 +495,7 @@ function buildSteps(k, tpl) {
     BR("br4", "Break · 10", "Stand, water.", S.shortSec),
     B("b6", "Block 6 · random", "The last one. Nothing left on the clock."),
     BR("br5", "Break", "Out of the chair. The real break.", br),
-    RV("r1", "Wrong questions only · EO + Rule line", "All six blocks: wrong questions only, 2 minutes each — Educational Objective and one Rule line. 30 · stand 10 · 30 · stand 10 · 30, hard stop."),
+    S.triage ? TRI("tri", 6) : RV("r1", "Wrong questions only · EO + Rule line", "All six blocks: wrong questions only, 2 minutes each — Educational Objective and one Rule line. 30 · stand 10 · 30 · stand 10 · 30, hard stop."),
     CL("close", "Close · evening off", "Notebook line · tomorrow is OFF · lights out early.", S.closeSec)
   ];
   else if (tpl === "between") list = [
@@ -560,11 +568,12 @@ function buildSteps(k, tpl) {
     for (let j = 1; j <= nC; j++) list.push(CC("c" + j, "CCS case " + j + num(cs[j - 1] || ""), j === 1 ? "Four lines before the first order. Feedback right after: one missed order + the misspelled words." : "First attempt only. Use the whole clock. Close line at the 2-minute warning. Feedback right after.", cs[j - 1] || ""));
     if (S.lunchAfter !== "blocks") list.push(lunch); else if (nC) list.push(BR("br4", "Break", "Out of the chair."));
     if (S.bio) list.push(BIO("bio", "Biostats contact · 4 questions", "A 4-question Biostatistics test in the QBank (pool Incorrect when Unused is empty)." + topic + " Draw the 2×2 first."));
+    if (S.triage) list.push(TRI("tri", nB));
     const dinnerAfter = Math.ceil(nB / 2);
     for (let i = 1; i <= nB; i++) {
       const pl = plan[i - 1] || null;
       const t = "Review " + i + (pl ? " · Block " + pl.n + (pl.correct != null ? " · " + pctText(pl) : "") : nB === 1 ? "" : i === 1 ? " · lowest score first" : i === nB ? " · highest score" : " · next lowest");
-      const w = i === 1 ? "Lowest score first, then upward. Wrong first (5+3) → right ones with the time left (60 s)." : i === nB ? "Hard stop. Ended early? → CCS " + (nC + 1) + (retry ? " · № " + retry : " (a retry)") + " fits here, strict clock." : "Same two timers. One Rule line per miss, in the UWorld note.";
+      const w = i === 1 ? (S.triage ? "Lowest score first, then upward. Only what the fast pass marked gets the 8 minutes (5+3) — fly through the rest." : "Lowest score first, then upward. Wrong first (5+3) → right ones with the time left (60 s).") : i === nB ? "Hard stop. Ended early? → CCS " + (nC + 1) + (retry ? " · № " + retry : " (a retry)") + " fits here, strict clock." : S.triage ? "The marked questions get the 8 minutes; the rest you fly through. One Rule line per miss, in the UWorld note." : "Same two timers. One Rule line per miss, in the UWorld note.";
       const st = RV("r" + i, t, w, revDef(pl)); st.blk = pl ? pl.id : null; st.blkInfo = pl;
       list.push(st);
       if (i < nB) list.push(i === dinnerAfter ? ML("dinner", "Dinner", "Away from the desk.") : BR(i <= 3 ? "br" + (i + 4) : "rb" + i, "Break", "Out of the chair."));
@@ -598,11 +607,14 @@ function loadSettings() {
   const nc = parseInt(S.nCases, 10); S.nCases = isNaN(nc) ? 2 : Math.max(0, Math.min(4, nc));
   if (S.lunchAfter !== "blocks") S.lunchAfter = "cases";
   S.reviewSec = [-1, 0, 1800, 2700, 3600, 5400].includes(+S.reviewSec) ? +S.reviewSec : -1;
-  S.bio = S.bio !== false;
+  // Nov 13: the 4-question Biostats step is out of the study day, the fast pass through all the blocks is in — once, on every device; Settings can still change both.
+  if (!(S.v >= 2)) { S.bio = false; S.triage = true; S.v = 2; if (p) P.writeJSON(LS_S, S); }
+  S.bio = S.bio === true; S.triage = S.triage !== false;
+  S.triSec = (+S.triSec >= 120 && +S.triSec <= 3600) ? Math.round(+S.triSec) : 600;
   P.setSound(S.sound);
 }
 function saveSettings() { P.writeJSON(LS_S, S); }
-function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, len: {}, order: [], rv: {}, scores: {}, st: {}, ccsLog: {}, epoch: 0, v: DAYV, startedAt: 0, startSet: 0, finishedAt: 0, updatedAt: 0 }; }
+function freshDay(k) { return { date: k, tpl: tplFor(k), steps: {}, cur: null, timer: null, consumed: {}, manual: {}, caseLen: {}, len: {}, order: [], rv: {}, scores: {}, st: {}, ccsLog: {}, epoch: 0, fit: 23, v: DAYV, startedAt: 0, startSet: 0, finishedAt: 0, updatedAt: 0 }; }
 function persist(touch) { stampGroups(); D.updatedAt = Date.now(); P.writeJSON(LS_D, D); if (touch !== false) P.live.touch(); }
 function history() { const h = P.readJSON(LS_H, []); return Array.isArray(h) ? h : []; }
 function spentRec(step, rec) { // [study, break] seconds a ticked step counts for: measured when it ran on a timer or in its page; the plan when it was ticked by hand; nothing when it was skipped before it began
@@ -643,7 +655,18 @@ function adopt(p) { // today's state from storage; true when it came from the pa
   if (old) { try { fitOldDay(); } catch (e) { console.warn("day: could not fit the earlier list", e); } }
   if (legacy) legacyStamps();
   D.v = DAYV;
-  return old || legacy;
+  let fitted = false;
+  if (!(p.fit >= 23)) { try { fitted = fitFastPass(); } catch (e) { console.warn("day: could not place the fast pass", e); } D.fit = 23; fitted = true; }
+  return old || legacy || fitted;
+}
+function fitFastPass() { // today began on the page before the fast pass existed: if the day is already past its place (a review is ticked or running), the new step is ticked with no time, so it is not left behind
+  const list = buildSteps(D.date, D.tpl), i = list.findIndex(s => s.kind === "triage");
+  if (i < 0 || (D.steps[list[i].id] && D.steps[list[i].id].done)) return false;
+  const later = list.slice(i + 1), T = D.timer;
+  const past = later.some(s => (D.steps[s.id] && D.steps[s.id].done && D.steps[s.id].src !== "skip") || (T && T.stepId === s.id)) || later.some(s => s.id === D.cur && s.kind !== "review");
+  if (!past) return false;
+  D.steps[list[i].id] = { done: true, at: 0, src: "fit", sec: 0, study: 0, brk: 0 };
+  return true;
 }
 function fitOldDay() { // a day begun on the earlier page (4 blocks, the cases between the reviews): its ticks are fitted to the order of today's list, once
   if (D.tpl !== "study") return;
@@ -908,7 +931,7 @@ function undoneNeighbor(step, dir) { // the nearest step not yet ticked, above (
   for (let j = i + dir; j >= 0 && j < STEPS.length; j += dir) if (!isDone(STEPS[j].id)) return STEPS[j];
   return null;
 }
-function lenOf(step) { return !step || !step.parts.length ? 0 : step.tool === "review" ? step.study : step.parts[0].sec; }   // what the length buttons change: the first part; for a review, its minutes of work
+function lenOf(step) { return !step || !step.parts.length ? 0 : step.tool === "review" ? step.study : step.kind === "triage" ? step.per : step.parts[0].sec; }   // what the length buttons change: the first part; for a review, its minutes of work
 function startStep(step, part) {
   if (!step || isDone(step.id) || !step.parts.length) return;
   part = part || 0;
@@ -946,6 +969,7 @@ function nextPartTap() { // "Feedback ▸" / "Stand ▸": after a part ended, on
   const c = cd(); if (!c) return;
   if (c.kind === "wait") { partArmed = 0; startNextPart(); return; }
   if (c.kind !== "own" || c.last) return;
+  if (c.step.kind === "triage") { partArmed = 0; startNextPart(); return; }
   if (partArmed && Date.now() - partArmed < 3500) { partArmed = 0; startNextPart(); return; }
   partArmed = Date.now(); render();
   setTimeout(() => { if (partArmed && Date.now() - partArmed >= 3500) { partArmed = 0; render(); } }, 3600);
@@ -1350,7 +1374,7 @@ function events() {
 }
 
 /* ---------- render ---------- */
-const KIND_NAMES = { block: "Block", brk: "Break", meal: "Meal", bio: "Biostats", ccs: "CCS", review: "Review", close: "Arrive · close", exam: "Exam day", off: "Day off" };
+const KIND_NAMES = { block: "Block", brk: "Break", meal: "Meal", bio: "Biostats", triage: "Fast pass", ccs: "CCS", review: "Review", close: "Arrive · close", exam: "Exam day", off: "Day off" };
 function mins(sec) { return fmt(sec).replace(/:00$/, ""); }
 function buildList() {
   const sig = D.date + "|" + D.tpl + "|" + STEPS.map(s => s.id + ":" + s.total + ":" + s.t).join(",");
@@ -1404,7 +1428,7 @@ function render() {
   renderTotals(now, c, runs);
   renderList(now, c, step, runs);
   renderTen();
-  $("seqMeta").textContent = STEPS.filter(s => isDone(s.id)).length + " of " + STEPS.length + " ticked" + (cal.note ? " · " + cal.note : "");
+  $("seqMeta").textContent = STEPS.filter(s => isDone(s.id)).length + " of " + STEPS.length + " ticked" + (dayNote(cal.note) ? " · " + dayNote(cal.note) : "");
 }
 function renderProjection(now, c, runs, step) {
   const el = $("proj");
@@ -1424,6 +1448,7 @@ function renderProjection(now, c, runs, step) {
 }
 function btn(label, cls, id, extra) { return '<button type="button" class="' + (cls || "") + '" data-act="' + id + '"' + (extra || "") + ">" + label + "</button>"; }
 function adjBtn(sec) { return btn((sec < 0 ? "−" : "+") + fmt(Math.abs(sec)), "", "adj", ' data-sec="' + sec + '"'); }
+function dayNote(note) { return S.bio ? (note || "") : String(note || "").replace(/\s*Biostats contact:[^.]*\.?/i, "").trim(); }
 function rows(list) { // the small buttons of the card, in named groups: [caption, buttons] or just buttons
   return list.map(r => (r && r.length === 2 && typeof r[0] === "string" && Array.isArray(r[1])) ? r : ["", r]).filter(r => r[1] && r[1].length)
     .map(r => (r[0] ? '<p class="cap">' + r[0] + "</p>" : "") + '<div class="row' + (r[1].length >= 4 ? " tight" : "") + '" style="--n:' + r[1].length + '">' + r[1].join("") + "</div>").join("");
@@ -1433,6 +1458,7 @@ function lenRow(step) { // the length buttons that fit the step: the two case cl
   const cur = lenOf(step), pre = (label, v) => btn(label + (cur === v ? " ✓" : ""), "len" + (cur === v ? " on" : ""), "len", ' data-sec="' + v + '"');
   if (step.tool === "ccs" && step.parts.length === 2) return [pre(fmt(S.caseSec), S.caseSec), pre(fmt(S.caseSec * 2), S.caseSec * 2)];
   if (step.tool === "review") return [1800, 2700, 3600, 5400].map(v => pre(v / 60 + " min", v));
+  if (step.kind === "triage") return [480, 600, 720].map(v => pre(fmt(v), v));      // per block
   const pm = [adjBtn(-300), adjBtn(300)];
   if (step.kind === "brk" && S.shortSec !== breakSec()) return [pre(fmt(S.shortSec), S.shortSec), pre(fmt(breakSec()), breakSec())].concat(pm);
   return pm;
@@ -1442,7 +1468,8 @@ let nowSig = "", stripSig = "", scoreSig = "", scoreMsg = "";
 function renderScores(step, mode) { // on a review card: the scores of today's blocks, typed once; the reviews then line up lowest first
   const el = $("nowScores");
   const nB = STEPS.filter(s => s.kind === "block" && /^b\d+$/.test(s.id)).length;
-  if (!(step && step.tool === "review" && D.tpl === "study" && nB && (mode === "idle" || mode === "wait"))) { if (!el.hidden) el.hidden = true; return; }
+  const onTri = !!(step && step.kind === "triage" && mode === "idle");   // before Start only: while the pass runs the card stays short — the clock and the next-block button
+  if (!(step && (onTri || (step.tool === "review" && (mode === "idle" || mode === "wait"))) && D.tpl === "study" && nB)) { if (!el.hidden) el.hidden = true; return; }
   const sig = D.date + "|" + nB;
   if (scoreSig !== sig || !el.firstChild) {
     scoreSig = sig;
@@ -1521,11 +1548,11 @@ function renderNow(now, c, step, runs) {
     } else if (mode === "idle") {
       mirror.hidden = true;
       $("nowPill").textContent = idx === 0 ? "First" : "Next"; $("nowWho").textContent = step.parts.length ? durText(step) : "tick when done";
-      stage.innerHTML = step.parts.length > 1 ? "<span>" + step.parts.map(p => esc(p.l) + " " + mins(p.sec)).join(" · ") + "</span>" : (after ? "<span>then · " + after.n + " " + esc(after.t) + "</span>" : "");
-      cue.textContent = step.parts.length ? (step.tool ? "Start here, or run it in the " + TOOL_PAGE[step.tool][0] + " page — the step ticks itself." : "Press Start when you begin.") : "Tap Done when it is done.";
+      stage.innerHTML = step.kind === "triage" ? "<span>" + step.parts.length + " × " + fmt(step.per) + " · the next block starts by itself</span>" : step.parts.length > 1 ? "<span>" + step.parts.map(p => esc(p.l) + " " + mins(p.sec)).join(" · ") + "</span>" : (after ? "<span>then · " + after.n + " " + esc(after.t) + "</span>" : "");
+      cue.textContent = step.kind === "triage" ? "Sort, do not study: right → next · guess → objective · wrong → objective + your answer's paragraph." : step.parts.length ? (step.tool ? "Start here, or run it in the " + TOOL_PAGE[step.tool][0] + " page — the step ticks itself." : "Press Start when you begin.") : "Tap Done when it is done.";
       btns.innerHTML = (step.parts.length ? btn("Start · " + fmt(step.parts[0].sec), "go", "start") : "") + btn("Done ✓", "done" + (step.parts.length ? "" : " solo"), "done");
       sub.innerHTML = rows([
-        [step.tool === "ccs" && step.parts.length === 2 ? "Case length" : step.tool === "review" ? "Review length" : "Length", lenRow(step)],
+        [step.tool === "ccs" && step.parts.length === 2 ? "Case length" : step.tool === "review" ? "Review length" : step.kind === "triage" ? "Per block" : "Length", lenRow(step)],
         swapRow,
         ["Another step first", [prev ? btn("↑ Previous", "", "prev") : "", next ? btn("Next ↓", "", "next") : "", prev ? btn("Move ▲", "", "mvup") : "", next ? btn("Move ▼", "", "mvdn") : ""].filter(Boolean)],
         ["This step", [skipB, soundB]]
@@ -1544,15 +1571,27 @@ function renderNow(now, c, step, runs) {
       mirror.hidden = true;
       const isBrk = c.kind === "break", nextB = !c.last && c.next ? [btn(partArmed ? "Sure? ▸" : esc(c.next.l) + " ▸", partArmed ? "armed" : "", "part")] : [];
       $("nowPill").textContent = paused ? "Paused" : over ? "Time" : isBrk ? "Break" : "Running";
-      $("nowWho").textContent = isBrk ? "the break shows on every page" : step.parts.length > 1 ? c.label + " · part " + (c.part + 1) + " of " + step.parts.length : c.label;
+      const tri = step.kind === "triage";
+      $("nowWho").textContent = isBrk ? "the break shows on every page" : tri ? c.label + " of " + step.parts.length : step.parts.length > 1 ? c.label + " · part " + (c.part + 1) + " of " + step.parts.length : c.label;
       cue.textContent = over ? (c.last ? "Tick it. The next step is waiting." : c.label + " is over.") : isBrk ? (step.kind === "meal" ? "Away from the desk." : "Out of the chair. No screen.") : step.kind === "block" ? "Easy ones first. 2:00 left → fill every blank." : step.kind === "review" ? (c.label === "Stand" ? "Stand. Walk. Water. No phone." : "Wrong first, 5+3. Right ones 60 s.") : step.kind === "ccs" ? (c.label === "Feedback" ? "One missed order + the misspelled words." : "Location → stabilize → orders → advance the clock → reassess → close line.") : step.kind === "bio" ? "Draw the 2×2 first." : "";
-      btns.innerHTML = btn(over ? "Done ✓ · next step" : "Done ✓", "done" + (over ? " solo" : ""), "done") + (over ? "" : btn("+5:00", "", "ext"));
       const caseRun = !isBrk && step.tool === "ccs" && c.part === 0 && step.parts.length === 2;
-      sub.innerHTML = rows([
-        [caseRun ? "Case length" : "Time", caseRun ? lenRow(step).concat(nextB) : over ? [adjBtn(60), adjBtn(300)] : [adjBtn(-300), adjBtn(-60), adjBtn(60)].concat(nextB)],
-        swapRow,
-        ["This step", (isBrk ? [] : [btn(paused ? "Resume" : "Pause", "", "pause")]).concat([skipB, stopB, soundB])]
-      ]);
+      if (tri && !c.last) {                                          // the fast pass, a block that is not the last: the big button moves on to the next block; ending the whole pass is a small one
+        cue.textContent = "Right → next · lucky guess → objective only · wrong → objective + your answer's paragraph. Mark what deserves the 8 minutes.";
+        btns.innerHTML = btn(esc(c.next.l) + " ▸", "go", "part") + btn("+1:00", "", "adj", ' data-sec="60"');
+        sub.innerHTML = rows([
+          ["Time", [adjBtn(-60), adjBtn(300)]],
+          ["This step", [btn(paused ? "Resume" : "Pause", "", "pause"), skipB, stopB, soundB]],
+          ["All blocks sorted already?", [btn("Done ✓ · end the pass", "", "done")]]
+        ]);
+      } else {
+        if (tri && !over) cue.textContent = "The last block. Right → next · lucky guess → objective only · wrong → objective + your answer's paragraph.";
+        btns.innerHTML = btn(over ? "Done ✓ · next step" : "Done ✓", "done" + (over ? " solo" : ""), "done") + (over ? "" : tri ? btn("+1:00", "", "adj", ' data-sec="60"') : btn("+5:00", "", "ext"));
+        sub.innerHTML = rows([
+          [caseRun ? "Case length" : "Time", caseRun ? lenRow(step).concat(nextB) : over ? [adjBtn(60), adjBtn(300)] : tri ? [adjBtn(-60), adjBtn(300)] : [adjBtn(-300), adjBtn(-60), adjBtn(60)].concat(nextB)],
+          swapRow,
+          ["This step", (isBrk ? [] : [btn(paused ? "Resume" : "Pause", "", "pause")]).concat([skipB, stopB, soundB])]
+        ]);
+      }
     }
     wire();
   }
@@ -1685,16 +1724,16 @@ function renderTen() { // the days from Day 1 to the last exam day, in weeks: pa
 
 /* ---------- settings ---------- */
 function settingsMsg(t) { $("settingsMsg").textContent = t; }
-const DUR_FIELDS = [["arriveSec", "Arrive"], ["shortSec", "Short break"], ["mealSec", "Lunch · dinner"], ["bioSec", "Biostats contact"], ["caseSec", "CCS case"], ["feedbackSec", "CCS feedback"], ["closeSec", "Close the day"], ["sampleSec", "Official sample block"], ["notesSec", "Notes read (Nov 16)"], ["packSec", "Pack (Nov 17)"]];
+const DUR_FIELDS = [["arriveSec", "Arrive"], ["shortSec", "Short break"], ["mealSec", "Lunch · dinner"], ["triSec", "Fast pass · per block"], ["bioSec", "Biostats contact"], ["caseSec", "CCS case"], ["feedbackSec", "CCS feedback"], ["closeSec", "Close the day"], ["sampleSec", "Official sample block"], ["notesSec", "Notes read (Nov 16)"], ["packSec", "Pack (Nov 17)"]];
 function fillSettings() {
   $("fDayOne").value = S.dayOne; $("fDays").value = S.nDays; $("fPlanStart").value = S.planStart; $("fPlanEnd").value = S.planEnd; $("fTpl").value = S.tpl; $("fRemind").checked = !!S.remind; $("fTheme").value = P.getTheme();
-  $("fBlocks").value = S.nBlocks; $("fCases").value = S.nCases; $("fLunch").value = S.lunchAfter; $("fReview").value = String(S.reviewSec); $("fBio").checked = !!S.bio;
+  $("fBlocks").value = S.nBlocks; $("fCases").value = S.nCases; $("fLunch").value = S.lunchAfter; $("fReview").value = String(S.reviewSec); $("fBio").checked = !!S.bio; $("fTri").checked = !!S.triage;
   $("fCal").value = S.cal;
   const rv = reviewCfg();
   $("durs").innerHTML = DUR_FIELDS.map(([k, l]) => '<label>' + l + '<input type="text" inputmode="numeric" data-dur="' + k + '" value="' + fmt(S[k]) + '"></label>').join("") +
     '<label>Block<span class="ro">' + fmt(blockSec()) + ' · Block page</span></label><label>Break after a task<span class="ro">' + fmt(breakSec()) + ' · Breaks below</span></label><label>Review chunk · stand<span class="ro">' + fmt(rv.chunk) + " · " + fmt(rv.stand) + ' · Review page</span></label>';
 }
-function shapeOf() { return [S.nBlocks, S.nCases, S.lunchAfter, S.bio ? 1 : 0].join("|"); }
+function shapeOf() { return [S.nBlocks, S.nCases, S.lunchAfter, S.bio ? 1 : 0, S.triage ? 1 : 0].join("|"); }
 function applySettings() { // saved at any moment, also while a timer runs: today's ticks stay with their steps
   const dayOne = $("fDayOne").value, nDays = parseInt($("fDays").value, 10);
   if (!parseKey(dayOne) || !nDays || nDays < 1 || nDays > 60) { settingsMsg("Check Day 1 and the number of days."); return; }
@@ -1704,7 +1743,7 @@ function applySettings() { // saved at any moment, also while a timer runs: toda
   for (const [k] of DUR_FIELDS) { const v = parseMS($("durs").querySelector('[data-dur="' + k + '"]').value); if (v == null || v < 60 || v > 4 * 3600) { settingsMsg("Durations as mm:ss, 1:00 to 240:00."); return; } durs[k] = v; }
   const tpl = TPLS.includes($("fTpl").value) ? $("fTpl").value : "auto", shape = shapeOf();
   S = Object.assign({}, S, durs, { dayOne: dayOne, nDays: nDays, planStart: $("fPlanStart").value.trim() || "8:00 AM", planEnd: $("fPlanEnd").value.trim() || "~10:00 PM", tpl: tpl, remind: $("fRemind").checked, cal: $("fCal").value,
-    nBlocks: nB, nCases: nC, lunchAfter: $("fLunch").value === "blocks" ? "blocks" : "cases", reviewSec: [-1, 0, 1800, 2700, 3600, 5400].includes(rvSec) ? rvSec : -1, bio: $("fBio").checked, v: 1 });
+    nBlocks: nB, nCases: nC, lunchAfter: $("fLunch").value === "blocks" ? "blocks" : "cases", reviewSec: [-1, 0, 1800, 2700, 3600, 5400].includes(rvSec) ? rvSec : -1, bio: $("fBio").checked, triage: $("fTri").checked, v: 2 });
   saveSettings();
   let msg = "Saved.";
   if (shape !== shapeOf() && D.order.length) { D.order = []; msg = "Saved. Today's list follows the new order; steps you had moved by hand are back in their places."; }
