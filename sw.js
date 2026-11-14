@@ -3,7 +3,7 @@
    Holds the pacer's upcoming events while the page is hidden and shows them as notifications (best effort:
    the browser may stop an idle worker, so the page re-checks on return). Bump VERSION whenever a page changes
    so installed copies pick up the update. */
-const VERSION = "pacer-v24";
+const VERSION = "pacer-v25";
 const FONT_CACHE = "pacer-fonts";
 const SHELL = [
   "./",

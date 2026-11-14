@@ -280,7 +280,7 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
           <label>Days, if no exam day is listed<input type="number" id="fDays" min="1" max="60" inputmode="numeric"></label>
           <label>Start badge<input type="text" id="fPlanStart" placeholder="8:00 AM"></label>
           <label>Done badge<input type="text" id="fPlanEnd" placeholder="~10:00 PM"></label>
-          <label class="wide">Today's sequence<select id="fTpl"><option value="auto">From the calendar below</option><option value="study">Study day · blocks in a row, cases, reviews</option><option value="tonight">Nov 7 tonight · 2 biostats blocks, 2 reviews, 2 cases</option><option value="rehearsal">Rehearsal · 6 blocks in a row, then wrong questions only</option><option value="between">Between exam days · 1 block, 1 review, 3 repeat cases</option><option value="interface">Interface day · official sample blocks and official CCS</option><option value="minimum">Minimum day · 1 block, 1 case, pack</option><option value="exam">Exam day · the morning list</option><option value="off">Day off</option></select></label>
+          <label class="wide">Today's sequence<select id="fTpl"><option value="auto">From the calendar below</option><option value="study">Study day · blocks in a row, cases, reviews</option><option value="tonight">Nov 7 tonight · 2 biostats blocks, 2 reviews, 2 cases</option><option value="rehearsal">Rehearsal · Exam Day 3: 9 blocks, 2 cases, the fast pass</option><option value="between">Between exam days · 1 block, 1 review, 3 repeat cases</option><option value="interface">Interface day · the software's buttons, 4 official CCS cases</option><option value="minimum">Minimum day · 2 official CCS cases, pack</option><option value="exam">Exam day · the morning list</option><option value="off">Day off</option></select></label>
           <label>Theme<select id="fTheme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
         </div>
         <label class="check wide"><input type="checkbox" id="fRemind"> Repeat the end sound every minute until I tick the step (five times at most)</label>
@@ -350,14 +350,24 @@ const CAL_V16 = CAL_V1.replace(
   "2026-11-11 | study | 10, 8, 113 | Biostats contact: Odds Ratio & Relative Risk.",
   "2026-11-11 | study | 94, 8, 113 | Biostats contact: Odds Ratio & Relative Risk. (94 replaces 10, done Nov 7.)");
 // L after a case number = a 20-minute case → 25:00 on the clock (12:30 otherwise). Either can be switched on the Now card before Start.
-const CAL_DEFAULT = CAL_V16
+const CAL_V17 = CAL_V16
   .replace("| 94, 8, 113 |", "| 94L, 8, 113 |")
   .replace("| 48, 126, 90 |", "| 48L, 126, 90L |")
   .replace("| 116, 75, 39 |", "| 116L, 75, 39 |")
   .replace("| 11, 15, 39 |", "| 11L, 15, 39 |")
   .replace("| 32, 6, 9 |", "| 32, 6L, 9 |");
+// Nov 13, evening: the rehearsal becomes Exam Day 3 in miniature (9 blocks, then 2 cases); no official sample blocks on Nov 16–17 — the software's tutorial and buttons and the six official practice cases instead.
+const CAL_NOV13 = [
+  ["2026-11-14 | rehearsal | | 6 random blocks in a row from the exam's hour. Then wrong questions only, EO + Rule line. Evening off. Exam Day 1 in miniature.",
+   "2026-11-14 | rehearsal | 34, 138 | Exam Day 3 in miniature: 9 random blocks on Day 3's break budget — 85 minutes, lunch included. Then 2 CCS cases, the fast pass, the marked questions. Evening off."],
+  ["2026-11-16 | interface | | 2 official sample blocks and 2 official practice CCS cases — buttons, not content. Afternoon: all UWorld Notes once, 40 min. Early night.",
+   "2026-11-16 | interface | | The 2026 exam software: the tutorial and the buttons — no blocks, nothing scored. 4 official practice CCS cases. Then all UWorld Notes once, 40 min. Early night."],
+  ["2026-11-17 | minimum | | Done by noon. Pack permit, ID, snacks, water. CCS cheat sheet from memory. Early lights out.",
+   "2026-11-17 | minimum | | Done by noon. The last 2 official practice CCS cases. Pack permit, ID, snacks, water. CCS cheat sheet from memory. Early lights out."]
+];
+const CAL_DEFAULT = CAL_NOV13.reduce((c, pr) => c.replace(pr[0], pr[1]), CAL_V17);
 const TPLS = ["study", "tonight", "rehearsal", "between", "interface", "minimum", "exam", "off"];
-const DEFAULTS = { arriveSec: 300, shortSec: 600, mealSec: 1800, bioSec: 600, caseSec: 750, feedbackSec: 600, closeSec: 600, sampleSec: 3600, notesSec: 2400, packSec: 900,
+const DEFAULTS = { arriveSec: 300, shortSec: 600, mealSec: 1800, bioSec: 600, caseSec: 750, feedbackSec: 600, closeSec: 600, sampleSec: 3600, uiSec: 1800, markedSec: 2700, notesSec: 2400, packSec: 900,
   nBlocks: 6, nCases: 2, lunchAfter: "cases", bio: false, triage: true, triSec: 600, reviewSec: -1,   // the study day: blocks in a row → cases → lunch → reviews. reviewSec: -1 by the block's score, 0 the Review page's Timer A, else seconds
   remind: true, sound: true, dayOne: "2026-11-08", nDays: 10, planStart: "8:00 AM", planEnd: "~10:00 PM", tpl: "auto", cal: CAL_DEFAULT, v: 2 };
 const DAYV = 18;                   // version of a day's saved state; a day begun on an older page is fitted to the new list once
@@ -486,23 +496,26 @@ function buildSteps(k, tpl) {
     CC("c2", "CCS case 2" + num(c2) + " · if there is time", "First attempt only. Use the whole clock. Close line at the 2-minute warning.", c2),
     CL("close", "Close · tomorrow's 4 tests created", "Create tomorrow's four random tests in UWorld · notebook line · pack the bag · Block 1 at 8:00 tomorrow.", S.closeSec)
   ];
-  else if (tpl === "rehearsal") list = [
-    CL("arrive", "Arrive · exam hour · bag packed like the exam", "Permit, ID, snacks, water. Phone in the bag. Scratch paper with the checkpoint line.", S.arriveSec),
-    B("b1", "Block 1 · random · 20 Q", "Exam Day 1 in miniature. Start in UWorld and in the pacer."),
-    BR("br1", "Break · 10", "Like the exam's. Stand, water, no review.", S.shortSec),
-    B("b2", "Block 2 · random", "Same four checkpoints."),
-    BR("br2", "Break · 10", "Stand, water.", S.shortSec),
-    B("b3", "Block 3 · random", "Easy ones first. 2:00 left → fill every blank."),
-    ML("lunch", "Lunch · 25", "Eat, walk. No questions.", 1500),
-    B("b4", "Block 4 · random", "Second half. Same rules."),
-    BR("br3", "Break · 10", "Stand, water.", S.shortSec),
-    B("b5", "Block 5 · random", "Flag at 50 s when behind."),
-    BR("br4", "Break · 10", "Stand, water.", S.shortSec),
-    B("b6", "Block 6 · random", "The last one. Nothing left on the clock."),
-    BR("br5", "Break", "Out of the chair. The real break.", br),
-    S.triage ? TRI("tri", 6) : RV("r1", "Wrong questions only · EO + Rule line", "All six blocks: wrong questions only, 2 minutes each — Educational Objective and one Rule line. 30 · stand 10 · 30 · stand 10 · 30, hard stop."),
-    CL("close", "Close · evening off", "Notebook line · tomorrow is OFF · lights out early.", S.closeSec)
-  ];
+  else if (tpl === "rehearsal") {                                  // Exam Day 3 in miniature: nine blocks on that day's break budget (85 minutes, lunch included: 7 × 8:00 + 25:00), then the day's two cases and a short review
+    const nR = 9, lunchAfter = 5;
+    const tipsR = ["Exam Day 3 in miniature. Start in UWorld and in the pacer.", "Same four checkpoints.", "Easy ones first. 2:00 left → fill every blank.", "Behind at a checkpoint → flag at 50 s.", "The last one before lunch. Same checkpoints.",
+      "Second half. Same rules as Block 1.", "Tired = flag sooner, not read faster.", "Second read of a stem = best answer, flag, move.", "The last one. Every blank filled."];
+    list = [CL("arrive", "Arrive · exam hour · bag packed like the exam", "Permit, ID, snacks, water. Phone in the bag. Exam Day 3 gives 85 minutes of break for the whole day, lunch included — today: 7 breaks of 8:00 + lunch 25:00.", S.arriveSec)];
+    for (let i = 1; i <= nR; i++) {
+      list.push(B("b" + i, "Block " + i + " · random" + (i === 1 ? " · 20 Q" : ""), tipsR[i - 1]));
+      if (i === lunchAfter) list.push(ML("lunch", "Lunch · 25", "Eat, walk. No questions. 25 of the day's 85 minutes.", 1500));
+      else if (i < nR) list.push(BR(i <= 3 ? "br" + i : "bb" + i, "Break · 8", i === 6 ? "Decision point. Clear head → Block 7. Re-reading stems, a headache, a short night → stop at six: tap the row of CCS case 1." : "Stand, water. No review. 8 of the day's 85 minutes.", 480));
+    }
+    list.push(BR("bb" + nR, "Break", "Out of the chair. The real break. Then the cases.", br));
+    list.push(CC("c1", "CCS case 1" + num(c1), "Four lines before the first order. Feedback right after: one missed order + the misspelled words.", c1));
+    list.push(CC("c2", "CCS case 2" + num(c2) + " · optional", "First attempt only. Use the whole clock. Close line at the 2-minute warning. Empty after nine blocks → one case is enough.", c2));
+    list.push(ML("dinner", "Dinner", "Away from the desk."));
+    if (S.triage) {
+      list.push(TRI("tri", nR));
+      list.push({ id: "rm", kind: "review", t: "Marked questions only", w: "Only what the fast pass marked: 8 minutes each (5+3), lowest block first. Hard stop — what is left keeps its Educational Objective from the fast pass.", parts: [{ l: "Review", sec: L("rm", S.markedSec) }] });
+    } else list.push(RV("r1", "Wrong questions only · EO + Rule line", "All nine blocks: wrong questions only, 2 minutes each — Educational Objective and one Rule line. 30 · stand 10 · 30 · stand 10 · 30, hard stop."));
+    list.push(CL("close", "Close · evening off", "Notebook line · tomorrow is OFF · lights out early.", S.closeSec));
+  }
   else if (tpl === "between") list = [
     CL("arrive", "Arrive · sit · phone in the bag", "Yesterday's notes → the Rule lines once.", S.arriveSec),
     B("b1", "Block 1 · random · 20 Q", "The one block of the day. Same checkpoints."),
@@ -516,24 +529,26 @@ function buildSteps(k, tpl) {
     CC("c3", "Repeat case 3" + num(c3) + " · strict clock", "Last one. Then the day is done.", c3),
     CL("close", "Close · done by early afternoon", "Notebook line · bag for the exam day · nothing in the evening.", S.closeSec)
   ];
-  else if (tpl === "interface") list = [
-    CL("arrive", "Arrive · sit · phone in the bag", "Today is about the buttons, not the content.", S.arriveSec),
-    { id: "s1", kind: "block", t: "Official sample test · block 1", w: "USMLE's own software: highlight, strike-out, lab values, the flag, End Block. Learn where everything is.", parts: [{ l: "Block", sec: S.sampleSec }] },
+  else if (tpl === "interface") list = [                           // no official sample blocks (a score two days before the exam changes nothing): the software's tutorial and buttons, then four of the six official practice cases
+    CL("arrive", "Arrive · sit · phone in the bag", "Today is about the buttons, not the content. Nothing is scored.", S.arriveSec),
+    { id: "ui", kind: "review", t: "Interface walk-through · the 2026 exam software", w: "The link on your accommodation letter. The tutorial, then the buttons: highlight, strike-out, lab values, calculator, the flag, the settings menu, the review screen, End Block. No block is taken; nothing is scored.", parts: [{ l: "Interface", sec: L("ui", S.uiSec) }] },
     BR("br1", "Break", "Out of the chair."),
-    { id: "s2", kind: "block", t: "Official sample test · block 2", w: "Same. Note anything that surprised you about the interface.", parts: [{ l: "Block", sec: S.sampleSec }] },
-    ML("lunch", "Lunch", "Eat, walk outside."),
     CC("c1", "Official practice CCS · case 1", "The real order sheet, the real clock, the real location change. The same four lines.", ""),
     BR("br2", "Break", "Walk. Water."),
     CC("c2", "Official practice CCS · case 2", "Advance the clock the way the real software wants it.", ""),
+    ML("lunch", "Lunch", "Eat, walk outside."),
+    CC("c3", "Official practice CCS · case 3", "Type the orders the way the real box wants them. Read the feedback once.", ""),
     BR("br3", "Break", "Out of the chair."),
+    CC("c4", "Official practice CCS · case 4", "The close line at the 2-minute warning.", ""),
+    BR("br4", "Break", "Out of the chair."),
     { id: "notes", kind: "review", t: "All UWorld Notes once · the Rule lines", w: "40 minutes. Read, do not rewrite. Nothing new is learned today.", parts: [{ l: "Notes", sec: S.notesSec }] },
     CL("close", "Close · early night", "Notebook line · bag · lights out early.", S.closeSec)
   ];
   else if (tpl === "minimum") list = [
     CL("arrive", "Arrive · sit", "Done by noon today.", S.arriveSec),
-    { id: "s1", kind: "block", t: "Official sample test · 1 block", w: "Warm hands. Buttons, not content.", parts: [{ l: "Block", sec: S.sampleSec }] },
+    CC("c1", "Official practice CCS · case 5", "The four lines, from memory.", ""),
     BR("br1", "Break", "Out of the chair."),
-    CC("c1", "Official practice CCS · 1 case", "The four lines, from memory.", ""),
+    CC("c2", "Official practice CCS · case 6", "The last one. The same four lines; the close line at the 2-minute warning.", ""),
     { id: "pack", kind: "close", t: "Pack · permit, ID, snacks, water", w: "Everything in the bag tonight, by the door.", parts: [{ l: "Pack", sec: S.packSec }] },
     { id: "sheet", kind: "ccs", t: "CCS cheat sheet from memory", w: "Write it from memory, then compare with the printed sheet.", parts: [{ l: "Sheet", sec: 900 }] },
     CL("close", "Close · early lights out", "Nothing after noon. Alarms set. Sleep is the last study session.", S.closeSec)
@@ -603,8 +618,11 @@ function loadSettings() {
   if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p);
   // Nov 11 fix: case 10 was done Nov 7; 94 takes its slot. An untouched calendar takes the new default; an edited one gets just that line patched.
   const calBefore = S.cal;
-  if (S.cal === CAL_V1 || S.cal === CAL_V16) S.cal = CAL_DEFAULT;
-  else if (/2026-11-11 \| study \| 10, 8, 113/.test(S.cal || "")) S.cal = S.cal.replace("2026-11-11 | study | 10, 8, 113", "2026-11-11 | study | 94, 8, 113");
+  if (S.cal === CAL_V1 || S.cal === CAL_V16 || S.cal === CAL_V17) S.cal = CAL_DEFAULT;
+  else if (typeof S.cal === "string") {
+    if (/2026-11-11 \| study \| 10, 8, 113/.test(S.cal)) S.cal = S.cal.replace("2026-11-11 | study | 10, 8, 113", "2026-11-11 | study | 94, 8, 113");
+    CAL_NOV13.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });
+  }
   if (p && S.cal !== calBefore) P.writeJSON(LS_S, S);
   if (!parseKey(S.dayOne)) S.dayOne = DEFAULTS.dayOne;
   if (!TPLS.includes(S.tpl)) S.tpl = "auto";
@@ -616,6 +634,8 @@ function loadSettings() {
   if (!(S.v >= 2)) { S.bio = false; S.triage = true; S.v = 2; if (p) P.writeJSON(LS_S, S); }
   S.bio = S.bio === true; S.triage = S.triage !== false;
   S.triSec = (+S.triSec >= 120 && +S.triSec <= 3600) ? Math.round(+S.triSec) : 600;
+  S.uiSec = (+S.uiSec >= 60 && +S.uiSec <= 4 * 3600) ? Math.round(+S.uiSec) : 1800;
+  S.markedSec = (+S.markedSec >= 60 && +S.markedSec <= 4 * 3600) ? Math.round(+S.markedSec) : 2700;
   P.setSound(S.sound);
 }
 function saveSettings() { P.writeJSON(LS_S, S); }
@@ -1471,7 +1491,7 @@ function adjBtn(sec) { return btn((sec < 0 ? "−" : "+") + fmt(Math.abs(sec)), 
 function dayNote(note) { // the calendar's line for the day, kept true to the day's list: no Biostats contact when that step is off; the fast pass named when it replaces the long review of the rehearsal
   let n = String(note || "");
   if (!S.bio) n = n.replace(/\s*Biostats contact:[^.]*\.?/i, "").trim();
-  if (S.triage) n = n.replace("Then wrong questions only, EO + Rule line.", "Then the fast pass through all six blocks.");
+  if (S.triage) n = n.replace("Then wrong questions only, EO + Rule line.", "Then the fast pass.");
   return n;
 }
 function rows(list) { // the small buttons of the card, in named groups: [caption, buttons] or just buttons
@@ -1701,7 +1721,7 @@ function workByDay() { // what each day really held, from what the Block, Review
   P.loadSessions().forEach(x => { if (x.type !== "block" && x.type !== "review" && x.type !== "ccs") return; const t = new Date(x.date).getTime(); if (!(t > 0)) return; const k = keyOf(t), m = map[k] || (map[k] = { block: 0, review: 0, ccs: 0 }); m[x.type]++; });
   workCache = { at: now, map: map }; return map;
 }
-function planLabel(tpl) { return tpl === "study" ? S.nBlocks + "B " + S.nCases + "C" : tpl === "tonight" ? "2B 2C" : tpl === "rehearsal" ? "6B" : tpl === "between" ? "1B 3C" : tpl === "interface" ? "sample" : tpl === "minimum" ? "light" : tpl === "off" ? "off" : ""; }
+function planLabel(tpl) { return tpl === "study" ? S.nBlocks + "B " + S.nCases + "C" : tpl === "tonight" ? "2B 2C" : tpl === "rehearsal" ? "9B 2C" : tpl === "between" ? "1B 3C" : tpl === "interface" ? "4C" : tpl === "minimum" ? "light" : tpl === "off" ? "off" : ""; }
 let ccsShown = { at: 0, sig: "" };
 function renderCcsDone() { // "40 different CCS cases done since Oct 13": the ccscases list of Nov 13 + what the pacer has seen since (looked up every five seconds)
   const now = Date.now(); if (now - ccsShown.at < 5000 && now >= ccsShown.at) return; ccsShown.at = now;
@@ -1757,7 +1777,7 @@ function renderTen() { // the days from Day 1 to the last exam day, in weeks: pa
 
 /* ---------- settings ---------- */
 function settingsMsg(t) { $("settingsMsg").textContent = t; }
-const DUR_FIELDS = [["arriveSec", "Arrive"], ["shortSec", "Short break"], ["mealSec", "Lunch · dinner"], ["triSec", "Fast pass · per block"], ["bioSec", "Biostats contact"], ["caseSec", "CCS case"], ["feedbackSec", "CCS feedback"], ["closeSec", "Close the day"], ["sampleSec", "Official sample block"], ["notesSec", "Notes read (Nov 16)"], ["packSec", "Pack (Nov 17)"]];
+const DUR_FIELDS = [["arriveSec", "Arrive"], ["shortSec", "Short break"], ["mealSec", "Lunch · dinner"], ["triSec", "Fast pass · per block"], ["bioSec", "Biostats contact"], ["caseSec", "CCS case"], ["feedbackSec", "CCS feedback"], ["closeSec", "Close the day"], ["markedSec", "Marked questions (Nov 14)"], ["uiSec", "Interface walk-through (Nov 16)"], ["notesSec", "Notes read (Nov 16)"], ["packSec", "Pack (Nov 17)"]];
 function fillSettings() {
   $("fDayOne").value = S.dayOne; $("fDays").value = S.nDays; $("fPlanStart").value = S.planStart; $("fPlanEnd").value = S.planEnd; $("fTpl").value = S.tpl; $("fRemind").checked = !!S.remind; $("fTheme").value = P.getTheme();
   $("fBlocks").value = S.nBlocks; $("fCases").value = S.nCases; $("fLunch").value = S.lunchAfter; $("fReview").value = String(S.reviewSec); $("fBio").checked = !!S.bio; $("fTri").checked = !!S.triage;
