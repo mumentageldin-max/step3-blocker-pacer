@@ -832,6 +832,11 @@ window.Pacer = (() => {
         b.addEventListener("click", () => location.reload());
         n.insertBefore(b, n.lastChild);
       });
+      let looked = Date.now();                                        // a tab that was left open: back in front, it asks once whether a newer version is there (at most every ten minutes)
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible" || Date.now() - looked < 600000) return; looked = Date.now();
+        try { navigator.serviceWorker.getRegistration().then(r => { if (r) r.update().catch(() => {}); }).catch(() => {}); } catch (e) {}
+      });
     }
   } catch (e) {}
   return api;
