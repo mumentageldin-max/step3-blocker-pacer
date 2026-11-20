@@ -289,7 +289,7 @@ textarea.cal{font-family:var(--font-num);font-size:12px;min-height:150px;width:1
         <div class="durs" id="durs"></div>
         <div class="rowhead"><h2>Calendar</h2><span class="meta">date | sequence | case numbers | note</span></div>
         <textarea class="cal" id="fCal" spellcheck="false"></textarea>
-        <p class="note">Case numbers: the first two are case 1 and case 2 of that day, a third is the retry for the 3rd slot. An L after a number (94L) is a 20-minute case → 25:00 on the clock; without it the case gets 12:30. A P before a number (P5) is an official practice case — the exam's own software, not a ccscases number. The Now card switches 12:30 / 25:00 at any moment, also in the middle of a case. A B before a number (B2) is the number of blocks on the clock. On the days of Nov 19–22: BIO10 is the set of 10 biostatistics questions, T2 is two Tutor blocks of incorrect questions, an N after a number (70N) is a new case, SHEET is the cheat sheet from memory, CCSFIRST puts the cases before the blocks. Sequences: study · tonight · rehearsal · between · interface · minimum · practice · final · exam · off. A date that is not listed gets a study day.</p>
+        <p class="note">Case numbers: the first two are case 1 and case 2 of that day, a third is the retry for the 3rd slot. An L after a number (94L) is a 20-minute case → 25:00 on the clock; without it the case gets 12:30. A P before a number (P5) is an official practice case — the exam's own software, not a ccscases number. The Now card switches 12:30 / 25:00 at any moment, also in the middle of a case. A B before a number (B2) is the number of blocks on the clock. On the days of Nov 19–22: BIO10 is the set of 10 biostatistics questions, T2 is two Tutor blocks of incorrect questions, an N after a number (70N) is a new case, SHEET is the cheat sheet from memory, CCSFIRST puts the cases before the blocks, BIOFIRST puts the biostatistics set first. Sequences: study · tonight · rehearsal · between · interface · minimum · practice · final · exam · off. A date that is not listed gets a study day.</p>
         <div class="formrow">
           <button type="button" id="btnApply">Save settings</button>
           <button type="button" id="btnCalReset">Calendar back to the plan</button>
@@ -406,18 +406,27 @@ const CAL_NOV18 = [
   ["2026-11-22 | between | 15, 5L, 9 | Same shape. Early night.",
    "2026-11-22 | final | B2, BIO10, 15, 5L, 9 | Half a day: 2 new blocks and the fast pass · 10 biostatistics · three repeats. Done by 1:00 pm. Pack. Early night."]
 ];
-const CAL_DEFAULT = CAL_NOV18.reduce((c, pr) => c.replace(pr[0], pr[1]), CAL_V27);
+const CAL_V28 = CAL_NOV18.reduce((c, pr) => c.replace(pr[0], pr[1]), CAL_V27);
+// Nov 20, after Thursday's sheet: the biostatistics set was the piece that fell off, so on Nov 20–22 it comes first (BIOFIRST); the blocks of these days are random, on the exam's clock;
+// Friday's Tutor blocks are endocrine (Thursday's) and pulmonary.
+const CAL_NOV20 = [
+  ["2026-11-20 | final | B2, BIO10, T2, P5, P6, 29N, 8, 21L, 138L | 2 new blocks and the fast pass · 10 biostatistics · official practice cases 5–6, one new case, the three weakest repeats · 2 Tutor blocks of your incorrect questions (pulmonary, infectious diseases).",
+   "2026-11-20 | final | BIOFIRST, B2, BIO10, T2, P5, P6, 29N, 8, 21L, 138L | Biostatistics first: 10 questions. Then 2 random blocks on the exam's clock and the fast pass · official practice cases 5–6, one new case, the three weakest repeats · 2 Tutor blocks of your incorrect questions (endocrine, pulmonary)."],
+  ["2026-11-21 | final | CCSFIRST, B2, BIO10, T2, 17N, 64N, 39, 11L, 6L, 34 | Exam Day 4 in miniature: six cases in a row first. Then 2 new blocks and the fast pass · 10 biostatistics · 2 Tutor blocks of your incorrect questions (gastrointestinal, rheumatology).",
+   "2026-11-21 | final | BIOFIRST, CCSFIRST, B2, BIO10, T2, 17N, 64N, 39, 11L, 6L, 34 | Biostatistics first: 10 questions. Then Exam Day 4 in miniature: six cases in a row. Then 2 random blocks on the exam's clock and the fast pass · 2 Tutor blocks of your incorrect questions (gastrointestinal, rheumatology)."],
+  ["2026-11-22 | final | B2, BIO10, 15, 5L, 9 | Half a day: 2 new blocks and the fast pass · 10 biostatistics · three repeats. Done by 1:00 pm. Pack. Early night.",
+   "2026-11-22 | final | BIOFIRST, B2, BIO10, 15, 5L, 9 | Half a day. Biostatistics first: 10 questions. Then 2 random blocks on the exam's clock and the fast pass · three repeats. Pack. Early night."]
+];
+const CAL_DEFAULT = CAL_NOV20.reduce((c, pr) => c.replace(pr[0], pr[1]), CAL_V28);
 const TPLS = ["study", "tonight", "rehearsal", "between", "interface", "minimum", "practice", "final", "exam", "off"];
 // what each block of the "final" days is made of: [title, how to create it in UWorld]; t = the system of each Tutor block of incorrect questions: [short name, UWorld's name]
 const FINAL_DAYS = {
   "2026-11-19": { b: [["random, unused", "UWorld: Timed · Unused · all systems. Same method as yesterday: last line → the choices → the first line → only where the answer lives."],
                       ["three systems, unused", "UWorld: Timed · Unused · tick three systems — General Principles · Allergy & Immunology · Poisoning & Environmental Exposure. Recall questions: answer and move."]],
                   t: [["renal", "Renal, Urinary Systems & Electrolytes"], ["endocrine", "Endocrine, Diabetes & Metabolism"]] },
-  "2026-11-20": { b: [["random, unused", "UWorld: Timed · Unused · all systems. Third read, or 2:00 on one question → pick, flag, next. 2:00 left → fill every blank."],
-                      ["four systems, unused", "UWorld: Timed · Unused · tick four systems — General Principles · Allergy & Immunology · Poisoning & Environmental Exposure · Male Reproductive System. Take what is left, up to 20."]],
-                  t: [["pulmonary", "Pulmonary & Critical Care"], ["infectious diseases", "Infectious Diseases"]] },
+  "2026-11-20": { b: [], t: [["endocrine", "Endocrine, Diabetes & Metabolism"], ["pulmonary", "Pulmonary & Critical Care"]] },
   "2026-11-21": { b: [], t: [["gastrointestinal", "Gastrointestinal & Nutrition"], ["rheumatology", "Rheumatology/Orthopedics & Sports"]] },
-  "2026-11-22": { b: [["random, unused", "Monday's first block, one day early. UWorld: Timed · Unused · all systems. Last line → the choices → the first line → only where the answer lives."]], t: [] }
+  "2026-11-22": { b: [], t: [] }
 };
 const DEFAULTS = { arriveSec: 300, shortSec: 600, mealSec: 1800, bioSec: 600, caseSec: 750, feedbackSec: 600, closeSec: 600, sampleSec: 3600, uiSec: 1800, markedSec: 2700, notesSec: 2400, packSec: 900,
   nBlocks: 6, nCases: 2, lunchAfter: "cases", bio: false, triage: true, triSec: 600, reviewSec: -1,   // the study day: blocks in a row → cases → lunch → reviews. reviewSec: -1 by the block's score, 0 the Review page's Timer A, else seconds
@@ -451,9 +460,9 @@ function calendar() { // { key: { tpl, cases: [], note } }
     const parts = line.split("|").map(s => s.trim());
     if (!parseKey(parts[0])) return;
     const tpl = TPLS.includes((parts[1] || "").toLowerCase()) ? parts[1].toLowerCase() : "study";
-    const cases = [], long = {}, official = [], fresh = {}; let blocks = 0, tutor = 0, bio = 0, sheet = false, ccsFirst = false;
+    const cases = [], long = {}, official = [], fresh = {}; let blocks = 0, tutor = 0, bio = 0, sheet = false, ccsFirst = false, bioFirst = false;
     // P5 = official practice case 5 (the exam's own software) — not a ccscases number; B2 = two blocks on the clock. For the "final" days: BIO10 = the set of 10 biostatistics questions,
-    // T2 = two Tutor blocks of incorrect questions, 70N = a new case (first attempt), SHEET = the CCS cheat sheet from memory, CCSFIRST = the cases come before the blocks
+    // T2 = two Tutor blocks of incorrect questions, 70N = a new case (first attempt), SHEET = the CCS cheat sheet from memory, CCSFIRST = the cases come before the blocks, BIOFIRST = the biostatistics set is the first step of the day
     (parts[2] || "").split(/[,\s]+/).forEach(tok => {
       const o = /^[Pp](\d+)$/.exec(tok); if (o) { official.push(o[1]); return; }
       const bk = /^[Bb](\d)$/.exec(tok); if (bk) { blocks = +bk[1]; return; }
@@ -461,14 +470,15 @@ function calendar() { // { key: { tpl, cases: [], note } }
       const bi = /^BIO(\d{1,2})?$/i.exec(tok); if (bi) { bio = Math.max(1, Math.min(20, +(bi[1] || 10))); return; }
       if (/^SHEET$/i.test(tok)) { sheet = true; return; }
       if (/^CCSFIRST$/i.test(tok)) { ccsFirst = true; return; }
+      if (/^BIOFIRST$/i.test(tok)) { bioFirst = true; return; }
       const m = /^(\d+)\s*(L|l|\*|:25|N|n)?$/.exec(tok); if (!m) return;
       cases.push(m[1]); if (/^n$/i.test(m[2] || "")) fresh[m[1]] = true; else if (m[2]) long[m[1]] = true;
     });
-    out[parts[0]] = { tpl: tpl, cases: cases, long: long, official: official, blocks: blocks, tutor: tutor, bio: bio, sheet: sheet, ccsFirst: ccsFirst, fresh: fresh, note: parts.slice(3).join(" | ") };
+    out[parts[0]] = { tpl: tpl, cases: cases, long: long, official: official, blocks: blocks, tutor: tutor, bio: bio, sheet: sheet, ccsFirst: ccsFirst, bioFirst: bioFirst, fresh: fresh, note: parts.slice(3).join(" | ") };
   });
   return out;
 }
-function calFor(k) { return calendar()[k] || { tpl: "study", cases: [], long: {}, official: [], blocks: 0, tutor: 0, bio: 0, sheet: false, ccsFirst: false, fresh: {}, note: "" }; }
+function calFor(k) { return calendar()[k] || { tpl: "study", cases: [], long: {}, official: [], blocks: 0, tutor: 0, bio: 0, sheet: false, ccsFirst: false, bioFirst: false, fresh: {}, note: "" }; }
 function tplFor(k) { return S.tpl !== "auto" ? S.tpl : calFor(k).tpl; }
 
 /* ---------- durations that live on the other pages ---------- */
@@ -666,7 +676,7 @@ function buildSteps(k, tpl) {
     const tipsO = ["The real order sheet, the real clock, the real location change. The card's list, one proving test, treat at the checkpoint.", "Advance the clock the way the real software wants it.", "Type the orders the way the real box wants them. After the case: check your orders against the cheat sheet.", "The close line at the 2-minute warning."];
     const mcq = [], ccsL = [], tut = [];
     for (let i = 1; i <= nF; i++) {
-      const lb = fd.b[i - 1] || ["random, unused", "UWorld: Timed · Unused · all systems. Third read, or 2:00 on one question → pick, flag, next. 2:00 left → fill every blank."];
+      const lb = fd.b[i - 1] || ["random, unused", "UWorld: Timed · Unused · all systems. On the paper: Q5 → 28:00 left · Q10 → 18:45 · Q15 → 9:20. Behind at Q5 → the next five get the short read: last line, choices, pick. At 0:00 here: fill every blank and end the block in UWorld — this clock is the exam's."];
       mcq.push(B("b" + i, "Block " + i + " · " + lb[0] + (i === 1 ? " · 20 Q" : ""), lb[1]));
       mcq.push(BR(i < nF ? "br" + i : "bb" + nF, "Break · 15", i < nF ? "Out of the chair, water. 15 of an exam day's 85 minutes." : "The real break.", 900));
     }
@@ -675,9 +685,10 @@ function buildSteps(k, tpl) {
       tri.w = "Right → next. Lucky guess → the Educational Objective only. Wrong → the Educational Objective, and write two things: the diagnosis · the test that proves it.";
       mcq.push(tri); mcq.push(BR("brt", "Break · 10", "Out of the chair.", 600));
     }
-    if (cal.bio > 0) mcq.push({ id: "bio", kind: "bio", t: "Biostatistics · " + cal.bio + " questions · Tutor",
+    const bioStep = cal.bio > 0 ? { id: "bio", kind: "bio", t: "Biostatistics · " + cal.bio + " questions · Tutor",
       w: "UWorld: Tutor · Unused · one system only — Biostatistics & Epidemiology · " + cal.bio + " questions. Before you open the explanation, name the core thing (1–8). Outside the eight → the Educational Objective, next. Hard stop.",
-      parts: [{ l: "Biostats", sec: L("bio", cal.bio * 240), cue: "Name the core thing (1–8) before the explanation. Outside the eight → the Educational Objective, next. Hard stop at 0:00." }] });
+      parts: [{ l: "Biostats", sec: L("bio", cal.bio * 240), cue: "Name the core thing (1–8) before the explanation. Outside the eight → the Educational Objective, next. Hard stop at 0:00." }] } : null;
+    if (bioStep && !cal.bioFirst) mcq.push(bioStep);
     if (cal.sheet) ccsL.push({ id: "sheet", kind: "notes", t: "CCS cheat sheet from memory", w: "CCS starts again. Write the sheet from memory, then compare with the printed one.", parts: [{ l: "Sheet", sec: 900, cue: "Write first, look after. Then compare with the printed sheet and mark only what you missed." }] });
     const cases = [];
     // a case step is named after its case — p3 is official practice case 3, n70 is ccscases № 70 — so its tick means that case on every device and after every change of the day's line
@@ -695,9 +706,12 @@ function buildSteps(k, tpl) {
     }
     const trim = arr => { while (arr.length && arr[arr.length - 1].kind === "brk") arr.pop(); return arr; };   // no break right before a lunch, another break or the close
     const first = cal.ccsFirst ? ccsL : mcq, second = cal.ccsFirst ? mcq : ccsL;
-    list = [CL("arrive", "Arrive · sit · phone in the bag", "Read once: the smallest step, with the patient, now · feelings first, then help · limits, kindly.", S.arriveSec)].concat(trim(first));
+    list = [CL("arrive", "Arrive · sit · phone in the bag", "Read once: the smallest step, with the patient, now · feelings first, then help · limits, kindly.", S.arriveSec)];
+    if (bioStep && cal.bioFirst) { list.push(bioStep); list.push(BR("brb", "Break · 10", "Out of the chair. Then the day.", 600)); }   // BIOFIRST: the set is the first thing of the day, before anything can push it off the sheet
+    list = list.concat(trim(first));
     if (first.length && second.length) list.push(big ? ML("lunch", "Lunch", "Away from the desk.") : BR("brl", "Break · 10", "Out of the chair.", 600));
     list = list.concat(trim(second));
+    trim(list);
     if (tut.length) { if (list.length > 1) list.push(BR("brc", "Break · 15", "The real break. Then your incorrect questions.", 900)); list = list.concat(tut); }
     list.push(CL("close", eve ? "Close · early night" : "Close", eve ? "Pack permit, ID, snacks, water. Nothing after this. Early lights out." : "Notebook line: one thing that worked, one thing to change. Lights out at the usual time.", S.closeSec));
   }
@@ -767,13 +781,14 @@ function loadSettings() {
   if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p);
   // Nov 11 fix: case 10 was done Nov 7; 94 takes its slot. An untouched calendar takes the new default; an edited one gets just that line patched.
   const calBefore = S.cal;
-  if (S.cal === CAL_V1 || S.cal === CAL_V16 || S.cal === CAL_V17 || S.cal === CAL_V25 || S.cal === CAL_V26 || S.cal === CAL_V27) S.cal = CAL_DEFAULT;
+  if (S.cal === CAL_V1 || S.cal === CAL_V16 || S.cal === CAL_V17 || S.cal === CAL_V25 || S.cal === CAL_V26 || S.cal === CAL_V27 || S.cal === CAL_V28) S.cal = CAL_DEFAULT;
   else if (typeof S.cal === "string") {
     if (/2026-11-11 \| study \| 10, 8, 113/.test(S.cal)) S.cal = S.cal.replace("2026-11-11 | study | 10, 8, 113", "2026-11-11 | study | 94, 8, 113");
     CAL_NOV13.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });
     CAL_NOV15.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });   // a line he rewrote himself is left alone
     CAL_NOV15B.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });
     CAL_NOV18.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });
+    CAL_NOV20.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });
   }
   if (p && S.cal !== calBefore) P.writeJSON(LS_S, S);
   if (!parseKey(S.dayOne)) S.dayOne = DEFAULTS.dayOne;
