@@ -417,7 +417,13 @@ const CAL_NOV20 = [
   ["2026-11-22 | final | B2, BIO10, 15, 5L, 9 | Half a day: 2 new blocks and the fast pass · 10 biostatistics · three repeats. Done by 1:00 pm. Pack. Early night.",
    "2026-11-22 | final | BIOFIRST, B2, BIO10, 15, 5L, 9 | Half a day. Biostatistics first: 10 questions. Then 2 random blocks on the exam's clock and the fast pass · three repeats. Pack. Early night."]
 ];
-const CAL_DEFAULT = CAL_NOV20.reduce((c, pr) => c.replace(pr[0], pr[1]), CAL_V28);
+const CAL_V29 = CAL_NOV20.reduce((c, pr) => c.replace(pr[0], pr[1]), CAL_V28);
+// Nov 21, after two days on the new order: Sunday's third repeat is № 39 (№ 5 already reached its mark), and the sheet gets a 15-minute drill on the test box after the biostatistics set.
+const CAL_NOV21 = [
+  ["2026-11-22 | final | BIOFIRST, B2, BIO10, 15, 5L, 9 | Half a day. Biostatistics first: 10 questions. Then 2 random blocks on the exam's clock and the fast pass · three repeats. Pack. Early night.",
+   "2026-11-22 | final | BIOFIRST, B2, BIO10, 15, 39, 9 | Half a day. Biostatistics first: 10 questions, then 15 minutes on the test box. Then 2 random blocks on the exam's clock and the fast pass · three repeats. Pack. Early night."]
+];
+const CAL_DEFAULT = CAL_NOV21.reduce((c, pr) => c.replace(pr[0], pr[1]), CAL_V29);
 const TPLS = ["study", "tonight", "rehearsal", "between", "interface", "minimum", "practice", "final", "exam", "off"];
 // what each block of the "final" days is made of: [title, how to create it in UWorld]; t = the system of each Tutor block of incorrect questions: [short name, UWorld's name]
 const FINAL_DAYS = {
@@ -426,7 +432,16 @@ const FINAL_DAYS = {
                   t: [["renal", "Renal, Urinary Systems & Electrolytes"], ["endocrine", "Endocrine, Diabetes & Metabolism"]] },
   "2026-11-20": { b: [], t: [["endocrine", "Endocrine, Diabetes & Metabolism"], ["pulmonary", "Pulmonary & Critical Care"]] },
   "2026-11-21": { b: [], t: [["gastrointestinal", "Gastrointestinal & Nutrition"], ["rheumatology", "Rheumatology/Orthopedics & Sports"]] },
-  "2026-11-22": { b: [], t: [] }
+  "2026-11-22": { b: [], t: [], drill: ["The test box · three questions to redo", "UWorld → Previous Tests → Review Test: test 90 question 20 · test 91 question 4 · test 95 question 6. For each one, draw the box on paper before you read the explanation.",
+                  "Draw the box first. Sensitivity and specificity: down the disease columns. PPV and NPV: across the test rows. Prevalence ↑ → PPV ↑, NPV ↓ — sensitivity and specificity do not move."] }
+};
+// the exam days' own lines: what goes on the scratch paper before Start, and the break line of that day
+const EXAM_LINE = ["The checkpoint line on the scratch paper", "Before Start on every block: Q5 → 28:00 left · Q10 → 18:45 · Q15 → 9:20 · 2:00 → fill. Behind at Q5 → the next five get the short read. At each checkpoint: eyes off the screen, one breath, then the clock."];
+const EXAM_DAYS = {
+  "2026-11-23": { line: EXAM_LINE, breaks: ["The break line on the scratch paper", "BREAKS 15 · 15 · L25 · 15 · 10 → LEFT 70 · 55 · 30 · 15 · 5. A 15-minute break is 10 minutes outside and 5 at the door. No reviewing: stand, water, snack."] },
+  "2026-11-24": { line: EXAM_LINE, breaks: ["The break line on the scratch paper", "Nine blocks. Out of the room after blocks 2, 4 and 7 (12 minutes each) and for lunch after block 5 (25). After blocks 1, 3, 6 and 8: 2 minutes in the chair. LEFT 83 · 71 · 69 · 57 · 32 · 30 · 18 · 16. No reviewing."] },
+  "2026-11-25": { line: ["CCS: the same moves in every case", "The card's list + ONE proving test → move the clock. At the checkpoint: treat, diagnosis open or not. Nothing invasive unless the case forces it."],
+                  fill: ["2-minute warning → the close line", "Never leave a case without it."] }
 };
 const DEFAULTS = { arriveSec: 300, shortSec: 600, mealSec: 1800, bioSec: 600, caseSec: 750, feedbackSec: 600, closeSec: 600, sampleSec: 3600, uiSec: 1800, markedSec: 2700, notesSec: 2400, packSec: 900,
   nBlocks: 6, nCases: 2, lunchAfter: "cases", bio: false, triage: true, triSec: 600, reviewSec: -1,   // the study day: blocks in a row → cases → lunch → reviews. reviewSec: -1 by the block's score, 0 the Review page's Timer A, else seconds
@@ -688,7 +703,8 @@ function buildSteps(k, tpl) {
     const bioStep = cal.bio > 0 ? { id: "bio", kind: "bio", t: "Biostatistics · " + cal.bio + " questions · Tutor",
       w: "UWorld: Tutor · Unused · one system only — Biostatistics & Epidemiology · " + cal.bio + " questions. Before you open the explanation, name the core thing (1–8). Outside the eight → the Educational Objective, next. Hard stop.",
       parts: [{ l: "Biostats", sec: L("bio", cal.bio * 240), cue: "Name the core thing (1–8) before the explanation. Outside the eight → the Educational Objective, next. Hard stop at 0:00." }] } : null;
-    if (bioStep && !cal.bioFirst) mcq.push(bioStep);
+    const drillStep = fd.drill ? { id: "box", kind: "notes", t: fd.drill[0], w: fd.drill[1], parts: [{ l: "Drill", sec: 900, cue: fd.drill[2] }] } : null;   // a short drill of the day, read on this card: it follows the set
+    if (bioStep && !cal.bioFirst) { mcq.push(bioStep); if (drillStep) mcq.push(drillStep); }
     if (cal.sheet) ccsL.push({ id: "sheet", kind: "notes", t: "CCS cheat sheet from memory", w: "CCS starts again. Write the sheet from memory, then compare with the printed one.", parts: [{ l: "Sheet", sec: 900, cue: "Write first, look after. Then compare with the printed sheet and mark only what you missed." }] });
     const cases = [];
     // a case step is named after its case — p3 is official practice case 3, n70 is ccscases № 70 — so its tick means that case on every device and after every change of the day's line
@@ -707,7 +723,7 @@ function buildSteps(k, tpl) {
     const trim = arr => { while (arr.length && arr[arr.length - 1].kind === "brk") arr.pop(); return arr; };   // no break right before a lunch, another break or the close
     const first = cal.ccsFirst ? ccsL : mcq, second = cal.ccsFirst ? mcq : ccsL;
     list = [CL("arrive", "Arrive · sit · phone in the bag", "Read once: the smallest step, with the patient, now · feelings first, then help · limits, kindly.", S.arriveSec)];
-    if (bioStep && cal.bioFirst) { list.push(bioStep); list.push(BR("brb", "Break · 10", "Out of the chair. Then the day.", 600)); }   // BIOFIRST: the set is the first thing of the day, before anything can push it off the sheet
+    if (bioStep && cal.bioFirst) { list.push(bioStep); if (drillStep) list.push(drillStep); list.push(BR("brb", "Break · 10", "Out of the chair. Then the day.", 600)); }   // BIOFIRST: the set is the first thing of the day, before anything can push it off the sheet
     list = list.concat(trim(first));
     if (first.length && second.length) list.push(big ? ML("lunch", "Lunch", "Away from the desk.") : BR("brl", "Break · 10", "Out of the chair.", 600));
     list = list.concat(trim(second));
@@ -715,15 +731,18 @@ function buildSteps(k, tpl) {
     if (tut.length) { if (list.length > 1) list.push(BR("brc", "Break · 15", "The real break. Then your incorrect questions.", 900)); list = list.concat(tut); }
     list.push(CL("close", eve ? "Close · early night" : "Close", eve ? "Pack permit, ID, snacks, water. Nothing after this. Early lights out." : "Notebook line: one thing that worked, one thing to change. Lights out at the usual time.", S.closeSec));
   }
-  else if (tpl === "exam") list = [
-    TICK("alarm", "exam", "Same alarms, same breakfast", "The morning you rehearsed."),
-    TICK("bag", "exam", "Permit · ID · snacks · water in the bag", "Checked by the door."),
-    TICK("line", "exam", "The checkpoint line on the scratch paper", "Before Start on every block."),
-    TICK("fill", "exam", "2:00 left → fill every blank", "Never leave a blank."),
-    TICK("breaks", "exam", "No reviewing in the breaks", "Stand, water, snack. Out of the chair."),
-    TICK("lunch", "exam", "Lunch: eat, walk, no phone", "The afternoon blocks are the same blocks."),
-    TICK("home", "exam", "Home. Nothing about the exam tonight.", "Eat. Sleep. Tomorrow is its own day.")
-  ];
+  else if (tpl === "exam") {
+    const ex = EXAM_DAYS[k] || {}, tx = (key, t, w) => ex[key] || [t, w];   // an exam day with lines of its own shows them; any other exam day keeps the plain ones
+    list = [
+      TICK("alarm", "exam", "Same alarms, same breakfast", "The morning you rehearsed."),
+      TICK("bag", "exam", "Permit · ID · snacks · water in the bag", "Checked by the door."),
+      TICK("line", "exam", tx("line", "The checkpoint line on the scratch paper", "Before Start on every block.")[0], tx("line", "The checkpoint line on the scratch paper", "Before Start on every block.")[1]),
+      TICK("fill", "exam", tx("fill", "2:00 left → fill every blank", "Never leave a blank.")[0], tx("fill", "2:00 left → fill every blank", "Never leave a blank.")[1]),
+      TICK("breaks", "exam", tx("breaks", "No reviewing in the breaks", "Stand, water, snack. Out of the chair.")[0], tx("breaks", "No reviewing in the breaks", "Stand, water, snack. Out of the chair.")[1]),
+      TICK("lunch", "exam", "Lunch: eat, walk, no phone", "The afternoon blocks are the same blocks."),
+      TICK("home", "exam", "Home. Nothing about the exam tonight.", "Eat. Sleep. Tomorrow is its own day.")
+    ];
+  }
   else if (tpl === "off") list = [
     TICK("off", "off", "Day off", "Notebook photo to Claude. Nothing else. The day off is off."),
     TICK("sleep", "off", "Lights out at the usual time", "Tomorrow starts at 8:00 again.")
@@ -781,7 +800,7 @@ function loadSettings() {
   if (p && typeof p === "object") S = Object.assign({}, DEFAULTS, p);
   // Nov 11 fix: case 10 was done Nov 7; 94 takes its slot. An untouched calendar takes the new default; an edited one gets just that line patched.
   const calBefore = S.cal;
-  if (S.cal === CAL_V1 || S.cal === CAL_V16 || S.cal === CAL_V17 || S.cal === CAL_V25 || S.cal === CAL_V26 || S.cal === CAL_V27 || S.cal === CAL_V28) S.cal = CAL_DEFAULT;
+  if (S.cal === CAL_V1 || S.cal === CAL_V16 || S.cal === CAL_V17 || S.cal === CAL_V25 || S.cal === CAL_V26 || S.cal === CAL_V27 || S.cal === CAL_V28 || S.cal === CAL_V29) S.cal = CAL_DEFAULT;
   else if (typeof S.cal === "string") {
     if (/2026-11-11 \| study \| 10, 8, 113/.test(S.cal)) S.cal = S.cal.replace("2026-11-11 | study | 10, 8, 113", "2026-11-11 | study | 94, 8, 113");
     CAL_NOV13.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });
@@ -789,6 +808,7 @@ function loadSettings() {
     CAL_NOV15B.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });
     CAL_NOV18.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });
     CAL_NOV20.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });
+    CAL_NOV21.forEach(pr => { if (S.cal.indexOf(pr[0]) >= 0) S.cal = S.cal.replace(pr[0], pr[1]); });
   }
   if (p && S.cal !== calBefore) P.writeJSON(LS_S, S);
   if (!parseKey(S.dayOne)) S.dayOne = DEFAULTS.dayOne;
