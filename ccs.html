@@ -223,6 +223,7 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;border-radiu
 
   <!-- SETUP -->
   <section class="card setup full" id="setup">
+    <div class="quicklinks" aria-label="Typing drill"><a href="#drill" data-kind="in" id="qlDrill">⌨ Typing drill · my missed orders</a></div>
     <details class="fold" id="precaseFold" open>
       <summary>Pre-case card · read once, then Start</summary>
       <div class="body">
@@ -306,7 +307,8 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;border-radiu
           <div class="rowhead"><h2>Drill</h2><span class="score" id="drillScore"></span></div>
           <div class="form drillopts">
             <label>Set<select id="drillSet">
-              <option value="missed">Missed in my cases + my words</option>
+              <option value="top">My missed orders · highest yield first</option>
+              <option value="missed">Older list · missed Oct 13–26 + my words</option>
               <option value="mine">My misspelled words only</option>
               <option value="all">All orders + my words</option>
               <option value="proc">Procedures &amp; surgeries</option>
@@ -330,6 +332,7 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;border-radiu
             <button type="button" class="small" id="btnSay" hidden>🔊 Say it</button>
             <button type="button" class="small" id="btnDrillCheck" disabled>Check</button>
             <button type="button" class="small" id="btnDrill">Start drill</button>
+            <button type="button" class="small" id="btnDrillTop" hidden>From the top</button>
           </div>
           <div class="fb" id="drillFb"></div>
           <p class="note" id="drillMissList" hidden></p>
@@ -983,10 +986,115 @@ const ORDERS = [
   { o: "Vaccine, diphtheria / tetanus / pertussis (Tdap)", k: "vaccine d", s: "vaccine diphtheria tetanus pertussis", d: "the adult tetanus booster", g: "close", w: "Every 10 years; every wound. Missed in 35, 13 (and 5 last year).", m: "35,13" },
   { o: "Vaccine, pneumococcal", k: "vaccine p", s: "vaccine pneumococcal", d: "pneumonia shot — 65+, COPD, splenectomy", g: "close", w: "P-MIST." },
   { o: "Vaccine, influenza", k: "vaccine i", s: "vaccine influenza", d: "the flu shot — every adult, every year", g: "close", w: "P-MIST." },
-  { o: "Vaccine, zoster (shingles)", k: "vaccine z", s: "vaccine zoster", d: "shingles shot — 50+", g: "close", w: "P-MIST." },
+  { o: "Vaccine, varicella virus (the graded line for zoster / shingles)", k: "vaccine v", s: "vaccine varicella virus", d: "shingles shot — 50+", g: "close", w: "ccscases gives the zoster credit to this line. On the exam: zoster, if the list has it." },
   { o: "Vaccine, meningococcal", k: "vaccine m", s: "vaccine meningococcal", d: "meningitis shot — teens, asplenia, dorms", g: "close", w: "P-MIST." },
   { o: "Vaccine, hepatitis B", k: "vaccine h", s: "vaccine hepatitis b", d: "hepatitis B series", g: "close", w: "" },
   { o: "Vaccine, human papillomavirus (HPV)", k: "vaccine hu", s: "vaccine human papillomavirus", d: "cervical-cancer prevention shot — 9–26 y", g: "close", w: "" },
+];
+/* The typing drill "top": the orders graded as missed in his own ccscases cases (read Nov 24: every graded attempt), merged by order and
+   ranked by the number of cases in which the order was missed; then the orders he wrote down himself after a case, and his misspelled words.
+   q = what he wants to do · o = the line to pick in the order list, spelled as the list spells it · k = the letters to type · k2 = a second way, shown beside it ·
+   a = other starts that also count · n = cases · w = the trap, or the moment to order it · s = the word for the spelling mode · mw = from his misspelled words */
+const MISSED = [
+  { q: "Tetanus booster for an adult (Tdap)", o: "Vaccine, diphtheria/tetanus/pertussis", k: "vacc", n: 11, w: "Pick the line with diphtheria in it. “Vaccine, tetanus toxoid” alone got no credit. No booster in 10 years, or a dirty wound.", s: "diphtheria" },
+  { q: "Urine test, basic (UA)", o: "Urinalysis", k: "urina", n: 8, w: "“uri” alone also lists uric acid and the urine tests.", s: "urinalysis" },
+  { q: "Cervical cancer screening (Pap)", o: "Papanicolaou smear", k: "pap", n: 7, w: "Woman 21 to 65, in the last minute. It is not the HPV vaccine.", s: "papanicolaou" },
+  { q: "Counsel: stop smoking", o: "Instruct patient, smoking cessation", k: "smok", k2: "instr", n: 7, w: "This line starts with Instruct, not Advise. Every smoker.", s: "cessation" },
+  { q: "Clotting times (PT / PTT)", o: "PT/PTT", k: "pt/p", a: ["ptt", "pti", "pt p", "pt i"], n: 7, w: "Bleeding, anticoagulants, liver disease, before a procedure." },
+  { q: "Culture — blood, urine, wound, throat, stool", o: "Bacterial culture, blood", k: "bact", n: 7, w: "Type bact, then read down to the site: blood · urine · wound · abscess · throat · stool · sputum.", s: "bacterial" },
+  { q: "Chest x-ray", o: "X-ray, chest, AP, portable", k: "chest", k2: "x-ray", a: ["x ray", "cxr"], n: 6, w: "AP, portable for a sick patient · PA/lateral in the office." },
+  { q: "Ceftriaxone", o: "Ceftriaxone sodium", k: "ceftr", n: 6, w: "“ceft” lists ceftazidime, ceftizoxime and ceftriaxone. Read to the end of the word: ceftri-AX-one.", s: "ceftriaxone" },
+  { q: "Basic chemistry (BMP)", o: "Basic metabolic profile", k: "bmp", k2: "basic", a: ["cmp", "compre"], n: 5, w: "One chemistry panel in every case. Comprehensive metabolic profile (cmp) counts too." },
+  { q: "Arterial blood gas (ABG)", o: "Arterial blood gases", k: "abg", k2: "arter", n: 5, w: "Low saturation, respiratory distress, coma, overdose, DKA.", s: "arterial" },
+  { q: "IV fluid: normal saline", o: "Saline solution, normal", k: "sali", n: 5, w: "The line starts with Saline — not Salicylate. Lactated Ringer solution (lact) counts too." },
+  { q: "Oxygen saturation", o: "Pulse oximetry", k: "pul", n: 5, w: "It is not in the vital signs. Every case, first batch.", s: "oximetry" },
+  { q: "Reassure the patient", o: "Reassure patient", k: "reas", n: 5, w: "A closing order, in the last minute.", s: "reassure" },
+  { q: "Urine drug screen", o: "Toxicology screen, urine", k: "tox", n: 5, w: "The line starts with Toxicology. Confusion, overdose, seizure, trauma, a psychiatric patient.", s: "toxicology" },
+  { q: "Blood bank: type and screen", o: "Type and screen, blood", k: "type", n: 5, w: "Bleeding, surgery, severe anemia." },
+  { q: "ESR (sed rate)", o: "Sedimentation rate, erythrocyte", k: "esr", k2: "sed", n: 5, w: "The line starts with Sedimentation.", s: "sedimentation" },
+  { q: "ECG, 12 lead", o: "Electrocardiography, 12 lead", k: "ecg", k2: "electroc", a: ["ekg"], n: 5, w: "Chest pain, dyspnea, syncope, palpitations, overdose, potassium.", s: "electrocardiography" },
+  { q: "Anti-nausea drug", o: "Ondansetron hydrochloride", k: "onda", n: 5, w: "The patient vomits → treat it.", s: "ondansetron" },
+  { q: "Gram stain — urine, sputum, wound, abscess", o: "Gram stain, urine, unspun", k: "gram", n: 5, w: "Type gram, then read down to the site." },
+  { q: "Nothing by mouth (NPO)", o: "Diet, NPO", k: "npo", k2: "diet", n: 4, w: "Surgical abdomen, pancreatitis, GI bleed, before a procedure." },
+  { q: "Shingles vaccine (zoster)", o: "Vaccine, varicella virus", k: "vacc", n: 4, w: "ccscases gives the credit to “Vaccine, varicella virus”. On the exam: zoster, if the list has it. Age 50 and over.", s: "varicella" },
+  { q: "Oxygen", o: "Oxygen", k: "oxyg", n: 4, w: "“oxy” also lists oxycodone and oxytocin. Low saturation, carbon monoxide, shock." },
+  { q: "Chlamydia test", o: "Chlamydia trachomatis DNA probe test, urine", k: "chlam", n: 4, w: "With the gonorrhea test: always the two together.", s: "chlamydia" },
+  { q: "Pneumonia vaccine", o: "Vaccine, pneumococcal", k: "vacc", n: 3, w: "An older adult, or a chronic illness.", s: "pneumococcal" },
+  { q: "Gonorrhea test", o: "Neisseria gonorrhoeae DNA probe test, urine", k: "neis", n: 3, w: "It is listed under Neisseria. With the chlamydia test.", s: "gonorrhoeae" },
+  { q: "HIV test", o: "Antibody/antigen, HIV, serum", k: "hiv", k2: "antib", n: 3, w: "Listed under Antibody/antigen. Every sexually transmitted infection, TB, weight loss, pregnancy." },
+  { q: "Thyroid test (TSH)", o: "Hormone, thyroid stimulating, serum", k: "tsh", k2: "horm", n: 3, w: "The line starts with Hormone." },
+  { q: "Lactate (lactic acid)", o: "Lactate, serum", k: "lacta", n: 3, w: "Not “Lactate dehydrogenase” (that is LDH), not Lactated Ringer. Sepsis, shock, ischemia." },
+  { q: "Breast cancer screening", o: "Mammography", k: "mamm", n: 3, w: "Woman 40 and over, in the last minute.", s: "mammography" },
+  { q: "Magnesium level", o: "Magnesium, serum", k: "magn", n: 3, w: "Pick “serum”. Magnesium sulfate and citrate are the drugs. Alcohol, arrhythmia, low potassium, seizure." },
+  { q: "Counsel: take the medicine every day", o: "Advise patient, medication compliance", k: "advi", n: 3, w: "A long-term drug started in the case.", s: "compliance" },
+  { q: "Call the surgeons", o: "Consult, surgery, general", k: "cons", n: 3, w: "Listed as Consult, surgery, general: the word surgery comes first.", s: "surgery" },
+  { q: "Cholesterol panel", o: "Lipid profile", k: "lipi", n: 3, w: "It is “profile”, not panel." },
+  { q: "Muscle enzyme (CK / CPK)", o: "Creatine phosphokinase, serum, total", k: "creatine", n: 3, w: "creatiNE, not creatiNINE. Found down, seizure, crush, overdose.", s: "phosphokinase" },
+  { q: "Dexamethasone", o: "Dexamethasone", k: "dexa", n: 3, w: "“dext” is dextrose. Betamethasone (betam) is its twin for fetal lungs.", s: "dexamethasone" },
+  { q: "Hepatitis B and C tests", o: "Hepatitis panel", k: "hepatit", n: 3, w: "One line covers A, B and C. Drug use, a sexually transmitted infection, abnormal liver tests." },
+  { q: "Counsel: no alcohol", o: "Advise patient, no alcohol", k: "advi", n: 3, w: "Type advi and read the list: every “Advise patient” line is there." },
+  { q: "Counsel: exercise", o: "Advise patient, exercise program", k: "advi", n: 3, w: "Heart disease, diabetes, obesity, osteoporosis." },
+  { q: "Hemoglobin A1c", o: "Hemoglobin A1C, blood", k: "a1c", k2: "hemog", a: ["hba1c", "hga1c"], n: 3, w: "Diabetes known or suspected; a high glucose in the case." },
+  { q: "Nitroglycerin", o: "Nitroglycerin", k: "nitrog", n: 3, w: "“nitro” also lists nitrofurantoin and nitroprusside.", s: "nitroglycerin" },
+  { q: "Low-salt diet", o: "Diet, low sodium", k: "diet", n: 3, w: "Type diet, then pick. Heart failure, hypertension, kidney disease, cirrhosis." },
+  { q: "Dietitian", o: "Consult, nutrition", k: "cons", n: 3, w: "Diabetes, obesity, celiac disease, cystic fibrosis." },
+  { q: "Acetaminophen for pain or fever", o: "Acetaminophen, therapy", k: "acetam", n: 3, w: "Pick “therapy”. The level is another line.", s: "acetaminophen" },
+  { q: "Azithromycin", o: "Azithromycin", k: "azit", n: 3, w: "With ceftriaxone for pneumonia in the hospital.", s: "azithromycin" },
+  { q: "Syphilis test", o: "Rapid plasma reagin test, serum", k: "rpr", k2: "rapid p", a: ["vdrl"], n: 2, w: "With HIV, in every sexually transmitted infection work-up. “VDRL, serum” counts too." },
+  { q: "Call the kidney doctors", o: "Consult, nephrology", k: "cons", n: 2, w: "", s: "nephrology" },
+  { q: "Call infectious disease", o: "Consult, infectious disease", k: "cons", n: 2, w: "", s: "infectious" },
+  { q: "Call the eye doctors", o: "Consult, ophthalmology", k: "cons", n: 2, w: "o-p-h-t-h: two h.", s: "ophthalmology" },
+  { q: "Report the infection to public health", o: "Refer patient, public health", k: "refer", n: 2, w: "TB, gonorrhea, chlamydia, syphilis, HIV." },
+  { q: "Fingerstick glucose", o: "Glucose, blood, random by glucometer", k: "gluc", n: 2, w: "Pick the glucometer line. Every confused, unconscious or seizing patient, first batch.", s: "glucometer" },
+  { q: "Activated charcoal", o: "Charcoal, activated", k: "char", n: 2, w: "The line starts with Charcoal. Early after an overdose, airway protected." },
+  { q: "Cardiac monitor", o: "Monitor, cardiac", k: "moni", n: 2, w: "The line starts with Monitor. Every unstable patient, first batch." },
+  { q: "Echocardiogram", o: "Echocardiography", k: "echo", n: 2, w: "", s: "echocardiography" },
+  { q: "Acetaminophen level", o: "Acetaminophen toxicity nomogram", k: "acetam", n: 2, w: "Every overdose, whatever the patient says was taken. On the exam the line may read “Acetaminophen, serum”: pick the level, not “therapy”." },
+  { q: "Blood alcohol level", o: "Ethanol, serum", k: "etha", n: 2, w: "It is listed as Ethanol." },
+  { q: "Pregnancy test", o: "HCG, beta, urine, qualitative", k: "hcg", n: 2, w: "Every woman of childbearing age, before imaging or drugs." },
+  { q: "Naloxone", o: "Naloxone hydrochloride", k: "nalo", n: 2, w: "“nal” also lists naltrexone. Coma with small pupils or slow breathing.", s: "naloxone" },
+  { q: "Rapid strep test", o: "Streptococcal culture, throat, rapid", k: "strep", n: 2, w: "", s: "streptococcal" },
+  { q: "A statin", o: "Atorvastatin", k: "ator", n: 2, w: "After a heart attack or a stroke.", s: "atorvastatin" },
+  { q: "Measure intake and urine output", o: "Input and output", k: "input", n: 2, w: "Listed as Input and output. Heart failure, kidney injury, sepsis, DKA." },
+  { q: "Counsel: no sex until treated", o: "Advise patient, no intercourse", k: "advi", n: 2, w: "", s: "intercourse" },
+  { q: "Counsel: no drugs", o: "Advise patient, no illegal drug use", k: "advi", n: 2, w: "" },
+  { q: "IV pain medicine", o: "Morphine sulfate", k: "morp", n: 2, w: "", s: "morphine" },
+  { q: "Metronidazole", o: "Metronidazole", k: "metro", n: 2, w: "“met” lists metformin, methotrexate, metoprolol… type five letters.", s: "metronidazole" },
+  { q: "Enoxaparin (low molecular weight heparin)", o: "Heparin, low molecular weight", k: "hepar", n: 2, w: "It is listed under Heparin.", s: "heparin" },
+  { q: "A beta blocker", o: "Metoprolol", k: "metop", n: 2, w: "After a heart attack; in heart failure once stable.", s: "metoprolol" },
+  { q: "CT of the abdomen and pelvis", o: "CT, abdomen/pelvis, with contrast", k: "ct, a", a: ["ctab"], n: 2, w: "Type ct, then read: the region, then with or without contrast." },
+  { q: "Pelvic ultrasound", o: "US, pelvis, transvaginal", k: "us, p", a: ["usp"], n: 2, w: "Listed as US, pelvis. Transvaginal in early pregnancy or pelvic pain." },
+  { q: "Bone density scan (DEXA)", o: "Bone densitometry", k: "bone", n: 2, w: "“dexa” in the order box is dexamethasone. Type bone.", s: "densitometry" },
+  { q: "ANA", o: "Antibody, antinuclear, serum", k: "ana", k2: "antib", n: 2, w: "Listed as Antibody, antinuclear.", s: "antinuclear" },
+  { q: "CRP", o: "C-reactive protein, serum", k: "crp", k2: "c-r", a: ["c r"], n: 2, w: "", s: "reactive protein" },
+  { q: "Surgical cleaning of a wound or burn", o: "Surgical debridement", k: "debr", k2: "surg", n: 1, w: "d-e-b-r-i-d-e-ment.", s: "debridement" },
+  { q: "Burn cream", o: "Silver sulfadiazine", k: "silv", n: 1, w: "sulfa-DIA-zine.", s: "sulfadiazine" },
+  { q: "Call the pediatric surgeons", o: "Consult, pediatric surgery", k: "cons", n: 1, w: "" },
+  { q: "Drug rehabilitation", o: "Consult, substance abuse unit", k: "cons", n: 1, w: "", s: "substance abuse" },
+  { q: "Urinary catheter", o: "Foley catheter", k: "fole", n: 1, w: "“foli” is folic acid.", s: "catheter" },
+  { q: "Ketone level in DKA", o: "Beta-hydroxybutyrate, blood", k: "beta-h", a: ["beta h"], n: 1, w: "", s: "hydroxybutyrate" },
+  { q: "Orthostatic blood pressure", o: "Blood pressure and pulse, postural", k: "postu", k2: "blood p", n: 1, w: "Listed as Blood pressure and pulse, postural. Dizziness, bleeding, dehydration." },
+  { q: "Prolactin", o: "Prolactin, serum", k: "prol", n: 1, w: "", s: "prolactin" },
+  { q: "Depression screening", o: "Depression index", k: "depr", n: 1, w: "" },
+  { q: "Mononucleosis test", o: "Infectious mononucleosis screening test, serum", k: "mono", k2: "infec", n: 1, w: "", s: "mononucleosis" },
+  { q: "Dialysis", o: "Hemodialysis", k: "hemod", n: 1, w: "With the nephrology consult.", s: "hemodialysis" },
+  { q: "ERCP", o: "Endoscopic retrograde cholangiopancreatography", k: "ercp", k2: "endosc", n: 1, w: "With the gastroenterology consult." },
+  { q: "Chest tube", o: "Tube thoracostomy", k: "tube", n: 1, w: "", s: "thoracostomy" },
+  { q: "Colchicine", o: "Colchicine", k: "colc", n: 1, w: "", s: "colchicine" },
+  { q: "Nimodipine", o: "Nimodipine", k: "nimo", n: 1, w: "After a subarachnoid hemorrhage.", s: "nimodipine" },
+  { q: "Epinephrine", o: "Epinephrine, therapy", k: "epin", n: 1, w: "Anaphylaxis, cardiac arrest.", s: "epinephrine" },
+  { q: "Carbon monoxide level", o: "Carbon monoxide, blood", k: "carbon", n: 1, w: "It is listed as Carbon monoxide, not carboxyhemoglobin." },
+  { q: "Emergency contraception", o: "Levonorgestrel", k: "levon", n: 1, w: "“levo” lists levofloxacin, levothyroxine and levonorgestrel. Type five letters.", s: "levonorgestrel" },
+  { q: "Continuous blood pressure monitoring", o: "Monitor, continuous blood pressure cuff", k: "moni", n: 1, w: "" },
+  { q: "Social worker", o: "Consult, social services", k: "cons", n: 1, w: "" },
+  { q: "Labetalol", o: "Labetalol hydrochloride", k: "labe", n: 1, mw: true, w: "l-a-b-e-t-a-l-o-l.", s: "labetalol" },
+  { q: "Pantoprazole", o: "Pantoprazole sodium", k: "pant", n: 1, mw: true, w: "", s: "pantoprazole" },
+  { q: "Sertraline", o: "Sertraline hydrochloride", k: "sert", n: 1, mw: true, w: "", s: "sertraline" },
+  { q: "Drain an abscess", o: "Incision and drainage", k: "inci", n: 1, mw: true, w: "", s: "incision and drainage" },
+  { q: "Needle decompression of the chest", o: "Needle thoracostomy", k: "needle", n: 1, mw: true, w: "Tension pneumothorax: before any x-ray.", s: "pneumothorax" },
+  { q: "MR angiography of the brain arteries", o: "MRA, cerebral arteries", k: "mra", n: 1, mw: true, w: "“CTA, cerebral arteries” counts too." },
+  { q: "Celiac antibody", o: "Antibody, endomysial, serum", k: "endom", k2: "antib", n: 1, mw: true, w: "Listed under Antibody. “Antibody, gliadin, serum” is the other one.", s: "endomysial" },
+  { q: "Bisphosphonate for osteoporosis", o: "Alendronate", k: "alen", n: 1, mw: true, w: "", s: "alendronate" }
 ];
 /* What to do in each phase, shown under the clock. Unstable and stable patients get different first orders. */
 function protoLines(ph, patient) {
@@ -1580,7 +1688,23 @@ function renderKeyList() {
 /* The drill. Sets: all / a group / the orders missed in his own cases (o.m). Modes: keys (type the letters you would
    type in Primum) or spelling (the order is spoken and shown as a shape; type the whole name). */
 let D = { items: [], i: 0, right: 0, answered: false, mode: "keys", set: "missed", n: 10, misses: [] };
-const GROUP_LABEL = { stab: "stabilize / monitor", lab: "lab", img: "imaging", proc: "procedure", med: "drug", close: "close: consult / counseling / vaccine" };
+const GROUP_LABEL = { stab: "stabilize / monitor", lab: "lab", img: "imaging", proc: "procedure", med: "drug", close: "close: consult / counseling / vaccine", top: "missed in my cases" };
+/* The set "top": MISSED in its own order — no shuffle, N at a time, the place kept on this device. A miss comes back once at the end of its round. */
+const topItems = mode => MISSED.map((m, i) => Object.assign({ g: "top", top: true, rank: i + 1, d: m.q }, m)).filter(o => mode !== "spell" || o.s);
+function topOff(mode) { try { const d = P.readJSON(LS_D, {}) || {}; const v = d.topOff ? +d.topOff[mode] : 0; return v > 0 ? Math.floor(v) : 0; } catch (e) { return 0; } }
+function setTopOff(mode, v) { try { const d = P.readJSON(LS_D, {}) || {}; d.topOff = d.topOff || {}; d.topOff[mode] = v; P.writeJSON(LS_D, d); } catch (e) {} }
+const TOP_SKIP = { serum: 1, blood: 1, urine: 1, patient: 1, advise: 1, test: 1, panel: 1, with: 1, without: 1, screen: 1, solution: 1, therapy: 1, total: 1, hydrochloride: 1, sodium: 1, sulfate: 1, probe: 1, random: 1, lead: 1, rate: 1, unspun: 1, contrast: 1, virus: 1, general: 1 };
+/* Right when the letters would find the line: they start with the key (or another start that counts), or with the line's own name, or with one of its words. Three letters at least, as in the order box. */
+function topOk(typed, o) {
+  const keys = [o.k, o.k2].concat(o.a || []).map(norm).filter(Boolean);
+  if (keys.some(k => typed.startsWith(k))) return true;
+  if (typed.length < 3) return false;
+  const name = norm(o.o), nk = norm(o.k), first = typed.split(" ")[0];
+  const need = name.startsWith(nk) ? nk.length : 4;                  // a key that is the start of the line also says how many letters beat the look-alikes (ceftr, lacta, nitrog)
+  if (typed.length >= need && name.startsWith(typed)) return true;
+  return String(o.o).toLowerCase().split(/[^a-z0-9]+/).some((w, i) => w && !TOP_SKIP[w] && w.startsWith(first) && first.length >= (i === 0 ? need : 4));   // the line's own words: diphtheria/tetanus/pertussis is three of them
+}
+function topWhy(o) { return o.mw ? "one of my misspelled words" : "missed in " + o.n + (o.n === 1 ? " case" : " of my cases"); }
 function spellTarget(o) {
   if (o.s) return o.s;
   return o.o.replace(/\(.*?\)/g, "").split(/ \/ | — | · | ×/)[0].replace(/\s+/g, " ").trim();
@@ -1609,6 +1733,7 @@ function renderWords() {
   const sel = $("drillSet"); if (sel && (D.i >= D.items.length || !D.items.length)) sel.dispatchEvent(new Event("change"));
 }
 function drillPool(set, mode) {
+  if (set === "top") return topItems(mode);
   const mine = myWords().map(wordAsOrder);
   if (set === "mine") return mine.filter(o => mode !== "spell" || spellable(o));
   let pool = ORDERS.filter(o => o.k !== "—");
@@ -1633,8 +1758,16 @@ function say(text) {
 function startDrill() {
   D.set = $("drillSet").value; D.mode = $("drillMode").value; D.n = +$("drillN").value || 10;
   const pool = drillPool(D.set, D.mode);
-  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-  D.items = pool.slice(0, Math.min(D.n, pool.length)); D.i = 0; D.right = 0; D.answered = false; D.misses = [];
+  D.poolN = pool.length; D.off = 0; D.first = 0;
+  if (D.set === "top") {                                             // highest yield first: in the list's order, from where he stopped
+    let off = topOff(D.mode); if (off >= pool.length) off = 0;
+    D.off = off; D.items = pool.slice(off, off + D.n);
+  } else {
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    D.items = pool.slice(0, Math.min(D.n, pool.length));
+  }
+  D.round = D.items.length; D.i = 0; D.right = 0; D.answered = false; D.misses = [];
+  $("btnDrillTop").hidden = true;
   $("drillIn").disabled = false; $("btnDrillCheck").disabled = false; $("btnDrill").textContent = "Restart";
   $("drillFb").textContent = ""; $("drillFb").className = "fb"; $("drillMissList").hidden = true;
   $("btnSay").hidden = D.mode !== "spell";
@@ -1642,6 +1775,17 @@ function startDrill() {
   showDrill();
 }
 function showDrill() {
+  if (D.i >= D.items.length && D.set === "top") {                   // the round is done: the place moves on, the button offers the next ones
+    const next = D.off + D.round >= D.poolN ? 0 : D.off + D.round; setTopOff(D.mode, next);
+    $("drillPrompt").textContent = D.first + " of " + D.round + " right the first time." + (next ? " Next: " + (next + 1) + "–" + Math.min(next + D.n, D.poolN) + " of " + D.poolN + "." : " That was the end of the list.");
+    $("drillScore").textContent = "orders " + (D.off + 1) + "–" + (D.off + D.round) + " of " + D.poolN;
+    $("drillHint").hidden = true; $("btnSay").hidden = true;
+    $("drillIn").disabled = true; $("btnDrillCheck").disabled = true;
+    $("btnDrill").textContent = next ? "Next " + Math.min(D.n, D.poolN - next) + " →" : "From the top"; $("btnDrillTop").hidden = !next;
+    if (D.misses.length) { $("drillMissList").hidden = false; $("drillMissList").innerHTML = "<b>Missed:</b> " + D.misses.map(P.esc).join(" · "); }
+    try { $("btnDrill").focus(); } catch (e) {}
+    return;
+  }
   if (D.i >= D.items.length) {
     const key = drillKey(), prev = bestFor(key), b = Math.max(prev == null ? 0 : prev, D.right), n = D.items.length;
     try { const d = P.readJSON(LS_D, {}) || {}; d.bests = d.bests || {}; d.bests[key] = b; d.last = { key, right: D.right, n, at: Date.now() }; if (key === "all|keys|10") d.best = b; P.writeJSON(LS_D, d); } catch (e) {}
@@ -1657,8 +1801,11 @@ function showDrill() {
     const t = spellTarget(o);
     $("drillPrompt").textContent = (D.i + 1) + ". 🔊 Type what you hear.";
     $("drillHint").hidden = false;
-    $("drillHint").innerHTML = "<b>" + P.esc(shape(t)) + "</b>" + (o.d ? " — " + P.esc(o.d) : "") + (o.mine ? " · my list" : " · " + P.esc(GROUP_LABEL[o.g] || o.g)) + (o.m ? " · missed in case " + P.esc(o.m.replace(/,/g, ", ")) : "");
+    $("drillHint").innerHTML = "<b>" + P.esc(shape(t)) + "</b>" + (o.d ? " — " + P.esc(o.d) : "") + (o.mine ? " · my list" : o.top ? " · " + P.esc(topWhy(o)) : " · " + P.esc(GROUP_LABEL[o.g] || o.g)) + (o.m ? " · missed in case " + P.esc(o.m.replace(/,/g, ", ")) : "");
     if (!say(t)) $("drillHint").innerHTML += " · (no speech on this device — use the shape)";
+  } else if (o.top) {                                               // what he wants to do; the letters and the line to pick come after the check
+    $("drillPrompt").textContent = o.rank + ". " + o.q;
+    $("drillHint").hidden = false; $("drillHint").textContent = topWhy(o) + (o.again ? " · once more" : "");
   } else {
     $("drillPrompt").textContent = (D.i + 1) + ". " + o.o.replace(/\s*\(.*?\)\s*/g, " ").trim();
     $("drillHint").hidden = !(o.m || o.mine); if (o.m) $("drillHint").textContent = "missed in case " + o.m.replace(/,/g, ", "); else if (o.mine) $("drillHint").textContent = "from my list" + (o.d ? " — " + o.d : "");
@@ -1682,12 +1829,21 @@ function checkDrill() {
   if (D.mode === "spell") {
     const t = norm(spellTarget(o)), alt = norm(o.o.replace(/\(.*?\)/g, "").split(/ \/ | — | · | ×/)[0]);
     const ok = typed === t || typed === alt;
-    if (ok) { D.right += 1; P.sfx("tick"); $("drillFb").className = "fb ok"; $("drillFb").textContent = "✓ " + spellTarget(o) + (o.w ? " — " + o.w : ""); }
+    if (ok) { D.right += 1; if (o.top && !o.again) D.first += 1; P.sfx("tick"); $("drillFb").className = "fb ok"; $("drillFb").textContent = "✓ " + spellTarget(o) + (o.w ? " — " + o.w : ""); }
     else {
       const close = lev(typed, t) <= 2;
+      if (o.top && !o.again) D.items.push(Object.assign({}, o, { again: true }));
       D.misses.push(spellTarget(o));
       P.sfx("behind"); $("drillFb").className = "fb bad";
       $("drillFb").textContent = (close ? "✗ almost — " : "✗ it is spelled ") + spellTarget(o) + " (you typed " + $("drillIn").value.trim() + ")" + (o.w ? " — " + o.w : "");
+    }
+  } else if (o.top) {
+    const ok = topOk(typed, o), line = "type " + o.k + (o.k2 ? " (or " + o.k2 + ")" : "") + " → pick “" + o.o + "”" + (o.w ? " — " + o.w : "");
+    if (ok) { D.right += 1; if (!o.again) D.first += 1; P.sfx("tick"); $("drillFb").className = "fb ok"; $("drillFb").textContent = "✓ " + line; }
+    else {
+      if (!o.again) D.items.push(Object.assign({}, o, { again: true }));   // it comes back once, at the end of this round
+      D.misses.push(o.q + " → " + o.k); P.sfx("behind"); $("drillFb").className = "fb bad";
+      $("drillFb").textContent = "✗ " + line + (typed.length < 3 ? " (Three letters at least.)" : "");
     }
   } else {
     const ok = typed.length >= key.length && (typed.startsWith(key) || name.startsWith(typed));
@@ -1726,10 +1882,31 @@ function init() {
   $("btnDrillCheck").addEventListener("click", checkDrill);
   $("btnSay").addEventListener("click", () => { if (D.i < D.items.length) say(spellTarget(D.items[D.i])); $("drillIn").focus(); });
   $("drillIn").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); checkDrill(); } });
+  const HELP = $("drillHelp").textContent;
   const showBest = () => {
-    const key = $("drillSet").value + "|" + $("drillMode").value + "|" + $("drillN").value, b = bestFor(key), pool = drillPool($("drillSet").value, $("drillMode").value).length;
-    $("drillScore").textContent = (b != null ? "best " + b + " / " + $("drillN").value + " · " : "") + pool + " orders in this set";
+    const set = $("drillSet").value, mode = $("drillMode").value, n = +$("drillN").value || 10;
+    const key = set + "|" + mode + "|" + n, b = bestFor(key), pool = drillPool(set, mode).length;
+    if (set === "top") {                                             // where he is in the list, and what the button will ask next
+      let off = topOff(mode); if (off >= pool) off = 0;
+      $("drillScore").textContent = "next: " + (off + 1) + "–" + Math.min(off + n, pool) + " of " + pool + " · highest yield first";
+      $("btnDrill").textContent = off ? "Next " + Math.min(n, pool - off) + " →" : "Start drill"; $("btnDrillTop").hidden = !off;
+      $("drillHelp").textContent = mode === "spell" ? "I say the word and show its shape. You type the whole word, every letter. Enter to check, Enter again for the next one."
+        : "I show what you want to order. You type the letters for the order box — three letters or more. Enter = check: I show the letters and the line to pick. Enter again = next. A miss comes back at the end of the round. If the short letters show nothing in the real list, type the start of the line.";
+    } else {
+      $("drillScore").textContent = (b != null ? "best " + b + " / " + $("drillN").value + " · " : "") + pool + " orders in this set";
+      $("btnDrill").textContent = "Start drill"; $("btnDrillTop").hidden = true; $("drillHelp").textContent = HELP;
+    }
   };
+  const openDrill = () => {                                          // the shortcut and ccs.html#drill: the fold open, the set chosen, the drill in view
+    if ($("toolsCard").hidden) return;
+    $("keysFold").open = true;
+    if (D.i >= D.items.length || !D.items.length) { $("drillSet").value = "top"; showBest(); }
+    setTimeout(() => { try { $("drill").scrollIntoView({ block: "start" }); $("btnDrill").focus({ preventScroll: true }); } catch (e) {} }, 120);
+  };
+  $("btnDrillTop").addEventListener("click", () => { setTopOff($("drillMode").value, 0); showBest(); });
+  $("qlDrill").addEventListener("click", e => { e.preventDefault(); openDrill(); });
+  window.addEventListener("hashchange", e => { if (/#drill$/.test(String((e && e.newURL) || location.href))) openDrill(); });   // read from the event: the section switcher may already have cleaned the address
+  if (location.hash === "#drill") openDrill();
   ["drillSet", "drillMode", "drillN"].forEach(id => $(id).addEventListener("change", () => { if (D.i >= D.items.length || !D.items.length) showBest(); }));
   showBest();
   $("fFinal").value = fmt(S.finalSec); $("fRevShort").value = fmt(S.revShortSec); $("fRevLong").value = fmt(S.revLongSec); $("fTheme").value = P.getTheme(); $("fClock").value = S.countdown ? "down" : "up";
