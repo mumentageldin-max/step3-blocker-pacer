@@ -441,7 +441,9 @@ const EXAM_DAYS = {
   "2026-11-23": { line: EXAM_LINE, breaks: ["The break line on the scratch paper", "BREAKS 15 · 15 · L25 · 15 · 10 → LEFT 70 · 55 · 30 · 15 · 5. A 15-minute break is 10 minutes outside and 5 at the door. No reviewing: stand, water, snack."] },
   "2026-11-24": { line: EXAM_LINE, breaks: ["The break line on the scratch paper", "Nine blocks. Out of the room after blocks 2, 4 and 7 (12 minutes each) and for lunch after block 5 (25). After blocks 1, 3, 6 and 8: 2 minutes in the chair. LEFT 83 · 71 · 69 · 57 · 32 · 30 · 18 · 16. No reviewing."] },
   "2026-11-25": { line: ["CCS: the same moves in every case", "The card's list + ONE proving test → move the clock. At the checkpoint: treat, diagnosis open or not. Nothing invasive unless the case forces it."],
-                  fill: ["2-minute warning → the close line", "Never leave a case without it."] }
+                  fill: ["2-minute warning → the close line", "Never leave a case without it."],
+                  breaks: ["The break line on the scratch paper", "BREAKS after 3: 12 · after 6: L25 · after 9: 12 · after 12: 10 → LEFT 71 · 44 · 30 · 18. About 14 cases. Out of the room after cases 3, 6 (lunch), 9 and 12: a 12-minute break is 7 minutes outside and 5 at the door. After every other case: 1 minute in the chair. LEFT is the break time when you start case 4, 7, 10 and 13. No reviewing."],
+                  lunch: ["Lunch after case 6: eat, walk, no phone", "The cases after lunch are the same cases."] }
 };
 const DEFAULTS = { arriveSec: 300, shortSec: 600, mealSec: 1800, bioSec: 600, caseSec: 750, feedbackSec: 600, closeSec: 600, sampleSec: 3600, uiSec: 1800, markedSec: 2700, notesSec: 2400, packSec: 900,
   nBlocks: 6, nCases: 2, lunchAfter: "cases", bio: false, triage: true, triSec: 600, reviewSec: -1,   // the study day: blocks in a row → cases → lunch → reviews. reviewSec: -1 by the block's score, 0 the Review page's Timer A, else seconds
@@ -739,7 +741,7 @@ function buildSteps(k, tpl) {
       TICK("line", "exam", tx("line", "The checkpoint line on the scratch paper", "Before Start on every block.")[0], tx("line", "The checkpoint line on the scratch paper", "Before Start on every block.")[1]),
       TICK("fill", "exam", tx("fill", "2:00 left → fill every blank", "Never leave a blank.")[0], tx("fill", "2:00 left → fill every blank", "Never leave a blank.")[1]),
       TICK("breaks", "exam", tx("breaks", "No reviewing in the breaks", "Stand, water, snack. Out of the chair.")[0], tx("breaks", "No reviewing in the breaks", "Stand, water, snack. Out of the chair.")[1]),
-      TICK("lunch", "exam", "Lunch: eat, walk, no phone", "The afternoon blocks are the same blocks."),
+      TICK("lunch", "exam", tx("lunch", "Lunch: eat, walk, no phone", "The afternoon blocks are the same blocks.")[0], tx("lunch", "Lunch: eat, walk, no phone", "The afternoon blocks are the same blocks.")[1]),
       TICK("home", "exam", "Home. Nothing about the exam tonight.", "Eat. Sleep. Tomorrow is its own day.")
     ];
   }
